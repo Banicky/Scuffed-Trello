@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import './App.css'
 
+// Initial set of columns, each has some hardcoded shit
 const INITIAL_COLUMNS = [
   {
     id: 'todo',
@@ -193,6 +194,13 @@ export default function App() {
           />
         ))}
       </main>
+
+      {/* <button onClick={async () => {
+        const res = await fetch('http://localhost:4000/api/health')
+        const data = await res.json()
+        console.log(data)
+      }}>Click me</button> */}
+
     </div>
   )
 }
