@@ -1,8 +1,8 @@
 # Scuffed-Trello
 Real-Time Collaborative Task Board (like a mini Trello)
 
-- React/Next.js frontend with WebSockets for live updates
-- Node.js or FastAPI backend with REST + WebSocket APIs
+- ReactJS frontend with WebSockets for live updates
+- Node.js backend with REST + WebSocket APIs
 - Postgres for tasks/users, Redis for session caching and pub/sub
 - JWT-based auth with OAuth (Google login)
 - Dockerized services, deployed on AWS (ECS, RDS, ElastiCache)
