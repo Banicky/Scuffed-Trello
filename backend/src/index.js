@@ -100,6 +100,17 @@ app.delete("/api/cards/:id", async (req, res) => {
   res.json({ success: true });
 });
 
+// PATCH /api/cards/:id  — move card to a new column / position
+app.patch('/api/cards/:id', async (req, res) => {
+  const { column_id, position } = req.body;
+  const result = await pool.query(
+    'UPDATE cards SET column_id = $1, position = $2 WHERE id = $3 RETURNING *',
+    [column_id, position, req.params.id]
+  );
+  res.json(result.rows[0]);
+});
+
+
 // Initializes the server
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

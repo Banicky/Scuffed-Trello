@@ -93,6 +93,11 @@
   border-radius: 12px;
   border: 1px solid var(--border);
   max-height: 100%;
+  transition: border-color 0.15s, background 0.15s;
+}
+.kanban-column.drag-over {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.06);
 }
 
 .column-header {
@@ -145,8 +150,12 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
-  cursor: default;
-  transition: box-shadow 0.15s, border-color 0.15s;
+  cursor: grab;
+  transition: box-shadow 0.15s, border-color 0.15s, border-top-color 0.1s;
+}
+.kanban-card.drop-target {
+  border-top: 2px solid #6366f1;
+}
 
   &:hover {
     box-shadow: var(--shadow);
