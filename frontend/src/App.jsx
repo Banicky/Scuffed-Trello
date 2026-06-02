@@ -1,46 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react' // triggers api call when page first loads
 import './App.css'
 
-// Initial set of columns, each has some hardcoded shit
-const INITIAL_COLUMNS = [
-  {
-    id: 'todo',
-    title: 'To Do',
-    color: '#6b7280',
-    cards: [
-      { id: 'c1', title: 'Design landing page', desc: 'Wireframes and mockups', tag: 'Design' },
-      { id: 'c2', title: 'Set up CI/CD pipeline', desc: 'GitHub Actions config', tag: 'DevOps' },
-      { id: 'c3', title: 'Write API docs', desc: 'OpenAPI spec for endpoints', tag: 'Docs' },
-    ],
-  },
-  {
-    id: 'in-progress',
-    title: 'In Progress',
-    color: '#f59e0b',
-    cards: [
-      { id: 'c4', title: 'Build auth system', desc: 'JWT + refresh tokens', tag: 'Backend' },
-      { id: 'c5', title: 'Dashboard UI', desc: 'React components for main view', tag: 'Frontend' },
-    ],
-  },
-  {
-    id: 'review',
-    title: 'In Review',
-    color: '#8b5cf6',
-    cards: [
-      { id: 'c6', title: 'Database schema', desc: 'PostgreSQL migrations ready', tag: 'Backend' },
-    ],
-  },
-  {
-    id: 'done',
-    title: 'Done',
-    color: '#10b981',
-    cards: [
-      { id: 'c7', title: 'Project setup', desc: 'Vite + React boilerplate', tag: 'DevOps' },
-      { id: 'c8', title: 'Define requirements', desc: 'Product spec approved', tag: 'Planning' },
-    ],
-  },
-]
+const API = 'http://localhost:4000'
 
+// predefined tag colors
 const TAG_COLORS = {
   Design:   { bg: 'rgba(236, 72, 153, 0.12)', color: '#ec4899' },
   DevOps:   { bg: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' },
@@ -50,8 +13,16 @@ const TAG_COLORS = {
   Planning: { bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981' },
 }
 
-function Tag({ label }) {
-  const style = TAG_COLORS[label] || { bg: 'var(--accent-bg)', color: 'var(--accent)' }
+// dot next to the title in each column
+const COLUMN_COLORS = {
+  'TO DO':       '#6b7280',
+  'IN PROGRESS': '#f59e0b',
+  'IN REVIEW':   '#8b5cf6',
+  'DONE':        '#10b981',
+}
+
+function Tag({ label, color }) {
+  const style = TAG_COLORS[label] || { bg: 'rgba(99,102,241,0.12)', color: color || '#6366f1' }
   return (
     <span className="card-tag" style={{ background: style.bg, color: style.color }}>
       {label}
@@ -63,17 +34,18 @@ function Card({ card, onDelete }) {
   return (
     <div className="kanban-card">
       <div className="card-header">
-        <Tag label={card.tag} />
+        <Tag label={card.label_name} color={card.label_color} />
         <button className="card-delete" onClick={() => onDelete(card.id)} title="Remove card">
           ✕
         </button>
       </div>
       <p className="card-title">{card.title}</p>
-      {card.desc && <p className="card-desc">{card.desc}</p>}
+      {card.description && <p className="card-desc">{card.description}</p>}
     </div>
   )
 }
 
+// uses label_name and label_color from the joined query to create tag, if no label, pass null to avoid showing default tag
 function AddCardForm({ onAdd, onCancel }) {
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
@@ -82,7 +54,7 @@ function AddCardForm({ onAdd, onCancel }) {
   function handleSubmit(e) {
     e.preventDefault()
     if (!title.trim()) return
-    onAdd({ title: title.trim(), desc: desc.trim(), tag })
+    onAdd({ title: title.trim(), description: desc.trim(), label_name: tag, label_color: TAG_COLORS[tag]?.color })
     setTitle('')
     setDesc('')
   }
@@ -116,15 +88,15 @@ function AddCardForm({ onAdd, onCancel }) {
 function Column({ column, onAddCard, onDeleteCard }) {
   const [adding, setAdding] = useState(false)
 
-  function handleAdd(cardData) {
-    onAddCard(column.id, cardData)
+  async function handleAdd(cardData) {
+    await onAddCard(column.id, cardData, column.cards.length + 1)
     setAdding(false)
   }
 
   return (
     <div className="kanban-column">
       <div className="column-header">
-        <span className="column-dot" style={{ background: column.color }} />
+        <span className="column-dot" style={{ background: COLUMN_COLORS[column.title] || '#6b7280' }} />
         <h2 className="column-title">{column.title}</h2>
         <span className="column-count">{column.cards.length}</span>
       </div>
@@ -145,29 +117,56 @@ function Column({ column, onAddCard, onDeleteCard }) {
   )
 }
 
-let nextId = 100
-
 export default function App() {
-  const [columns, setColumns] = useState(INITIAL_COLUMNS)
+  // starts empty, fills in after API fetch completes
+  const [columns, setColumns] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  function addCard(columnId, cardData) {
+  // on page load: fetch columns for board 1, then fetch cards for each column in parallel
+  useEffect(() => {
+    async function load() {
+      const colRes = await fetch(`${API}/api/boards/1/columns`)
+      const cols = await colRes.json()
+
+      const withCards = await Promise.all(cols.map(async col => {
+        const cardRes = await fetch(`${API}/api/columns/${col.id}/cards`)
+        const cards = await cardRes.json()
+        return { ...col, cards }
+      }))
+
+      setColumns(withCards)
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  // POSTs new card to API, then adds the returned card (with label) to state immediately
+  async function addCard(columnId, cardData, position) {
+    const res = await fetch(`${API}/api/cards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ column_id: columnId, position, ...cardData }),
+    })
+    const newCard = await res.json()
     setColumns(cols => cols.map(col =>
-      col.id === columnId
-        ? { ...col, cards: [...col.cards, { ...cardData, id: `c${++nextId}` }] }
-        : col
+      col.id === columnId ? { ...col, cards: [...col.cards, newCard] } : col
     ))
   }
 
-  function deleteCard(columnId, cardId) {
+  // sends DELETE to API, then removes card from state
+  async function deleteCard(columnId, cardId) {
+    await fetch(`${API}/api/cards/${cardId}`, { method: 'DELETE' })
     setColumns(cols => cols.map(col =>
-      col.id === columnId
-        ? { ...col, cards: col.cards.filter(c => c.id !== cardId) }
-        : col
+      col.id === columnId ? { ...col, cards: col.cards.filter(c => c.id !== cardId) } : col
     ))
   }
 
+  // totalCards and doneCount drive the "X cards · X done" in the header
   const totalCards = columns.reduce((sum, col) => sum + col.cards.length, 0)
-  const doneCount = columns.find(c => c.id === 'done')?.cards.length ?? 0
+  const doneCount = columns.find(c => c.title === 'DONE')?.cards.length ?? 0
+
+  // show loading screen while initial fetch is in progress
+  if (loading) return <div className="app-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>Loading...</div>
 
   return (
     <div className="app-shell">
@@ -194,13 +193,6 @@ export default function App() {
           />
         ))}
       </main>
-
-      {/* <button onClick={async () => {
-        const res = await fetch('http://localhost:4000/api/health')
-        const data = await res.json()
-        console.log(data)
-      }}>Click me</button> */}
-
     </div>
   )
 }
