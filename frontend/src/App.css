@@ -161,21 +161,54 @@
     box-shadow: var(--shadow);
     border-color: var(--accent-border);
   }
-}
 
 .card-header {
   display: flex;
-  align-items: center;
+  align-items: right;
   justify-content: space-between;
   margin-bottom: 8px;
 }
 
 .card-tag {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 769;
   padding: 2px 8px;
-  border-radius: 99px;
+  border-radius: 100px;
   letter-spacing: 0.03em;
+  margin-left: -4px;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.card-star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 18px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+
+  .kanban-card:hover & {
+    opacity: 1;
+  }
+
+  &.active {
+    opacity: 1;
+    color: #f59e0b;
+  }
+
+  &:hover {
+    background: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+  }
 }
 
 .card-delete {
@@ -183,7 +216,7 @@
   border: none;
   cursor: pointer;
   color: var(--text);
-  font-size: 11px;
+  font-size: 14px;
   padding: 2px 4px;
   border-radius: 4px;
   line-height: 1;
@@ -197,6 +230,35 @@
   &:hover {
     background: rgba(239, 68, 68, 0.12);
     color: #ef4444;
+  }
+}
+
+.card-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.card-edit {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 15px;
+  transform: rotate(90deg);
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+
+  .kanban-card:hover & {
+    opacity: 1;
+  }
+
+  &:hover {
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--accent);
   }
 }
 

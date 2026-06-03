@@ -100,9 +100,33 @@ app.delete("/api/cards/:id", async (req, res) => {
   res.json({ success: true });
 });
 
-// PATCH /api/cards/:id  — move card to a new column / position
+// PATCH /api/cards/:id  — move card, toggle starred, or edit content
 app.patch('/api/cards/:id', async (req, res) => {
-  const { column_id, position } = req.body;
+  const { column_id, position, starred, title, description, label_name, label_color } = req.body;
+
+  if (starred !== undefined) {
+    const result = await pool.query(
+      'UPDATE cards SET starred = $1 WHERE id = $2 RETURNING *',
+      [starred, req.params.id]
+    );
+    return res.json(result.rows[0]);
+  }
+
+  if (title !== undefined) {
+    const result = await pool.query(
+      'UPDATE cards SET title = $1, description = $2 WHERE id = $3 RETURNING *',
+      [title, description || null, req.params.id]
+    );
+    await pool.query('DELETE FROM labels WHERE card_id = $1', [req.params.id]);
+    if (label_name) {
+      await pool.query(
+        'INSERT INTO labels (card_id, name, color) VALUES ($1, $2, $3)',
+        [req.params.id, label_name, label_color]
+      );
+    }
+    return res.json({ ...result.rows[0], label_name: label_name || null, label_color: label_color || null });
+  }
+
   const result = await pool.query(
     'UPDATE cards SET column_id = $1, position = $2 WHERE id = $3 RETURNING *',
     [column_id, position, req.params.id]
@@ -111,6 +135,12 @@ app.patch('/api/cards/:id', async (req, res) => {
 });
 
 
-// Initializes the server
+// Run any pending schema migrations before accepting requests
+async function migrate() {
+  await pool.query(`
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS starred BOOLEAN NOT NULL DEFAULT false
+  `);
+}
+
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+migrate().then(() => app.listen(PORT, () => console.log(`Server running on port ${PORT}`)));

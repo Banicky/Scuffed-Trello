@@ -33,23 +33,85 @@ function Tag({ label, color }) {
 // onDragStart: stores this card's id in the drag event so the drop target knows which card was picked up
 // onDragOverCard: tells App which card is currently being hovered over, used to determine insertion point
 // isDropTarget: when true, renders a purple top border showing where the dragged card will be inserted
-function Card({ card, onDelete, onDragStart, onDragOverCard, isDropTarget }) {
+function Card({ card, onDelete, onToggleStar, onEdit, onDragStart, onDragOverCard, isDropTarget }) {
+  const [editing, setEditing] = useState(false)
+
+  if (editing) {
+    return (
+      <div className="kanban-card">
+        <EditCardForm
+          card={card}
+          onSave={data => { onEdit(card.id, data); setEditing(false) }}
+          onCancel={() => setEditing(false)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div
-      className={`kanban-card${isDropTarget ? ' drop-target' : ''}`}
+      className={`kanban-card${isDropTarget ? ' drop-target' : ''}${card.starred ? ' starred' : ''}`}
       draggable
       onDragStart={onDragStart}
       onDragOver={e => { e.preventDefault(); onDragOverCard(card.id) }}
     >
       <div className="card-header">
         <Tag label={card.label_name} color={card.label_color} />
-        <button className="card-delete" onClick={() => onDelete(card.id)} title="Remove card">
-          ✕
-        </button>
+        <div className="card-actions">
+          <button
+            className={`card-star${card.starred ? ' active' : ''}`}
+            onClick={() => onToggleStar(card.id, card.starred)}
+            title={card.starred ? 'Unstar' : 'Star'}
+          >
+            {card.starred ? '★' : '☆'}
+          </button>
+          <button className="card-delete" onClick={() => onDelete(card.id)} title="Remove card">
+            ✕
+          </button>
+        </div>
       </div>
       <p className="card-title">{card.title}</p>
       {card.description && <p className="card-desc">{card.description}</p>}
+      <div className="card-footer">
+        <button className="card-edit" onClick={() => setEditing(true)} title="Edit card">✎</button>
+      </div>
     </div>
+  )
+}
+
+function EditCardForm({ card, onSave, onCancel }) {
+  const [title, setTitle] = useState(card.title)
+  const [desc, setDesc] = useState(card.description || '')
+  const [tag, setTag] = useState(card.label_name || 'Design')
+
+  function handleSubmit(e) {
+    e.preventDefault()
+    if (!title.trim()) return
+    onSave({ title: title.trim(), description: desc.trim(), label_name: tag, label_color: TAG_COLORS[tag]?.color })
+  }
+
+  return (
+    <form className="add-card-form" onSubmit={handleSubmit}>
+      <select className="card-input" value={tag} onChange={e => setTag(e.target.value)}>
+        {Object.keys(TAG_COLORS).map(t => <option key={t}>{t}</option>)}
+      </select>
+      <input
+        className="card-input"
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        autoFocus
+      />
+      <input
+        className="card-input"
+        placeholder="Description (optional)"
+        value={desc}
+        onChange={e => setDesc(e.target.value)}
+      />
+      <div className="add-card-actions">
+        <button className="btn-primary" type="submit">Save</button>
+        <button className="btn-ghost" type="button" onClick={onCancel}>Cancel</button>
+      </div>
+    </form>
   )
 }
 
@@ -98,7 +160,7 @@ function AddCardForm({ onAdd, onCancel }) {
 // onDrop: when a card is dropped, passes the event
 // isDragOver: when true, applies the purple border/background highlight to the column
 // onDragOverCard / dragOverCardId: passed through to each Card so the insertion indicator works
-function Column({ column, onAddCard, onDeleteCard, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId }) {
+function Column({ column, onAddCard, onDeleteCard, onToggleStar, onEdit, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId }) {
   const [adding, setAdding] = useState(false)
 
   async function handleAdd(cardData) {
@@ -124,6 +186,8 @@ function Column({ column, onAddCard, onDeleteCard, onDragOver, onDrop, isDragOve
             key={card.id}
             card={card}
             onDelete={id => onDeleteCard(column.id, id)}
+            onToggleStar={onToggleStar}
+            onEdit={(cardId, data) => onEdit(column.id, cardId, data)}
             // store cardId in dataTransfer so moveCard can read it on drop
             onDragStart={e => e.dataTransfer.setData('cardId', card.id)}
             onDragOverCard={onDragOverCard}
@@ -160,7 +224,9 @@ export default function App() {
       const withCards = await Promise.all(cols.map(async col => {
         const cardRes = await fetch(`${API}/api/columns/${col.id}/cards`)
         const cards = await cardRes.json()
-        return { ...col, cards }
+        // keep starred cards pinned to the top of each column
+        const sorted = [...cards].sort((a, b) => b.starred - a.starred)
+        return { ...col, cards: sorted }
       }))
 
       setColumns(withCards)
@@ -179,6 +245,51 @@ export default function App() {
     const newCard = await res.json()
     setColumns(cols => cols.map(col =>
       col.id === columnId ? { ...col, cards: [...col.cards, newCard] } : col
+    ))
+  }
+
+  async function editCard(columnId, cardId, cardData) {
+    const res = await fetch(`${API}/api/cards/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cardData),
+    })
+    const updated = await res.json()
+    setColumns(cols => cols.map(col =>
+      col.id === columnId
+        ? { ...col, cards: col.cards.map(c => c.id === cardId ? { ...c, ...updated } : c) }
+        : col
+    ))
+  }
+
+  async function toggleStar(columnId, cardId, currentStarred) {
+    const newStarred = !currentStarred
+
+    await fetch(`${API}/api/cards/${cardId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ starred: newStarred }),
+    })
+
+    // Re-sort the column so starred cards are always at the top of the state array,
+    // then repatch all positions so DB order matches what's on screen after refresh
+    const col = columns.find(c => c.id === columnId)
+    const updated = col.cards.map(c => c.id === cardId ? { ...c, starred: newStarred } : c)
+    const reordered = [
+      ...updated.filter(c => c.starred),
+      ...updated.filter(c => !c.starred),
+    ]
+
+    setColumns(cols => cols.map(c =>
+      c.id === columnId ? { ...c, cards: reordered } : c
+    ))
+
+    await Promise.all(reordered.map((c, i) =>
+      fetch(`${API}/api/cards/${c.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column_id: columnId, position: i }),
+      })
     ))
   }
 
@@ -202,13 +313,21 @@ export default function App() {
     const card = sourceCol.cards.find(c => c.id === cardId)
     const sameColumn = sourceCol.id === targetColumnId
 
+    // Clamp the insertion index so starred cards never end up below unstarred ones
+    // and unstarred cards never end up above starred ones
+    function clampInsert(dragged, pool, rawAt) {
+      const starredCount = pool.filter(c => c.starred).length
+      return dragged.starred ? Math.min(rawAt, starredCount) : Math.max(rawAt, starredCount)
+    }
+
     let updatedSourceCards, updatedTargetCards
 
     if (sameColumn) {
       // reorder within the same column: remove the card then splice it in at the hovered position
       const cards = sourceCol.cards.filter(c => c.id !== cardId)
-      const insertAt = overCardId ? cards.findIndex(c => c.id === overCardId) : cards.length
-      cards.splice(insertAt >= 0 ? insertAt : cards.length, 0, card)
+      const rawAt = overCardId ? cards.findIndex(c => c.id === overCardId) : cards.length
+      const insertAt = clampInsert(card, cards, rawAt >= 0 ? rawAt : cards.length)
+      cards.splice(insertAt, 0, card)
       updatedSourceCards = cards
       updatedTargetCards = cards
 
@@ -223,8 +342,9 @@ export default function App() {
       updatedSourceCards = sourceCol.cards.filter(c => c.id !== cardId)
       const targetCol = columns.find(col => col.id === targetColumnId)
       const targetCards = [...targetCol.cards]
-      const insertAt = overCardId ? targetCards.findIndex(c => c.id === overCardId) : targetCards.length
-      targetCards.splice(insertAt >= 0 ? insertAt : targetCards.length, 0, card)
+      const rawAt = overCardId ? targetCards.findIndex(c => c.id === overCardId) : targetCards.length
+      const insertAt = clampInsert(card, targetCards, rawAt >= 0 ? rawAt : targetCards.length)
+      targetCards.splice(insertAt, 0, card)
       updatedTargetCards = targetCards
 
       setColumns(cols => cols.map(col => {
@@ -280,6 +400,8 @@ export default function App() {
             column={col}
             onAddCard={addCard}
             onDeleteCard={deleteCard}
+            onToggleStar={(cardId, starred) => toggleStar(col.id, cardId, starred)}
+            onEdit={editCard}
             onDragOver={setDragOverColId}
             onDrop={moveCard}
             isDragOver={dragOverColId === col.id}
