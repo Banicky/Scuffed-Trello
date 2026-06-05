@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react' // triggers api call when page first loads
+import { useState, useEffect } from 'react'
 import './App.css'
 
 const API = 'http://localhost:4000'
@@ -210,6 +210,8 @@ function Column({ column, onAddCard, onDeleteCard, onToggleStar, onEdit, onDragO
 export default function App() {
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
+  const [board, setBoard] = useState(null)
+  const [editingTitle, setEditingTitle] = useState(false)
   // tracks which column the dragged card is currently hovering over (for highlight)
   const [dragOverColId, setDragOverColId] = useState(null)
   // tracks which card the dragged card is hovering over (for insertion point indicator)
@@ -220,6 +222,9 @@ export default function App() {
     async function load() {
       const colRes = await fetch(`${API}/api/boards/1/columns`)
       const cols = await colRes.json()
+      const boardRes = await fetch(`${API}/api/boards/1`)
+      const boardData = await boardRes.json()
+      setBoard(boardData)
 
       const withCards = await Promise.all(cols.map(async col => {
         const cardRes = await fetch(`${API}/api/columns/${col.id}/cards`)
@@ -234,6 +239,17 @@ export default function App() {
     }
     load()
   }, [])
+
+  async function renameBoard(newTitle) {
+    if (!newTitle.trim() || newTitle === board.title) return
+    const res = await fetch(`${API}/api/boards/${board.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle.trim() }),
+    })
+    const updated = await res.json()
+    setBoard(updated)
+  }
 
   // POSTs new card to API, then adds the returned card (with label) to state immediately
   async function addCard(columnId, cardData, position) {
@@ -382,9 +398,24 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="topbar-left">
-          <div className="board-icon">K</div>
+          <div className="board-icon">{board?.title?.charAt(0)}</div>
           <div>
-            <div className="board-name">My Project</div>
+            {editingTitle ? (
+              <input
+                className="board-name-input"
+                defaultValue={board.title}
+                autoFocus
+                onBlur={e => { renameBoard(e.target.value); setEditingTitle(false) }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { renameBoard(e.target.value); setEditingTitle(false) }
+                  if (e.key === 'Escape') setEditingTitle(false)
+                }}
+              />
+            ) : (
+              <div className="board-name" onClick={() => setEditingTitle(true)} title="Click to rename">
+                {board.title}
+              </div>
+            )}
             <div className="board-meta">{totalCards} cards &middot; {doneCount} done</div>
           </div>
         </div>

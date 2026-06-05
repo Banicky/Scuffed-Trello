@@ -29,6 +29,20 @@ app.post("/api/boards", async (req, res) => {
   res.json(result.rows[0]);
 });
 
+app.get("/api/boards/:id", async (req, res) => {
+  const result = await pool.query("SELECT * FROM boards WHERE id = $1", [req.params.id]);
+  res.json(result.rows[0]);
+});
+
+app.patch("/api/boards/:id", async (req, res) => {
+  const { title } = req.body;
+  const result = await pool.query(
+    "UPDATE boards SET title = $1 WHERE id = $2 RETURNING *",
+    [title, req.params.id]
+  );
+  res.json(result.rows[0]);
+});
+
 // deletes board with specified id
 app.delete("/api/boards/:id", async (req, res) => {
   await pool.query("DELETE FROM boards WHERE id = $1", [req.params.id]);

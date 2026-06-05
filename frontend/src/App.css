@@ -43,6 +43,20 @@
   font-size: 15px;
   color: var(--text-h);
   line-height: 1.2;
+  cursor: pointer;
+}
+
+.board-name-input {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-h);
+  line-height: 1.2;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  outline: none;
+  width: 160px;
+  padding: 0;
 }
 
 .board-meta {
