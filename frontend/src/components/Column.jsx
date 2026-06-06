@@ -46,8 +46,10 @@ function AddCardForm({ onAdd, onCancel }) {
 // onDrop: when a card is dropped, passes the event
 // isDragOver: when true, applies the purple border/background highlight to the column
 // onDragOverCard / dragOverCardId: passed through to each Card so the insertion indicator works
-export default function Column({ column, onAddCard, onDeleteCard, onToggleStar, onEdit, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId }) {
+export default function Column({ column, onAddCard, onDeleteCard, onToggleStar, onEdit, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId }) {
   const [adding, setAdding] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(!!column.editingTitle)
+  const [confirming, setConfirming] = useState(false)
 
   async function handleAdd(cardData) {
     await onAddCard(column.id, cardData, column.cards.length + 1)
@@ -62,9 +64,35 @@ export default function Column({ column, onAddCard, onDeleteCard, onToggleStar, 
       onDrop={e => onDrop(e, column.id)}
     >
       <div className="column-header">
-        <span className="column-dot" style={{ background: COLUMN_COLORS[column.title] || '#6b7280' }} />
-        <h2 className="column-title">{column.title}</h2>
-        <span className="column-count">{column.cards.length}</span>
+        {confirming ? (
+          <div className="column-confirm">
+            <span className="column-confirm-msg">Delete column?</span>
+            <button className="btn-danger-sm" onClick={() => onDeleteColumn(column.id)}>Delete</button>
+            <button className="btn-ghost-sm" onClick={() => setConfirming(false)}>Cancel</button>
+          </div>
+        ) : (
+          <>
+            <span className="column-dot" style={{ background: COLUMN_COLORS[column.title] || '#6b7280' }} />
+            {editingTitle ? (
+              <input
+                className="column-title-input"
+                defaultValue={column.title}
+                autoFocus
+                onBlur={e => { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }
+                  if (e.key === 'Escape') setEditingTitle(false)
+                }}
+              />
+            ) : (
+              <h2 className="column-title" onClick={() => setEditingTitle(true)} title="Click to rename">
+                {column.title}
+              </h2>
+            )}
+            <span className="column-count">{column.cards.length}</span>
+            <button className="column-delete" onClick={() => setConfirming(true)} title="Delete column">✕</button>
+          </>
+        )}
       </div>
       <div className="column-cards">
         {column.cards.map(card => (

@@ -76,6 +76,15 @@ app.delete("/api/columns/:id", async (req, res) => {
   res.json({ success: true });
 });
 
+app.patch("/api/columns/:id", async (req, res) => {
+  const { title } = req.body;
+  const result = await pool.query(
+    "UPDATE columns SET title = $1 WHERE id = $2 RETURNING *",
+    [title, req.params.id]
+  );
+  res.json(result.rows[0]);
+});
+
 // card routes
 // uses LEFT JOIN to fetch cards and labels in one query ordered by position otherwise need to make separate req for every label
 app.get("/api/columns/:columnId/cards", async (req, res) => {

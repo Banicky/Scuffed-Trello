@@ -106,6 +106,35 @@ export default function App() {
     ))
   }
 
+  async function addColumn() {
+    const position = columns.length
+    const res = await fetch(`${API}/api/columns`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ board_id: board.id, title: 'New Column', position }),
+    })
+    const newCol = await res.json()
+    setColumns(cols => [...cols, { ...newCol, cards: [], editingTitle: true }])
+  }
+
+  async function renameColumn(columnId, newTitle) {
+    if (!newTitle.trim()) return
+    const res = await fetch(`${API}/api/columns/${columnId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle.trim() }),
+    })
+    const updated = await res.json()
+    setColumns(cols => cols.map(col =>
+      col.id === columnId ? { ...col, title: updated.title } : col
+    ))
+  }
+
+  async function deleteColumn(columnId) {
+    await fetch(`${API}/api/columns/${columnId}`, { method: 'DELETE' })
+    setColumns(cols => cols.filter(col => col.id !== columnId))
+  }
+
   async function deleteCard(columnId, cardId) {
     await fetch(`${API}/api/cards/${cardId}`, { method: 'DELETE' })
     setColumns(cols => cols.map(col =>
@@ -229,6 +258,8 @@ export default function App() {
             onDeleteCard={deleteCard}
             onToggleStar={(cardId, starred) => toggleStar(col.id, cardId, starred)}
             onEdit={editCard}
+            onRenameColumn={renameColumn}
+            onDeleteColumn={deleteColumn}
             onDragOver={setDragOverColId}
             onDrop={moveCard}
             isDragOver={dragOverColId === col.id}
@@ -236,6 +267,9 @@ export default function App() {
             dragOverCardId={dragOverCardId}
           />
         ))}
+        <button className="add-column-btn" onClick={addColumn}>
+          <span>+</span> Add column
+        </button>
       </main>
     </div>
   )
