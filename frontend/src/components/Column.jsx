@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Card from './Card.jsx'
-import { TAG_COLORS, COLUMN_COLORS } from '../constants.js'
+import { TAG_COLORS, COLUMN_PALETTE } from '../constants.js'
 
 function AddCardForm({ onAdd, onCancel }) {
   const [title, setTitle] = useState('')
@@ -46,7 +46,7 @@ function AddCardForm({ onAdd, onCancel }) {
 // onDrop: when a card is dropped, passes the event
 // isDragOver: when true, applies the purple border/background highlight to the column
 // onDragOverCard / dragOverCardId: passed through to each Card so the insertion indicator works
-export default function Column({ column, onAddCard, onDeleteCard, onToggleStar, onEdit, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId }) {
+export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId }) {
   const [adding, setAdding] = useState(false)
   const [editingTitle, setEditingTitle] = useState(!!column.editingTitle)
   const [confirming, setConfirming] = useState(false)
@@ -72,7 +72,7 @@ export default function Column({ column, onAddCard, onDeleteCard, onToggleStar, 
           </div>
         ) : (
           <>
-            <span className="column-dot" style={{ background: COLUMN_COLORS[column.title] || '#6b7280' }} />
+            <span className="column-dot" style={{ background: COLUMN_PALETTE[colorIndex % COLUMN_PALETTE.length] }} />
             {editingTitle ? (
               <input
                 className="column-title-input"

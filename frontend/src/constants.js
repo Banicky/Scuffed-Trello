@@ -7,9 +7,13 @@ export const TAG_COLORS = {
   Planning: { bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981' },
 }
 
-export const COLUMN_COLORS = {
-  'TO DO':       '#6b7280',
-  'IN PROGRESS': '#f59e0b',
-  'IN REVIEW':   '#8b5cf6',
-  'DONE':        '#10b981',
-}
+export const COLUMN_PALETTE = [
+  '#6b7280',
+  '#f59e0b',
+  '#8b5cf6',
+  '#10b981',
+  '#3b82f6',
+  '#ec4899',
+  '#ef4444',
+  '#14b8a6',
+]

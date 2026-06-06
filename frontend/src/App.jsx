@@ -250,10 +250,11 @@ export default function App() {
       </header>
 
       <main className="board">
-        {columns.map(col => (
+        {columns.map((col, i) => (
           <Column
             key={col.id}
             column={col}
+            colorIndex={i}
             onAddCard={addCard}
             onDeleteCard={deleteCard}
             onToggleStar={(cardId, starred) => toggleStar(col.id, cardId, starred)}
