@@ -74,6 +74,9 @@ export default function BoardView({ boardId, user, onBack }) {
   const [dragOverColId, setDragOverColId] = useState(null)
   const [dragOverCardId, setDragOverCardId] = useState(null)
   const [showMembers, setShowMembers] = useState(false)
+  const [columnLimitError, setColumnLimitError] = useState(false)
+  const [draggingColId, setDraggingColId] = useState(null)
+  const [colDragOverId, setColDragOverId] = useState(null)
 
   const isOwner = board?.owner_id === user.id
 
@@ -161,6 +164,11 @@ export default function BoardView({ boardId, user, onBack }) {
   }
 
   async function addColumn() {
+    if (columns.length >= 10) {
+      setColumnLimitError(true)
+      setTimeout(() => setColumnLimitError(false), 3000)
+      return
+    }
     const position = columns.length
     const res = await apiFetch('/api/columns', {
       method: 'POST',
@@ -191,6 +199,23 @@ export default function BoardView({ boardId, user, onBack }) {
     await apiFetch(`/api/cards/${cardId}`, { method: 'DELETE' })
     setColumns(cols => cols.map(col =>
       col.id === columnId ? { ...col, cards: col.cards.filter(c => c.id !== cardId) } : col
+    ))
+  }
+
+  async function moveColumn(draggedColId, targetColId) {
+    if (draggedColId === targetColId) return
+    const from = columns.findIndex(c => c.id === draggedColId)
+    const to = columns.findIndex(c => c.id === targetColId)
+    if (from === -1 || to === -1) return
+    const reordered = [...columns]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(from < to ? to - 1 : to, 0, moved)
+    setColumns(reordered)
+    await Promise.all(reordered.map((col, i) =>
+      apiFetch(`/api/columns/${col.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ position: i }),
+      })
     ))
   }
 
@@ -324,16 +349,35 @@ export default function BoardView({ boardId, user, onBack }) {
             onEdit={editCard}
             onRenameColumn={renameColumn}
             onDeleteColumn={deleteColumn}
-            onDragOver={setDragOverColId}
+            onDragOver={colId => {
+              if (draggingColId !== null) setColDragOverId(colId)
+              else setDragOverColId(colId)
+            }}
             onDrop={moveCard}
-            isDragOver={dragOverColId === col.id}
-            onDragOverCard={setDragOverCardId}
+            isDragOver={
+              (draggingColId === null && dragOverColId === col.id) ||
+              (draggingColId !== null && draggingColId !== col.id && colDragOverId === col.id)
+            }
+            onDragOverCard={cardId => { if (draggingColId === null) setDragOverCardId(cardId) }}
             dragOverCardId={dragOverCardId}
+            onColumnDragStart={setDraggingColId}
+            onColumnDrop={(e, targetColId) => {
+              const draggedColId = Number(e.dataTransfer.getData('columnId'))
+              setDraggingColId(null)
+              setColDragOverId(null)
+              moveColumn(draggedColId, targetColId)
+            }}
+            onColumnDragEnd={() => { setDraggingColId(null); setColDragOverId(null) }}
           />
         ))}
         <button className="add-column-btn" onClick={addColumn}>
           <span>+</span> Add column
         </button>
+        {columnLimitError && (
+          <p style={{ color: 'red', alignSelf: 'flex-end', margin: '0 0 8px 8px', fontSize: '0.9rem' }}>
+            Maximum of 10 columns reached
+          </p>
+        )}
       </main>
     </div>
   )

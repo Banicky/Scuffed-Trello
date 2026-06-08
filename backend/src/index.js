@@ -229,6 +229,10 @@ app.post("/api/columns", requireAuth, async (req, res) => {
   if (!await canAccessBoard(req.session.userId, board_id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
+  const countResult = await pool.query("SELECT COUNT(*) FROM columns WHERE board_id = $1", [board_id]);
+  if (parseInt(countResult.rows[0].count) >= 10) {
+    return res.status(400).json({ error: "Column limit reached (max 10)" });
+  }
   const result = await pool.query(
     "INSERT INTO columns (board_id, title, position) VALUES ($1, $2, $3) RETURNING *",
     [board_id, title, position]
@@ -250,10 +254,16 @@ app.patch("/api/columns/:id", requireAuth, async (req, res) => {
   if (!col.rows[0] || !await canAccessBoard(req.session.userId, col.rows[0].board_id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
-  const { title } = req.body;
+  const { title, position } = req.body;
+  const fields = [];
+  const values = [];
+  if (title !== undefined) { fields.push(`title = $${values.length + 1}`); values.push(title); }
+  if (position !== undefined) { fields.push(`position = $${values.length + 1}`); values.push(position); }
+  if (fields.length === 0) return res.status(400).json({ error: "Nothing to update" });
+  values.push(req.params.id);
   const result = await pool.query(
-    "UPDATE columns SET title = $1 WHERE id = $2 RETURNING *",
-    [title, req.params.id]
+    `UPDATE columns SET ${fields.join(', ')} WHERE id = $${values.length} RETURNING *`,
+    values
   );
   res.json(result.rows[0]);
 });

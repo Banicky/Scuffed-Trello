@@ -46,7 +46,7 @@ function AddCardForm({ onAdd, onCancel }) {
 // onDrop: when a card is dropped, passes the event
 // isDragOver: when true, applies the purple border/background highlight to the column
 // onDragOverCard / dragOverCardId: passed through to each Card so the insertion indicator works
-export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId }) {
+export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd }) {
   const [adding, setAdding] = useState(false)
   const [editingTitle, setEditingTitle] = useState(!!column.editingTitle)
   const [confirming, setConfirming] = useState(false)
@@ -58,10 +58,21 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
 
   return (
     <div
+      draggable
       className={`kanban-column${isDragOver ? ' drag-over' : ''}`}
+      onDragStart={e => {
+        if (e.target !== e.currentTarget) return
+        e.dataTransfer.setData('type', 'column')
+        e.dataTransfer.setData('columnId', String(column.id))
+        onColumnDragStart(column.id)
+      }}
+      onDragEnd={() => onColumnDragEnd?.()}
       onDragOver={e => { e.preventDefault(); onDragOver(column.id) }}
       onDragLeave={() => onDragOver(null)}
-      onDrop={e => onDrop(e, column.id)}
+      onDrop={e => {
+        if (e.dataTransfer.getData('type') === 'column') onColumnDrop(e, column.id)
+        else onDrop(e, column.id)
+      }}
     >
       <div className="column-header">
         {confirming ? (
@@ -90,7 +101,7 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
               </h2>
             )}
             <span className="column-count">{column.cards.length}</span>
-            <button className="column-delete" onClick={() => setConfirming(true)} title="Delete column">✕</button>
+            <button draggable={false} className="column-delete" onClick={() => setConfirming(true)} title="Delete column">✕</button>
           </>
         )}
       </div>
