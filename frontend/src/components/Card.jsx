@@ -83,7 +83,16 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
       <div className="card-footer">
         <button className="card-edit" onClick={() => setEditing(true)} title="Edit card">✎</button>
         <div className="card-by-info">
-          {card.last_edited_by_username && <span className="card-by card-last-edited">last edited by: {card.last_edited_by_username}</span>}
+          {card.last_edited_by_username && (
+            <>
+              <span className="card-by card-last-edited">last edited by: {card.last_edited_by_username}</span>
+              {card.updated_at && (
+                <span className="card-by card-last-edited card-updated-at">
+                  at {new Date(card.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                </span>
+              )}
+            </>
+          )}
           {card.created_by_username && <span className="card-by">by: {card.created_by_username}</span>}
         </div>
       </div>

@@ -298,7 +298,7 @@ app.post("/api/cards", requireAuth, async (req, res) => {
   }
 
   const cardResult = await pool.query(
-    "INSERT INTO cards (column_id, title, description, position, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+    "INSERT INTO cards (column_id, title, description, position, created_by, updated_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *",
     [column_id, title, description, position, req.session.userId]
   );
   const card = cardResult.rows[0];
@@ -348,7 +348,7 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
 
   if (title !== undefined) {
     const result = await pool.query(
-      "UPDATE cards SET title = $1, description = $2, last_edited_by = $3 WHERE id = $4 RETURNING *",
+      "UPDATE cards SET title = $1, description = $2, last_edited_by = $3, updated_at = NOW() WHERE id = $4 RETURNING *",
       [title, description || null, req.session.userId, req.params.id]
     );
     await pool.query("DELETE FROM labels WHERE card_id = $1", [req.params.id]);
@@ -364,7 +364,7 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
 
   if (track_edit) {
     const result = await pool.query(
-      "UPDATE cards SET column_id = $1, position = $2, last_edited_by = $3 WHERE id = $4 RETURNING *",
+      "UPDATE cards SET column_id = $1, position = $2, last_edited_by = $3, updated_at = NOW() WHERE id = $4 RETURNING *",
       [column_id, position, req.session.userId, req.params.id]
     );
     const editor = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
@@ -424,6 +424,10 @@ async function migrate() {
 
   await pool.query(`
     ALTER TABLE cards ADD COLUMN IF NOT EXISTS last_edited_by INTEGER REFERENCES users(id)
+  `);
+
+  await pool.query(`
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ
   `);
 }
 
