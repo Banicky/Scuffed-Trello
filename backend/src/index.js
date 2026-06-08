@@ -276,9 +276,10 @@ app.get("/api/columns/:columnId/cards", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   const result = await pool.query(
-    `SELECT cards.*, labels.name AS label_name, labels.color AS label_color
+    `SELECT cards.*, labels.name AS label_name, labels.color AS label_color, users.username AS created_by_username
      FROM cards
      LEFT JOIN labels ON labels.card_id = cards.id
+     LEFT JOIN users ON users.id = cards.created_by
      WHERE cards.column_id = $1
      ORDER BY cards.position`,
     [req.params.columnId]
@@ -294,8 +295,8 @@ app.post("/api/cards", requireAuth, async (req, res) => {
   }
 
   const cardResult = await pool.query(
-    "INSERT INTO cards (column_id, title, description, position) VALUES ($1, $2, $3, $4) RETURNING *",
-    [column_id, title, description, position]
+    "INSERT INTO cards (column_id, title, description, position, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+    [column_id, title, description, position, req.session.userId]
   );
   const card = cardResult.rows[0];
 
@@ -306,7 +307,8 @@ app.post("/api/cards", requireAuth, async (req, res) => {
     );
   }
 
-  res.json({ ...card, label_name: label_name || null, label_color: label_color || null });
+  const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+  res.json({ ...card, label_name: label_name || null, label_color: label_color || null, created_by_username: user.rows[0]?.username || null });
 });
 
 app.delete("/api/cards/:id", requireAuth, async (req, res) => {
@@ -401,6 +403,10 @@ async function migrate() {
 
   await pool.query(`
     ALTER TABLE cards ADD COLUMN IF NOT EXISTS starred BOOLEAN NOT NULL DEFAULT false
+  `);
+
+  await pool.query(`
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id)
   `);
 }
 

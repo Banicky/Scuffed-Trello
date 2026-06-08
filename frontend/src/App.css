@@ -249,8 +249,15 @@
 
 .card-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   margin-top: 8px;
+}
+
+.card-by {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  font-style: italic;
 }
 
 .card-edit {

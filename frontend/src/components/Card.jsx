@@ -82,6 +82,7 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
       {card.description && <p className="card-desc">{card.description}</p>}
       <div className="card-footer">
         <button className="card-edit" onClick={() => setEditing(true)} title="Edit card">✎</button>
+        {card.created_by_username && <span className="card-by">by: {card.created_by_username}</span>}
       </div>
     </div>
   )
