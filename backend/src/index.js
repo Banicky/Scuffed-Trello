@@ -1,42 +1,222 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import bcrypt from "bcrypt";
 import pool from "./database.js";
 
 const app = express();
+const PgSession = connectPgSimple(session);
 
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173" }));
+app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
 app.use(express.json());
+app.use(session({
+  store: new PgSession({ pool }),
+  secret: process.env.SESSION_SECRET || "dev-secret-change-in-prod",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 },
+}));
 
-// Health
+function requireAuth(req, res, next) {
+  if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
+  next();
+}
+
+// helper: check if user owns or is a member of the board
+async function canAccessBoard(userId, boardId) {
+  const result = await pool.query(
+    `SELECT 1 FROM boards WHERE id = $1 AND owner_id = $2
+     UNION
+     SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2`,
+    [boardId, userId]
+  );
+  return result.rowCount > 0;
+}
+
+async function isOwner(userId, boardId) {
+  const result = await pool.query(
+    "SELECT 1 FROM boards WHERE id = $1 AND owner_id = $2",
+    [boardId, userId]
+  );
+  return result.rowCount > 0;
+}
+
+// ── Health ──────────────────────────────────────────────────────────────────
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// fetches boards from db ordered by id
-app.get("/api/boards", async (req, res) => {
-  const result = await pool.query("SELECT * FROM boards ORDER BY id");
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+app.post("/api/auth/register", async (req, res) => {
+  const { username, email, password } = req.body;
+  if (!username?.trim() || !email?.trim() || !password) {
+    return res.status(400).json({ error: "Username, email and password are required" });
+  }
+
+  const existing = await pool.query(
+    "SELECT id FROM users WHERE username = $1 OR email = $2",
+    [username.trim(), email.trim()]
+  );
+  if (existing.rowCount > 0) {
+    return res.status(409).json({ error: "Username or email already taken" });
+  }
+
+  const password_hash = await bcrypt.hash(password, 10);
+  const result = await pool.query(
+    "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email",
+    [username.trim(), email.trim(), password_hash]
+  );
+  const user = result.rows[0];
+  req.session.userId = user.id;
+  res.status(201).json(user);
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const { username, password } = req.body;
+  if (!username?.trim() || !password) {
+    return res.status(400).json({ error: "Username and password are required" });
+  }
+
+  const result = await pool.query(
+    "SELECT * FROM users WHERE username = $1 OR email = $1",
+    [username.trim()]
+  );
+  const user = result.rows[0];
+  if (!user) return res.status(401).json({ error: "Invalid credentials" });
+
+  const match = await bcrypt.compare(password, user.password_hash);
+  if (!match) return res.status(401).json({ error: "Invalid credentials" });
+
+  req.session.userId = user.id;
+  res.json({ id: user.id, username: user.username, email: user.email });
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  req.session.destroy(() => res.json({ success: true }));
+});
+
+app.get("/api/auth/me", async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
+  const result = await pool.query(
+    "SELECT id, username, email FROM users WHERE id = $1",
+    [req.session.userId]
+  );
+  if (!result.rows[0]) return res.status(401).json({ error: "Unauthorized" });
+  res.json(result.rows[0]);
+});
+
+// ── Boards ───────────────────────────────────────────────────────────────────
+
+// returns boards owned by or shared with the logged-in user
+app.get("/api/boards", requireAuth, async (req, res) => {
+  const result = await pool.query(
+    `SELECT b.*, 'owner' AS role FROM boards b WHERE b.owner_id = $1
+     UNION
+     SELECT b.*, 'member' AS role FROM boards b
+       JOIN board_members bm ON bm.board_id = b.id
+       WHERE bm.user_id = $1
+     ORDER BY id`,
+    [req.session.userId]
+  );
   res.json(result.rows);
 });
 
-// creates new board with title from request body and returns the created board
-app.post("/api/boards", async (req, res) => {
+app.post("/api/boards", requireAuth, async (req, res) => {
   const { title } = req.body;
   const result = await pool.query(
-    "INSERT INTO boards (title) VALUES ($1) RETURNING *",
-    [title]
+    "INSERT INTO boards (title, owner_id) VALUES ($1, $2) RETURNING *",
+    [title, req.session.userId]
+  );
+  res.json({ ...result.rows[0], role: "owner" });
+});
+
+app.get("/api/boards/:id", requireAuth, async (req, res) => {
+  if (!await canAccessBoard(req.session.userId, req.params.id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const result = await pool.query("SELECT * FROM boards WHERE id = $1", [req.params.id]);
+  res.json(result.rows[0]);
+});
+
+app.patch("/api/boards/:id", requireAuth, async (req, res) => {
+  if (!await canAccessBoard(req.session.userId, req.params.id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { title } = req.body;
+  const result = await pool.query(
+    "UPDATE boards SET title = $1 WHERE id = $2 RETURNING *",
+    [title, req.params.id]
   );
   res.json(result.rows[0]);
 });
 
-// deletes board with specified id
-app.delete("/api/boards/:id", async (req, res) => {
+app.delete("/api/boards/:id", requireAuth, async (req, res) => {
+  if (!await isOwner(req.session.userId, req.params.id)) {
+    return res.status(403).json({ error: "Only the board owner can delete it" });
+  }
   await pool.query("DELETE FROM boards WHERE id = $1", [req.params.id]);
   res.json({ success: true });
 });
 
-// fetches all columns beloging to a board ordered by position, boardId is from url parameter
-app.get("/api/boards/:boardId/columns", async (req, res) => {
+// ── Board members ─────────────────────────────────────────────────────────────
+
+app.get("/api/boards/:boardId/members", requireAuth, async (req, res) => {
+  if (!await canAccessBoard(req.session.userId, req.params.boardId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const result = await pool.query(
+    `SELECT u.id, u.username, u.email FROM users u
+     JOIN board_members bm ON bm.user_id = u.id
+     WHERE bm.board_id = $1`,
+    [req.params.boardId]
+  );
+  res.json(result.rows);
+});
+
+app.post("/api/boards/:boardId/members", requireAuth, async (req, res) => {
+  if (!await isOwner(req.session.userId, req.params.boardId)) {
+    return res.status(403).json({ error: "Only the board owner can invite members" });
+  }
+  const { username } = req.body;
+  const userResult = await pool.query(
+    "SELECT id, username, email FROM users WHERE username = $1 OR email = $1",
+    [username]
+  );
+  if (!userResult.rows[0]) return res.status(404).json({ error: "User not found" });
+  const invitee = userResult.rows[0];
+
+  if (invitee.id === req.session.userId) {
+    return res.status(400).json({ error: "You already own this board" });
+  }
+
+  await pool.query(
+    "INSERT INTO board_members (board_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [req.params.boardId, invitee.id]
+  );
+  res.json(invitee);
+});
+
+app.delete("/api/boards/:boardId/members/:userId", requireAuth, async (req, res) => {
+  if (!await isOwner(req.session.userId, req.params.boardId)) {
+    return res.status(403).json({ error: "Only the board owner can remove members" });
+  }
+  await pool.query(
+    "DELETE FROM board_members WHERE board_id = $1 AND user_id = $2",
+    [req.params.boardId, req.params.userId]
+  );
+  res.json({ success: true });
+});
+
+// ── Columns ───────────────────────────────────────────────────────────────────
+
+app.get("/api/boards/:boardId/columns", requireAuth, async (req, res) => {
+  if (!await canAccessBoard(req.session.userId, req.params.boardId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
   const result = await pool.query(
     "SELECT * FROM columns WHERE board_id = $1 ORDER BY position",
     [req.params.boardId]
@@ -44,9 +224,11 @@ app.get("/api/boards/:boardId/columns", async (req, res) => {
   res.json(result.rows);
 });
 
-// creates new column with title, position and board_id from request body and returns the created column
-app.post("/api/columns", async (req, res) => {
+app.post("/api/columns", requireAuth, async (req, res) => {
   const { board_id, title, position } = req.body;
+  if (!await canAccessBoard(req.session.userId, board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
   const result = await pool.query(
     "INSERT INTO columns (board_id, title, position) VALUES ($1, $2, $3) RETURNING *",
     [board_id, title, position]
@@ -54,15 +236,35 @@ app.post("/api/columns", async (req, res) => {
   res.json(result.rows[0]);
 });
 
-// deletes column with specified id
-app.delete("/api/columns/:id", async (req, res) => {
+app.delete("/api/columns/:id", requireAuth, async (req, res) => {
+  const col = await pool.query("SELECT board_id FROM columns WHERE id = $1", [req.params.id]);
+  if (!col.rows[0] || !await canAccessBoard(req.session.userId, col.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
   await pool.query("DELETE FROM columns WHERE id = $1", [req.params.id]);
   res.json({ success: true });
 });
 
-// card routes
-// uses LEFT JOIN to fetch cards and labels in one query ordered by position otherwise need to make separate req for every label
-app.get("/api/columns/:columnId/cards", async (req, res) => {
+app.patch("/api/columns/:id", requireAuth, async (req, res) => {
+  const col = await pool.query("SELECT board_id FROM columns WHERE id = $1", [req.params.id]);
+  if (!col.rows[0] || !await canAccessBoard(req.session.userId, col.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { title } = req.body;
+  const result = await pool.query(
+    "UPDATE columns SET title = $1 WHERE id = $2 RETURNING *",
+    [title, req.params.id]
+  );
+  res.json(result.rows[0]);
+});
+
+// ── Cards ─────────────────────────────────────────────────────────────────────
+
+app.get("/api/columns/:columnId/cards", requireAuth, async (req, res) => {
+  const col = await pool.query("SELECT board_id FROM columns WHERE id = $1", [req.params.columnId]);
+  if (!col.rows[0] || !await canAccessBoard(req.session.userId, col.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
   const result = await pool.query(
     `SELECT cards.*, labels.name AS label_name, labels.color AS label_color
      FROM cards
@@ -74,15 +276,17 @@ app.get("/api/columns/:columnId/cards", async (req, res) => {
   res.json(result.rows);
 });
 
-// creates card by inserting into cards table then if label provided, inserts into labels table
-app.post("/api/cards", async (req, res) => {
+app.post("/api/cards", requireAuth, async (req, res) => {
   const { column_id, title, description, position, label_name, label_color } = req.body;
+  const col = await pool.query("SELECT board_id FROM columns WHERE id = $1", [column_id]);
+  if (!col.rows[0] || !await canAccessBoard(req.session.userId, col.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
 
   const cardResult = await pool.query(
     "INSERT INTO cards (column_id, title, description, position) VALUES ($1, $2, $3, $4) RETURNING *",
     [column_id, title, description, position]
   );
-
   const card = cardResult.rows[0];
 
   if (label_name) {
@@ -95,11 +299,100 @@ app.post("/api/cards", async (req, res) => {
   res.json({ ...card, label_name: label_name || null, label_color: label_color || null });
 });
 
-app.delete("/api/cards/:id", async (req, res) => {
+app.delete("/api/cards/:id", requireAuth, async (req, res) => {
+  const card = await pool.query(
+    "SELECT columns.board_id FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1",
+    [req.params.id]
+  );
+  if (!card.rows[0] || !await canAccessBoard(req.session.userId, card.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
   await pool.query("DELETE FROM cards WHERE id = $1", [req.params.id]);
   res.json({ success: true });
 });
 
-// Initializes the server
+// PATCH /api/cards/:id — move card, toggle starred, or edit content
+app.patch("/api/cards/:id", requireAuth, async (req, res) => {
+  const card = await pool.query(
+    "SELECT columns.board_id FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1",
+    [req.params.id]
+  );
+  if (!card.rows[0] || !await canAccessBoard(req.session.userId, card.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const { column_id, position, starred, title, description, label_name, label_color } = req.body;
+
+  if (starred !== undefined) {
+    const result = await pool.query(
+      "UPDATE cards SET starred = $1 WHERE id = $2 RETURNING *",
+      [starred, req.params.id]
+    );
+    return res.json(result.rows[0]);
+  }
+
+  if (title !== undefined) {
+    const result = await pool.query(
+      "UPDATE cards SET title = $1, description = $2 WHERE id = $3 RETURNING *",
+      [title, description || null, req.params.id]
+    );
+    await pool.query("DELETE FROM labels WHERE card_id = $1", [req.params.id]);
+    if (label_name) {
+      await pool.query(
+        "INSERT INTO labels (card_id, name, color) VALUES ($1, $2, $3)",
+        [req.params.id, label_name, label_color]
+      );
+    }
+    return res.json({ ...result.rows[0], label_name: label_name || null, label_color: label_color || null });
+  }
+
+  const result = await pool.query(
+    "UPDATE cards SET column_id = $1, position = $2 WHERE id = $3 RETURNING *",
+    [column_id, position, req.params.id]
+  );
+  res.json(result.rows[0]);
+});
+
+// ── Migrations ────────────────────────────────────────────────────────────────
+
+async function migrate() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(50) UNIQUE NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS session (
+      sid VARCHAR NOT NULL PRIMARY KEY,
+      sess JSON NOT NULL,
+      expire TIMESTAMPTZ NOT NULL
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS session_expire_idx ON session (expire)
+  `);
+
+  await pool.query(`
+    ALTER TABLE boards ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id)
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS board_members (
+      board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      PRIMARY KEY (board_id, user_id)
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS starred BOOLEAN NOT NULL DEFAULT false
+  `);
+}
+
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+migrate().then(() => app.listen(PORT, () => console.log(`Server running on port ${PORT}`)));
