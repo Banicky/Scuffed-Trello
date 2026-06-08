@@ -268,18 +268,26 @@ export default function BoardView({ boardId, user, onBack }) {
     }
 
     const toPatch = sameColumn
-      ? updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i }))
+      ? updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i, track_edit: c.id === cardId }))
       : [
-          ...updatedSourceCards.map((c, i) => ({ id: c.id, column_id: sourceCol.id, position: i })),
-          ...updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i })),
+          ...updatedSourceCards.map((c, i) => ({ id: c.id, column_id: sourceCol.id, position: i, track_edit: c.id === cardId })),
+          ...updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i, track_edit: c.id === cardId })),
         ]
 
-    await Promise.all(toPatch.map(({ id, column_id, position }) =>
+    const responses = await Promise.all(toPatch.map(({ id, column_id, position, track_edit }) =>
       apiFetch(`/api/cards/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ column_id, position }),
-      })
+        body: JSON.stringify({ column_id, position, track_edit }),
+      }).then(r => r.json())
     ))
+
+    const movedCard = responses.find(r => r.id === cardId)
+    if (movedCard?.last_edited_by_username) {
+      setColumns(cols => cols.map(col => ({
+        ...col,
+        cards: col.cards.map(c => c.id === cardId ? { ...c, last_edited_by_username: movedCard.last_edited_by_username } : c),
+      })))
+    }
   }
 
   const totalCards = columns.reduce((sum, col) => sum + col.cards.length, 0)

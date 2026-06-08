@@ -276,10 +276,13 @@ app.get("/api/columns/:columnId/cards", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   const result = await pool.query(
-    `SELECT cards.*, labels.name AS label_name, labels.color AS label_color, users.username AS created_by_username
+    `SELECT cards.*, labels.name AS label_name, labels.color AS label_color,
+            creator.username AS created_by_username,
+            editor.username AS last_edited_by_username
      FROM cards
      LEFT JOIN labels ON labels.card_id = cards.id
-     LEFT JOIN users ON users.id = cards.created_by
+     LEFT JOIN users creator ON creator.id = cards.created_by
+     LEFT JOIN users editor ON editor.id = cards.last_edited_by
      WHERE cards.column_id = $1
      ORDER BY cards.position`,
     [req.params.columnId]
@@ -333,7 +336,7 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
 
-  const { column_id, position, starred, title, description, label_name, label_color } = req.body;
+  const { column_id, position, starred, title, description, label_name, label_color, track_edit } = req.body;
 
   if (starred !== undefined) {
     const result = await pool.query(
@@ -345,8 +348,8 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
 
   if (title !== undefined) {
     const result = await pool.query(
-      "UPDATE cards SET title = $1, description = $2 WHERE id = $3 RETURNING *",
-      [title, description || null, req.params.id]
+      "UPDATE cards SET title = $1, description = $2, last_edited_by = $3 WHERE id = $4 RETURNING *",
+      [title, description || null, req.session.userId, req.params.id]
     );
     await pool.query("DELETE FROM labels WHERE card_id = $1", [req.params.id]);
     if (label_name) {
@@ -355,7 +358,17 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
         [req.params.id, label_name, label_color]
       );
     }
-    return res.json({ ...result.rows[0], label_name: label_name || null, label_color: label_color || null });
+    const editor = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+    return res.json({ ...result.rows[0], label_name: label_name || null, label_color: label_color || null, last_edited_by_username: editor.rows[0]?.username || null });
+  }
+
+  if (track_edit) {
+    const result = await pool.query(
+      "UPDATE cards SET column_id = $1, position = $2, last_edited_by = $3 WHERE id = $4 RETURNING *",
+      [column_id, position, req.session.userId, req.params.id]
+    );
+    const editor = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+    return res.json({ ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null });
   }
 
   const result = await pool.query(
@@ -407,6 +420,10 @@ async function migrate() {
 
   await pool.query(`
     ALTER TABLE cards ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id)
+  `);
+
+  await pool.query(`
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS last_edited_by INTEGER REFERENCES users(id)
   `);
 }
 
