@@ -47,7 +47,7 @@ function AddCardForm({ onAdd, onCancel }) {
 // onDrop: when a card is dropped, passes the event
 // isDragOver: when true, applies the purple border/background highlight to the column
 // onDragOverCard / dragOverCardId: passed through to each Card so the insertion indicator works
-export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onReact, currentUserId, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd }) {
+export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onReact, currentUserId, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, isDraggingCol, isColDropTarget, colDragDirection, anyColDragging, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd }) {
   const [adding, setAdding] = useState(false)
   const [editingTitle, setEditingTitle] = useState(!!column.editingTitle)
   const [confirming, setConfirming] = useState(false)
@@ -61,7 +61,7 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
   return (
     <div
       draggable
-      className={`kanban-column${isDragOver ? ' drag-over' : ''}${collapsed ? ' collapsed' : ''}`}
+      className={`kanban-column${isDragOver ? ' drag-over' : ''}${collapsed ? ' collapsed' : ''}${isDraggingCol ? ' col-dragging' : ''}${anyColDragging && !isDraggingCol && !isColDropTarget ? ' col-dim' : ''}`}
       onDragStart={e => {
         if (e.target !== e.currentTarget) return
         e.dataTransfer.setData('type', 'column')
@@ -76,6 +76,16 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
         else onDrop(e, column.id)
       }}
     >
+      {isDraggingCol && colDragDirection && (
+        <div className="col-drag-overlay col-drag-overlay--source">
+          <span className="col-drag-arrow">{colDragDirection === 'right' ? '→' : '←'}</span>
+        </div>
+      )}
+      {isColDropTarget && colDragDirection && (
+        <div className="col-drag-overlay col-drag-overlay--target">
+          <span className="col-drag-arrow">{colDragDirection === 'right' ? '←' : '→'}</span>
+        </div>
+      )}
       <div className="column-header">
         {confirming ? (
           <div className="column-confirm">

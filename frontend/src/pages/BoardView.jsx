@@ -359,7 +359,13 @@ export default function BoardView({ boardId, user, onBack }) {
       )}
 
       <main className="board">
-        {columns.map((col, i) => (
+        {columns.map((col, i) => {
+          const draggingIdx = columns.findIndex(c => c.id === draggingColId)
+          const overIdx = columns.findIndex(c => c.id === colDragOverId)
+          const colDragDirection = draggingColId && colDragOverId && draggingIdx !== overIdx
+            ? (draggingIdx < overIdx ? 'right' : 'left')
+            : null
+          return (
           <Column
             key={col.id}
             column={col}
@@ -377,10 +383,11 @@ export default function BoardView({ boardId, user, onBack }) {
               else setDragOverColId(colId)
             }}
             onDrop={moveCard}
-            isDragOver={
-              (draggingColId === null && dragOverColId === col.id) ||
-              (draggingColId !== null && draggingColId !== col.id && colDragOverId === col.id)
-            }
+            isDragOver={draggingColId === null && dragOverColId === col.id}
+            isDraggingCol={col.id === draggingColId}
+            isColDropTarget={draggingColId !== null && draggingColId !== col.id && colDragOverId === col.id}
+            colDragDirection={colDragDirection}
+            anyColDragging={draggingColId !== null}
             onDragOverCard={cardId => { if (draggingColId === null) setDragOverCardId(cardId) }}
             dragOverCardId={dragOverCardId}
             onColumnDragStart={setDraggingColId}
@@ -392,7 +399,8 @@ export default function BoardView({ boardId, user, onBack }) {
             }}
             onColumnDragEnd={() => { setDraggingColId(null); setColDragOverId(null) }}
           />
-        ))}
+          )
+        })}
         <button className="add-column-btn" onClick={addColumn}>
           <span>+</span> Add column
         </button>
