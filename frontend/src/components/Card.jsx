@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Tag from './Tag.jsx'
 import { TAG_COLORS } from '../constants.js'
+
+const QUICK_EMOJIS = ['👍', '👎', '❤️', '😄', '🎉', '🚀', '😮', '😢']
 
 function EditCardForm({ card, onSave, onCancel }) {
   const [title, setTitle] = useState(card.title)
@@ -24,11 +26,12 @@ function EditCardForm({ card, onSave, onCancel }) {
         onChange={e => setTitle(e.target.value)}
         autoFocus
       />
-      <input
-        className="card-input"
+      <textarea
+        className="card-input card-desc-input"
         placeholder="Description (optional)"
         value={desc}
         onChange={e => setDesc(e.target.value)}
+        rows={3}
       />
       <div className="add-card-actions">
         <button className="btn-primary" type="submit">Save</button>
@@ -41,8 +44,26 @@ function EditCardForm({ card, onSave, onCancel }) {
 // onDragStart: stores this card's id in the drag event so the drop target knows which card was picked up
 // onDragOverCard: tells App which card is currently being hovered over, used to determine insertion point
 // isDropTarget: when true, renders a purple top border showing where the dragged card will be inserted
-export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart, onDragOverCard, isDropTarget }) {
+export default function Card({ card, onDelete, onToggleStar, onEdit, onReact, currentUserId, onDragStart, onDragOverCard, isDropTarget }) {
   const [editing, setEditing] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
+  const pickerRef = useRef(null)
+
+  useEffect(() => {
+    if (!showPicker) return
+    function handleClick(e) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) setShowPicker(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showPicker])
+
+  const grouped = (card.reactions || []).reduce((acc, r) => {
+    if (!acc[r.emoji]) acc[r.emoji] = { count: 0, userIds: [] }
+    acc[r.emoji].count++
+    acc[r.emoji].userIds.push(r.userId)
+    return acc
+  }, {})
 
   if (editing) {
     return (
@@ -80,6 +101,36 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
       </div>
       <p className="card-title">{card.title}</p>
       {card.description && <p className="card-desc">{card.description}</p>}
+      <div className="card-reactions" ref={pickerRef}>
+        {Object.entries(grouped).map(([emoji, { count, userIds }]) => (
+          <button
+            key={emoji}
+            draggable={false}
+            className={`reaction-pill${userIds.includes(currentUserId) ? ' active' : ''}`}
+            onClick={() => onReact(card.id, emoji)}
+          >
+            {emoji} <span>{count}</span>
+          </button>
+        ))}
+        <button
+          draggable={false}
+          className="reaction-add-btn"
+          onClick={() => setShowPicker(p => !p)}
+          title="Add reaction"
+        >+</button>
+        {showPicker && (
+          <div className="reaction-picker">
+            {QUICK_EMOJIS.map(e => (
+              <button
+                key={e}
+                draggable={false}
+                className={`reaction-option${grouped[e]?.userIds.includes(currentUserId) ? ' active' : ''}`}
+                onClick={() => { onReact(card.id, e); setShowPicker(false) }}
+              >{e}</button>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="card-footer">
         <button className="card-edit" onClick={() => setEditing(true)} title="Edit card">✎</button>
         <div className="card-by-info">
@@ -88,7 +139,7 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
               <span className="card-by card-last-edited">last edited by: {card.last_edited_by_username}</span>
               {card.updated_at && (
                 <span className="card-by card-last-edited card-updated-at">
-                  at {new Date(card.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} {new Date(card.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                  at {new Date(card.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} {new Date(card.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' })}
                 </span>
               )}
             </>

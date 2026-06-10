@@ -278,7 +278,12 @@ app.get("/api/columns/:columnId/cards", requireAuth, async (req, res) => {
   const result = await pool.query(
     `SELECT cards.*, labels.name AS label_name, labels.color AS label_color,
             creator.username AS created_by_username,
-            editor.username AS last_edited_by_username
+            editor.username AS last_edited_by_username,
+            COALESCE(
+              (SELECT json_agg(jsonb_build_object('emoji', cr.emoji, 'userId', cr.user_id))
+               FROM card_reactions cr WHERE cr.card_id = cards.id),
+              '[]'::json
+            ) AS reactions
      FROM cards
      LEFT JOIN labels ON labels.card_id = cards.id
      LEFT JOIN users creator ON creator.id = cards.created_by
@@ -378,6 +383,41 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
   res.json(result.rows[0]);
 });
 
+// POST /api/cards/:id/reactions — toggle an emoji reaction for the current user
+app.post("/api/cards/:id/reactions", requireAuth, async (req, res) => {
+  const card = await pool.query(
+    "SELECT columns.board_id FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1",
+    [req.params.id]
+  );
+  if (!card.rows[0] || !await canAccessBoard(req.session.userId, card.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const { emoji } = req.body;
+  const existing = await pool.query(
+    "SELECT 1 FROM card_reactions WHERE card_id = $1 AND user_id = $2 AND emoji = $3",
+    [req.params.id, req.session.userId, emoji]
+  );
+
+  if (existing.rowCount > 0) {
+    await pool.query(
+      "DELETE FROM card_reactions WHERE card_id = $1 AND user_id = $2 AND emoji = $3",
+      [req.params.id, req.session.userId, emoji]
+    );
+  } else {
+    await pool.query(
+      "INSERT INTO card_reactions (card_id, user_id, emoji) VALUES ($1, $2, $3)",
+      [req.params.id, req.session.userId, emoji]
+    );
+  }
+
+  const reactions = await pool.query(
+    `SELECT emoji, user_id AS "userId" FROM card_reactions WHERE card_id = $1`,
+    [req.params.id]
+  );
+  res.json({ reactions: reactions.rows });
+});
+
 // ── Migrations ────────────────────────────────────────────────────────────────
 
 async function migrate() {
@@ -428,6 +468,15 @@ async function migrate() {
 
   await pool.query(`
     ALTER TABLE cards ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS card_reactions (
+      card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      emoji VARCHAR(10) NOT NULL,
+      PRIMARY KEY (card_id, user_id, emoji)
+    )
   `);
 }
 

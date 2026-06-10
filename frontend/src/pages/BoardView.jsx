@@ -163,6 +163,19 @@ export default function BoardView({ boardId, user, onBack }) {
     ))
   }
 
+  async function reactCard(columnId, cardId, emoji) {
+    const res = await apiFetch(`/api/cards/${cardId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ emoji }),
+    })
+    const { reactions } = await res.json()
+    setColumns(cols => cols.map(col =>
+      col.id === columnId
+        ? { ...col, cards: col.cards.map(c => c.id === cardId ? { ...c, reactions } : c) }
+        : col
+    ))
+  }
+
   async function addColumn() {
     if (columns.length >= 10) {
       setColumnLimitError(true)
@@ -355,6 +368,8 @@ export default function BoardView({ boardId, user, onBack }) {
             onDeleteCard={deleteCard}
             onToggleStar={(cardId, starred) => toggleStar(col.id, cardId, starred)}
             onEdit={editCard}
+            onReact={(cardId, emoji) => reactCard(col.id, cardId, emoji)}
+            currentUserId={user.id}
             onRenameColumn={renameColumn}
             onDeleteColumn={deleteColumn}
             onDragOver={colId => {

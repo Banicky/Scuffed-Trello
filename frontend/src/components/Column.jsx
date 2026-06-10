@@ -27,11 +27,12 @@ function AddCardForm({ onAdd, onCancel }) {
         onChange={e => setTitle(e.target.value)}
         autoFocus
       />
-      <input
-        className="card-input"
+      <textarea
+        className="card-input card-desc-input"
         placeholder="Description (optional)"
         value={desc}
         onChange={e => setDesc(e.target.value)}
+        rows={3}
       />
       <div className="add-card-actions">
         <button className="btn-primary" type="submit">Add card</button>
@@ -46,7 +47,7 @@ function AddCardForm({ onAdd, onCancel }) {
 // onDrop: when a card is dropped, passes the event
 // isDragOver: when true, applies the purple border/background highlight to the column
 // onDragOverCard / dragOverCardId: passed through to each Card so the insertion indicator works
-export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd }) {
+export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onReact, currentUserId, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd }) {
   const [adding, setAdding] = useState(false)
   const [editingTitle, setEditingTitle] = useState(!!column.editingTitle)
   const [confirming, setConfirming] = useState(false)
@@ -85,23 +86,25 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
         ) : (
           <>
             <span className="column-dot" style={{ background: COLUMN_PALETTE[colorIndex % COLUMN_PALETTE.length] }} />
-            {editingTitle ? (
-              <input
-                className="column-title-input"
-                defaultValue={column.title}
-                autoFocus
-                onBlur={e => { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }
-                  if (e.key === 'Escape') setEditingTitle(false)
-                }}
-              />
-            ) : (
-              <h2 className="column-title" onClick={() => setEditingTitle(true)} title="Click to rename">
-                {column.title}
-              </h2>
-            )}
-            <span className="column-count">{column.cards.length}</span>
+            <div className="column-title-group">
+              {editingTitle ? (
+                <input
+                  className="column-title-input"
+                  defaultValue={column.title}
+                  autoFocus
+                  onBlur={e => { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }
+                    if (e.key === 'Escape') setEditingTitle(false)
+                  }}
+                />
+              ) : (
+                <h2 className="column-title" onClick={() => setEditingTitle(true)} title="Click to rename">
+                  {column.title}
+                </h2>
+              )}
+              <span className="column-count">{column.cards.length}</span>
+            </div>
             <button draggable={false} className="column-collapse" onClick={() => setCollapsed(c => !c)} title={collapsed ? 'Expand column' : 'Collapse column'}>
               {collapsed ? '▶' : '▼'}
             </button>
@@ -117,6 +120,8 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
             onDelete={id => onDeleteCard(column.id, id)}
             onToggleStar={onToggleStar}
             onEdit={(cardId, data) => onEdit(column.id, cardId, data)}
+            onReact={onReact}
+            currentUserId={currentUserId}
             onDragStart={e => e.dataTransfer.setData('cardId', card.id)}
             onDragOverCard={onDragOverCard}
             isDropTarget={dragOverCardId === card.id}
