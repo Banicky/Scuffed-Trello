@@ -149,6 +149,28 @@
   line-height: 18px;
 }
 
+.column-collapse {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #888);
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.kanban-column:hover .column-collapse,
+.kanban-column.collapsed .column-collapse {
+  opacity: 1;
+}
+.column-collapse:hover {
+  background: var(--border);
+  color: var(--text-h);
+}
+
+
 .column-cards {
   display: flex;
   flex-direction: column;
@@ -156,6 +178,16 @@
   padding: 4px 10px 12px;
   overflow-y: auto;
   flex: 1;
+  max-height: 2000px;
+  opacity: 1;
+  transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
+}
+.column-cards--collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
 }
 
 /* ── Card ── */
@@ -269,8 +301,12 @@
 }
 
 .kanban-card:hover .card-last-edited {
-  max-height: 20px;
+  max-height: 40px;
   opacity: 1;
+}
+
+.card-updated-at {
+  text-align: right;
 }
 
 .card-by {

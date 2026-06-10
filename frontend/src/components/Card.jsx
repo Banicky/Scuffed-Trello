@@ -88,7 +88,7 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
               <span className="card-by card-last-edited">last edited by: {card.last_edited_by_username}</span>
               {card.updated_at && (
                 <span className="card-by card-last-edited card-updated-at">
-                  at {new Date(card.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                  at {new Date(card.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} {new Date(card.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} {Intl.DateTimeFormat().resolvedOptions().timeZone}
                 </span>
               )}
             </>

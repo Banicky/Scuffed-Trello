@@ -50,6 +50,7 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
   const [adding, setAdding] = useState(false)
   const [editingTitle, setEditingTitle] = useState(!!column.editingTitle)
   const [confirming, setConfirming] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
 
   async function handleAdd(cardData) {
     await onAddCard(column.id, cardData, column.cards.length + 1)
@@ -59,7 +60,7 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
   return (
     <div
       draggable
-      className={`kanban-column${isDragOver ? ' drag-over' : ''}`}
+      className={`kanban-column${isDragOver ? ' drag-over' : ''}${collapsed ? ' collapsed' : ''}`}
       onDragStart={e => {
         if (e.target !== e.currentTarget) return
         e.dataTransfer.setData('type', 'column')
@@ -101,11 +102,14 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
               </h2>
             )}
             <span className="column-count">{column.cards.length}</span>
+            <button draggable={false} className="column-collapse" onClick={() => setCollapsed(c => !c)} title={collapsed ? 'Expand column' : 'Collapse column'}>
+              {collapsed ? '▶' : '▼'}
+            </button>
             <button draggable={false} className="column-delete" onClick={() => setConfirming(true)} title="Delete column">✕</button>
           </>
         )}
       </div>
-      <div className="column-cards">
+      <div className={`column-cards${collapsed ? ' column-cards--collapsed' : ''}`}>
         {column.cards.map(card => (
           <Card
             key={card.id}
