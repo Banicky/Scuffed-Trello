@@ -25,6 +25,7 @@ function AddCardForm({ onAdd, onCancel }) {
         placeholder="Card title"
         value={title}
         onChange={e => setTitle(e.target.value)}
+        maxLength={255}
         autoFocus
       />
       <input
@@ -32,6 +33,7 @@ function AddCardForm({ onAdd, onCancel }) {
         placeholder="Description (optional)"
         value={desc}
         onChange={e => setDesc(e.target.value)}
+        maxLength={3000}
       />
       <div className="add-card-actions">
         <button className="btn-primary" type="submit">Add card</button>
@@ -77,6 +79,7 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
               <input
                 className="column-title-input"
                 defaultValue={column.title}
+                maxLength={255}
                 autoFocus
                 onBlur={e => { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }}
                 onKeyDown={e => {

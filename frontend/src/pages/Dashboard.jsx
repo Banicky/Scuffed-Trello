@@ -2,6 +2,84 @@ import { useState, useEffect, useRef } from 'react'
 import { apiFetch } from '../api.js'
 import { COLUMN_PALETTE } from '../constants.js'
 
+function ChangePasswordModal({ onClose }) {
+  const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    if (form.newPassword !== form.confirmPassword) return setError('New passwords do not match')
+    if (form.newPassword.length < 6) return setError('New password must be at least 6 characters')
+    setLoading(true)
+    const res = await apiFetch('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword: form.currentPassword, newPassword: form.newPassword }),
+    })
+    const data = await res.json()
+    setLoading(false)
+    if (!res.ok) return setError(data.error)
+    setSuccess(true)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <span className="modal-title">Change Password</span>
+          <button className="members-panel-close" onClick={onClose}>✕</button>
+        </div>
+        {success ? (
+          <div className="modal-success">
+            <p>Password changed successfully.</p>
+            <button className="btn-primary" onClick={onClose}>Done</button>
+          </div>
+        ) : (
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <label className="auth-label">Current password</label>
+            <input
+              className="card-input"
+              type="password"
+              value={form.currentPassword}
+              onChange={e => setForm(f => ({ ...f, currentPassword: e.target.value }))}
+              maxLength={255}
+              autoFocus
+              required
+            />
+            <label className="auth-label">New password</label>
+            <input
+              className="card-input"
+              type="password"
+              value={form.newPassword}
+              onChange={e => setForm(f => ({ ...f, newPassword: e.target.value }))}
+              maxLength={255}
+              required
+            />
+            <label className="auth-label">Confirm new password</label>
+            <input
+              className="card-input"
+              type="password"
+              value={form.confirmPassword}
+              onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
+              maxLength={255}
+              required
+            />
+            {error && <p className="auth-error">{error}</p>}
+            <div className="modal-actions">
+              <button className="btn-primary" type="submit" disabled={loading}>
+                {loading ? 'Saving…' : 'Change password'}
+              </button>
+              <button className="btn-ghost" type="button" onClick={onClose}>Cancel</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function BoardSettingsPopover({ board, onRename, onDelete, onClose }) {
   const [renameVal, setRenameVal] = useState(board.title)
   const [confirming, setConfirming] = useState(false)
@@ -31,6 +109,7 @@ function BoardSettingsPopover({ board, onRename, onDelete, onClose }) {
           className="card-input"
           value={renameVal}
           onChange={e => setRenameVal(e.target.value)}
+          maxLength={255}
           autoFocus
         />
         <button className="btn-primary" type="submit">Save</button>
@@ -92,6 +171,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout }) {
   const [activeTab, setActiveTab] = useState('mine')
   const [newTitle, setNewTitle] = useState('')
   const [addingBoard, setAddingBoard] = useState(false)
+  const [showChangePw, setShowChangePw] = useState(false)
 
   useEffect(() => {
     apiFetch('/api/boards')
@@ -138,9 +218,12 @@ export default function Dashboard({ user, onOpenBoard, onLogout }) {
         </div>
         <div className="topbar-right">
           <span className="dashboard-username">{user.username}</span>
+          <button className="btn-ghost" onClick={() => setShowChangePw(true)}>Change password</button>
           <button className="btn-ghost logout-btn" onClick={onLogout}>Log out</button>
         </div>
       </header>
+
+      {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
 
       <main className="dashboard-main">
         <div className="dash-tabs">
@@ -176,6 +259,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout }) {
                   placeholder="Board name"
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
+                  maxLength={255}
                   autoFocus
                 />
                 <button className="btn-primary" type="submit">Create</button>

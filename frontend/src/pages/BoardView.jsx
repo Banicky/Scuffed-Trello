@@ -57,6 +57,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
             placeholder="Username or email"
             value={invite}
             onChange={e => setInvite(e.target.value)}
+            maxLength={255}
           />
           <button className="btn-primary" type="submit">Invite</button>
         </form>
@@ -278,6 +279,7 @@ export default function BoardView({ boardId, user, onBack }) {
               <input
                 className="board-name-input"
                 defaultValue={board.title}
+                maxLength={255}
                 autoFocus
                 onBlur={e => { renameBoard(e.target.value); setEditingTitle(false) }}
                 onKeyDown={e => {

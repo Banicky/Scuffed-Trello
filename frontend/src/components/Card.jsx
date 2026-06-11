@@ -22,6 +22,7 @@ function EditCardForm({ card, onSave, onCancel }) {
         className="card-input"
         value={title}
         onChange={e => setTitle(e.target.value)}
+        maxLength={255}
         autoFocus
       />
       <input
@@ -29,6 +30,7 @@ function EditCardForm({ card, onSave, onCancel }) {
         placeholder="Description (optional)"
         value={desc}
         onChange={e => setDesc(e.target.value)}
+        maxLength={3000}
       />
       <div className="add-card-actions">
         <button className="btn-primary" type="submit">Save</button>

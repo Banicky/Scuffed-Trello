@@ -43,6 +43,10 @@ async function isOwner(userId, boardId) {
   return result.rowCount > 0;
 }
 
+function tooLong(val, max) {
+  return val && val.length > max;
+}
+
 // ── Health ──────────────────────────────────────────────────────────────────
 
 app.get("/api/health", (req, res) => {
@@ -56,6 +60,9 @@ app.post("/api/auth/register", async (req, res) => {
   if (!username?.trim() || !email?.trim() || !password) {
     return res.status(400).json({ error: "Username, email and password are required" });
   }
+  if (tooLong(username, 50)) return res.status(400).json({ error: "Username must be 50 characters or fewer" });
+  if (tooLong(email, 255)) return res.status(400).json({ error: "Email must be 255 characters or fewer" });
+  if (tooLong(password, 255)) return res.status(400).json({ error: "Password must be 255 characters or fewer" });
 
   const existing = await pool.query(
     "SELECT id FROM users WHERE username = $1 OR email = $2",
@@ -99,6 +106,40 @@ app.post("/api/auth/logout", (req, res) => {
   req.session.destroy(() => res.json({ success: true }));
 });
 
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { username, newPassword } = req.body;
+  if (!username?.trim() || !newPassword) {
+    return res.status(400).json({ error: "Username/email and new password are required" });
+  }
+  if (tooLong(newPassword, 255)) return res.status(400).json({ error: "Password must be 255 characters or fewer" });
+
+  const result = await pool.query(
+    "SELECT id FROM users WHERE username = $1 OR email = $1",
+    [username.trim()]
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: "No account found with that username or email" });
+
+  const password_hash = await bcrypt.hash(newPassword, 10);
+  await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [password_hash, result.rows[0].id]);
+  res.json({ success: true });
+});
+
+app.post("/api/auth/change-password", requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Both current and new password are required" });
+  }
+  if (tooLong(newPassword, 255)) return res.status(400).json({ error: "Password must be 255 characters or fewer" });
+
+  const result = await pool.query("SELECT password_hash FROM users WHERE id = $1", [req.session.userId]);
+  const match = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+  if (!match) return res.status(401).json({ error: "Current password is incorrect" });
+
+  const password_hash = await bcrypt.hash(newPassword, 10);
+  await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [password_hash, req.session.userId]);
+  res.json({ success: true });
+});
+
 app.get("/api/auth/me", async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
   const result = await pool.query(
@@ -127,6 +168,7 @@ app.get("/api/boards", requireAuth, async (req, res) => {
 
 app.post("/api/boards", requireAuth, async (req, res) => {
   const { title } = req.body;
+  if (tooLong(title, 255)) return res.status(400).json({ error: "Title must be 255 characters or fewer" });
   const result = await pool.query(
     "INSERT INTO boards (title, owner_id) VALUES ($1, $2) RETURNING *",
     [title, req.session.userId]
@@ -147,6 +189,7 @@ app.patch("/api/boards/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   const { title } = req.body;
+  if (tooLong(title, 255)) return res.status(400).json({ error: "Title must be 255 characters or fewer" });
   const result = await pool.query(
     "UPDATE boards SET title = $1 WHERE id = $2 RETURNING *",
     [title, req.params.id]
@@ -229,6 +272,7 @@ app.post("/api/columns", requireAuth, async (req, res) => {
   if (!await canAccessBoard(req.session.userId, board_id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
+  if (tooLong(title, 255)) return res.status(400).json({ error: "Title must be 255 characters or fewer" });
   const result = await pool.query(
     "INSERT INTO columns (board_id, title, position) VALUES ($1, $2, $3) RETURNING *",
     [board_id, title, position]
@@ -251,6 +295,7 @@ app.patch("/api/columns/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   const { title } = req.body;
+  if (tooLong(title, 255)) return res.status(400).json({ error: "Title must be 255 characters or fewer" });
   const result = await pool.query(
     "UPDATE columns SET title = $1 WHERE id = $2 RETURNING *",
     [title, req.params.id]
@@ -282,6 +327,8 @@ app.post("/api/cards", requireAuth, async (req, res) => {
   if (!col.rows[0] || !await canAccessBoard(req.session.userId, col.rows[0].board_id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
+  if (tooLong(title, 255)) return res.status(400).json({ error: "Title must be 255 characters or fewer" });
+  if (tooLong(description, 3000)) return res.status(400).json({ error: "Description must be 3000 characters or fewer" });
 
   const cardResult = await pool.query(
     "INSERT INTO cards (column_id, title, description, position) VALUES ($1, $2, $3, $4) RETURNING *",
@@ -332,6 +379,8 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
   }
 
   if (title !== undefined) {
+    if (tooLong(title, 255)) return res.status(400).json({ error: "Title must be 255 characters or fewer" });
+    if (tooLong(description, 3000)) return res.status(400).json({ error: "Description must be 3000 characters or fewer" });
     const result = await pool.query(
       "UPDATE cards SET title = $1, description = $2 WHERE id = $3 RETURNING *",
       [title, description || null, req.params.id]
@@ -377,6 +426,15 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS session_expire_idx ON session (expire)
   `);
 
+  // Create DB entries in order to avoid constraints
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS boards (
+      id SERIAL PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      owner_id INTEGER REFERENCES users(id),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
   await pool.query(`
     ALTER TABLE boards ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id)
   `);
@@ -390,7 +448,35 @@ async function migrate() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS columns (
+      id SERIAL PRIMARY KEY,
+      board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cards (
+      id SERIAL PRIMARY KEY,
+      column_id INTEGER NOT NULL REFERENCES columns(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      position INTEGER NOT NULL DEFAULT 0,
+      starred BOOLEAN NOT NULL DEFAULT false
+    )
+  `);
+  await pool.query(`
     ALTER TABLE cards ADD COLUMN IF NOT EXISTS starred BOOLEAN NOT NULL DEFAULT false
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS labels (
+      id SERIAL PRIMARY KEY,
+      card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      name VARCHAR(100),
+      color VARCHAR(50)
+    )
   `);
 }
 
