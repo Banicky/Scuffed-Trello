@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Column from '../components/Column.jsx'
+import CardDetailModal from '../components/CardDetailModal.jsx'
 import { apiFetch } from '../api.js'
 import { COLUMN_PALETTE } from '../constants.js'
 
@@ -77,6 +78,7 @@ export default function BoardView({ boardId, user, onBack }) {
   const [columnLimitError, setColumnLimitError] = useState(false)
   const [draggingColId, setDraggingColId] = useState(null)
   const [colDragOverId, setColDragOverId] = useState(null)
+  const [detailCard, setDetailCard] = useState(null)
 
   const isOwner = board?.owner_id === user.id
 
@@ -358,6 +360,14 @@ export default function BoardView({ boardId, user, onBack }) {
         </div>
       )}
 
+      {detailCard && (
+        <CardDetailModal
+          card={detailCard}
+          currentUserId={user.id}
+          onClose={() => setDetailCard(null)}
+        />
+      )}
+
       <main className="board">
         {columns.map((col, i) => {
           const draggingIdx = columns.findIndex(c => c.id === draggingColId)
@@ -398,6 +408,7 @@ export default function BoardView({ boardId, user, onBack }) {
               moveColumn(draggedColId, targetColId)
             }}
             onColumnDragEnd={() => { setDraggingColId(null); setColDragOverId(null) }}
+            onOpenDetail={card => setDetailCard(card)}
           />
           )
         })}

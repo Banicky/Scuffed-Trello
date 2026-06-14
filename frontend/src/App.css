@@ -1202,3 +1202,209 @@ select.card-input {
     border-color: var(--accent-border);
   }
 }
+
+/* ── Card title clickable hint ── */
+.card-title--clickable {
+  cursor: pointer;
+  &:hover { color: var(--accent); }
+}
+.card-desc--clickable {
+  cursor: pointer;
+}
+
+/* ── Card detail modal ── */
+.card-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 300;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+}
+
+.card-modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 600px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.card-modal-header {
+  padding: 24px 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+  line-height: 1.3;
+  padding-right: 28px;
+}
+
+.card-modal-body {
+  padding: 16px 24px 24px;
+}
+
+.card-modal-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card-modal-desc {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.card-modal-desc--empty {
+  color: var(--text-muted, #888);
+  font-style: italic;
+}
+
+.card-modal-section-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+/* ── Comments ── */
+.card-modal-comments {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.comment-empty {
+  font-size: 13px;
+  color: var(--text-muted, #888);
+  font-style: italic;
+  margin: 0;
+}
+
+.comment-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.comment-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.comment-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.comment-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.comment-author {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.comment-date {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+}
+
+.comment-body {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.comment-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  padding: 0;
+  transition: color 0.15s;
+
+  &:hover { color: var(--text-h); }
+}
+
+.comment-action-btn--danger:hover {
+  color: #ef4444;
+}
+
+.comment-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.comment-edit-input {
+  min-height: 48px;
+  resize: vertical;
+}
+
+.comment-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-input {
+  min-height: 60px;
+  resize: vertical;
+  line-height: 1.5;
+}

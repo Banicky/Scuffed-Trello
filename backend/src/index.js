@@ -418,6 +418,78 @@ app.post("/api/cards/:id/reactions", requireAuth, async (req, res) => {
   res.json({ reactions: reactions.rows });
 });
 
+// ── Comments ──────────────────────────────────────────────────────────────────
+
+app.get("/api/cards/:id/comments", requireAuth, async (req, res) => {
+  const card = await pool.query(
+    "SELECT columns.board_id FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1",
+    [req.params.id]
+  );
+  if (!card.rows[0] || !await canAccessBoard(req.session.userId, card.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const result = await pool.query(
+    `SELECT cc.*, u.username FROM card_comments cc
+     JOIN users u ON u.id = cc.user_id
+     WHERE cc.card_id = $1
+     ORDER BY cc.created_at ASC`,
+    [req.params.id]
+  );
+  res.json(result.rows);
+});
+
+app.post("/api/cards/:id/comments", requireAuth, async (req, res) => {
+  const card = await pool.query(
+    "SELECT columns.board_id FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1",
+    [req.params.id]
+  );
+  if (!card.rows[0] || !await canAccessBoard(req.session.userId, card.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { body } = req.body;
+  if (!body?.trim()) return res.status(400).json({ error: "Comment body is required" });
+
+  const result = await pool.query(
+    "INSERT INTO card_comments (card_id, user_id, body) VALUES ($1, $2, $3) RETURNING *",
+    [req.params.id, req.session.userId, body.trim()]
+  );
+  const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+  res.json({ ...result.rows[0], username: user.rows[0].username });
+});
+
+app.patch("/api/comments/:id", requireAuth, async (req, res) => {
+  const comment = await pool.query(
+    `SELECT cc.*, columns.board_id FROM card_comments cc
+     JOIN cards ON cards.id = cc.card_id
+     JOIN columns ON columns.id = cards.column_id
+     WHERE cc.id = $1`,
+    [req.params.id]
+  );
+  if (!comment.rows[0]) return res.status(404).json({ error: "Not found" });
+  if (comment.rows[0].user_id !== req.session.userId) {
+    return res.status(403).json({ error: "You can only edit your own comments" });
+  }
+  const { body } = req.body;
+  if (!body?.trim()) return res.status(400).json({ error: "Comment body is required" });
+
+  const result = await pool.query(
+    "UPDATE card_comments SET body = $1, edited_at = NOW() WHERE id = $2 RETURNING *",
+    [body.trim(), req.params.id]
+  );
+  const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+  res.json({ ...result.rows[0], username: user.rows[0].username });
+});
+
+app.delete("/api/comments/:id", requireAuth, async (req, res) => {
+  const comment = await pool.query("SELECT user_id FROM card_comments WHERE id = $1", [req.params.id]);
+  if (!comment.rows[0]) return res.status(404).json({ error: "Not found" });
+  if (comment.rows[0].user_id !== req.session.userId) {
+    return res.status(403).json({ error: "You can only delete your own comments" });
+  }
+  await pool.query("DELETE FROM card_comments WHERE id = $1", [req.params.id]);
+  res.json({ success: true });
+});
+
 // ── Migrations ────────────────────────────────────────────────────────────────
 
 async function migrate() {
@@ -476,6 +548,17 @@ async function migrate() {
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       emoji VARCHAR(10) NOT NULL,
       PRIMARY KEY (card_id, user_id, emoji)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS card_comments (
+      id SERIAL PRIMARY KEY,
+      card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      edited_at TIMESTAMPTZ
     )
   `);
 }

@@ -47,7 +47,7 @@ function AddCardForm({ onAdd, onCancel }) {
 // onDrop: when a card is dropped, passes the event
 // isDragOver: when true, applies the purple border/background highlight to the column
 // onDragOverCard / dragOverCardId: passed through to each Card so the insertion indicator works
-export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onReact, currentUserId, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, isDraggingCol, isColDropTarget, colDragDirection, anyColDragging, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd }) {
+export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onReact, currentUserId, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, isDraggingCol, isColDropTarget, colDragDirection, anyColDragging, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd, onOpenDetail }) {
   const [adding, setAdding] = useState(false)
   const [editingTitle, setEditingTitle] = useState(!!column.editingTitle)
   const [confirming, setConfirming] = useState(false)
@@ -135,6 +135,7 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
             onDragStart={e => e.dataTransfer.setData('cardId', card.id)}
             onDragOverCard={onDragOverCard}
             isDropTarget={dragOverCardId === card.id}
+            onOpenDetail={() => onOpenDetail(card)}
           />
         ))}
         {adding

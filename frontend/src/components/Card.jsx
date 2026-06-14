@@ -44,7 +44,7 @@ function EditCardForm({ card, onSave, onCancel }) {
 // onDragStart: stores this card's id in the drag event so the drop target knows which card was picked up
 // onDragOverCard: tells App which card is currently being hovered over, used to determine insertion point
 // isDropTarget: when true, renders a purple top border showing where the dragged card will be inserted
-export default function Card({ card, onDelete, onToggleStar, onEdit, onReact, currentUserId, onDragStart, onDragOverCard, isDropTarget }) {
+export default function Card({ card, onDelete, onToggleStar, onEdit, onReact, currentUserId, onDragStart, onDragOverCard, isDropTarget, onOpenDetail }) {
   const [editing, setEditing] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
   const pickerRef = useRef(null)
@@ -99,8 +99,8 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onReact, cu
           </button>
         </div>
       </div>
-      <p className="card-title">{card.title}</p>
-      {card.description && <p className="card-desc">{card.description}</p>}
+      <p className="card-title card-title--clickable" onClick={onOpenDetail}>{card.title}</p>
+      {card.description && <p className="card-desc card-desc--clickable" onClick={onOpenDetail}>{card.description}</p>}
       <div className="card-reactions" ref={pickerRef}>
         {Object.entries(grouped).map(([emoji, { count, userIds }]) => (
           <button
