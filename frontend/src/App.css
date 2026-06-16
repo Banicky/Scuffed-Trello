@@ -326,99 +326,6 @@
   margin-top: 8px;
 }
 
-.card-reactions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  position: relative;
-  margin-top: 8px;
-}
-
-.reaction-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  background: var(--border);
-  border: 1px solid transparent;
-  border-radius: 12px;
-  padding: 1px 7px;
-  font-size: 13px;
-  cursor: pointer;
-  color: var(--text);
-  transition: background 0.15s, border-color 0.15s;
-}
-.reaction-pill:hover {
-  background: var(--accent-border);
-}
-.reaction-pill.active {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: #6366f1;
-  color: var(--text-h);
-}
-.reaction-pill span {
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.reaction-add-btn {
-  background: none;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-  width: 24px;
-  height: 20px;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  color: var(--text-muted, #888);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
-}
-.kanban-card:hover .reaction-add-btn {
-  opacity: 1;
-}
-.reaction-add-btn:hover {
-  background: var(--border);
-  color: var(--text-h);
-}
-
-.reaction-picker {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  max-width: 196px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px;
-  box-shadow: var(--shadow);
-  z-index: 50;
-}
-
-.reaction-option {
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font-size: 18px;
-  padding: 3px 5px;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-  line-height: 1;
-}
-.reaction-option:hover {
-  background: var(--border);
-}
-.reaction-option.active {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: #6366f1;
-}
-
 .card-by-info {
   display: flex;
   flex-direction: column;
@@ -484,6 +391,75 @@
   color: var(--text);
   margin: 0;
   line-height: 1.5;
+}
+
+.card-image-thumb {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+/* Image upload control inside the add/edit card forms */
+.card-image-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-image-add {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.card-image-hint {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  opacity: 0.8;
+}
+
+.card-image-error {
+  font-size: 11px;
+  color: #ef4444;
+  flex-basis: 100%;
+}
+
+.card-image-preview {
+  position: relative;
+  display: inline-block;
+}
+.card-image-preview img {
+  max-width: 100%;
+  max-height: 140px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+.card-image-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-image-remove:hover {
+  color: #ef4444;
+  border-color: #ef4444;
 }
 
 /* ── Add column button ── */
@@ -1306,6 +1282,7 @@ select.card-input {
 }
 
 .comment-item {
+  position: relative;
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -1358,6 +1335,72 @@ select.card-input {
   word-break: break-word;
 }
 
+.comment-reactions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.comment-reaction-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--border);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 1px 7px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.15s, border-color 0.15s;
+}
+.comment-reaction-pill:hover {
+  border-color: #6366f1;
+}
+.comment-reaction-pill.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: #6366f1;
+  color: var(--text-h);
+}
+.comment-reaction-pill span {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.comment-reaction-add-wrap {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+/* Reveal on hovering the comment, or keep visible while its picker is open */
+.comment-item:hover .comment-reaction-add-wrap,
+.comment-reaction-add-wrap:focus-within {
+  opacity: 1;
+}
+
+.comment-reaction-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  height: 26px;
+  padding: 0 7px;
+  cursor: pointer;
+  color: var(--text-muted, #888);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.comment-reaction-add:hover {
+  color: var(--text-h);
+  border-color: #6366f1;
+}
+
 .comment-actions {
   display: flex;
   gap: 8px;
@@ -1407,4 +1450,162 @@ select.card-input {
   min-height: 60px;
   resize: vertical;
   line-height: 1.5;
+  width: 100%;
+}
+
+.comment-input-wrap {
+  position: relative;
+  display: flex;
+}
+
+.comment-input-wrap .comment-input {
+  padding-right: 66px;
+}
+
+.comment-input-tools {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.emoji-picker-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.emoji-trigger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  border-radius: 6px;
+  color: var(--text-muted, #888);
+  transition: color 0.15s, background 0.15s;
+}
+.emoji-trigger-btn:hover {
+  color: var(--text-h);
+  background: var(--border);
+}
+.emoji-trigger-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  width: 288px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: var(--shadow);
+  z-index: 50;
+}
+
+.emoji-picker-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: 0 auto;
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+.emoji-picker-option:hover {
+  background: var(--border);
+}
+
+/* Card's own image shown in the detail modal */
+.card-modal-image-link {
+  display: block;
+  margin-bottom: 16px;
+}
+.card-modal-image {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+/* Image in a posted comment */
+.comment-image-link {
+  display: inline-block;
+  margin-top: 6px;
+}
+.comment-image {
+  max-width: 240px;
+  max-height: 240px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+/* Pending image preview in the composer */
+.comment-image-preview {
+  position: relative;
+  display: inline-block;
+  margin-top: 2px;
+}
+.comment-image-preview img {
+  max-width: 160px;
+  max-height: 160px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+.comment-image-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.comment-image-remove:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.comment-upload-disclaimer {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  opacity: 0.8;
+  margin: 0;
+}
+
+.comment-upload-status {
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  margin: 0;
+}
+.comment-upload-status--error {
+  color: #ef4444;
 }

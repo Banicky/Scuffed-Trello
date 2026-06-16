@@ -1,18 +1,21 @@
 import { useState } from 'react'
 import Card from './Card.jsx'
+import ImageUploadField from './ImageUploadField.jsx'
 import { TAG_COLORS, COLUMN_PALETTE } from '../constants.js'
 
 function AddCardForm({ onAdd, onCancel }) {
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
   const [tag, setTag] = useState('Design')
+  const [imageUrl, setImageUrl] = useState(null)
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!title.trim()) return
-    onAdd({ title: title.trim(), description: desc.trim(), label_name: tag, label_color: TAG_COLORS[tag]?.color })
+    onAdd({ title: title.trim(), description: desc.trim(), label_name: tag, label_color: TAG_COLORS[tag]?.color, image_url: imageUrl })
     setTitle('')
     setDesc('')
+    setImageUrl(null)
   }
 
   return (
@@ -34,6 +37,7 @@ function AddCardForm({ onAdd, onCancel }) {
         onChange={e => setDesc(e.target.value)}
         rows={3}
       />
+      <ImageUploadField value={imageUrl} onChange={setImageUrl} />
       <div className="add-card-actions">
         <button className="btn-primary" type="submit">Add card</button>
         <button className="btn-ghost" type="button" onClick={onCancel}>Cancel</button>
@@ -47,7 +51,7 @@ function AddCardForm({ onAdd, onCancel }) {
 // onDrop: when a card is dropped, passes the event
 // isDragOver: when true, applies the purple border/background highlight to the column
 // onDragOverCard / dragOverCardId: passed through to each Card so the insertion indicator works
-export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onReact, currentUserId, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, isDraggingCol, isColDropTarget, colDragDirection, anyColDragging, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd, onOpenDetail }) {
+export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, isDraggingCol, isColDropTarget, colDragDirection, anyColDragging, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd, onOpenDetail }) {
   const [adding, setAdding] = useState(false)
   const [editingTitle, setEditingTitle] = useState(!!column.editingTitle)
   const [confirming, setConfirming] = useState(false)
@@ -130,8 +134,6 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
             onDelete={id => onDeleteCard(column.id, id)}
             onToggleStar={onToggleStar}
             onEdit={(cardId, data) => onEdit(column.id, cardId, data)}
-            onReact={onReact}
-            currentUserId={currentUserId}
             onDragStart={e => e.dataTransfer.setData('cardId', card.id)}
             onDragOverCard={onDragOverCard}
             isDropTarget={dragOverCardId === card.id}
