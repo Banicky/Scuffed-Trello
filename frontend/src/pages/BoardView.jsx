@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Column from '../components/Column.jsx'
+import CardDetailModal from '../components/CardDetailModal.jsx'
 import { apiFetch } from '../api.js'
 import { COLUMN_PALETTE } from '../constants.js'
 
@@ -74,6 +75,10 @@ export default function BoardView({ boardId, user, onBack }) {
   const [dragOverColId, setDragOverColId] = useState(null)
   const [dragOverCardId, setDragOverCardId] = useState(null)
   const [showMembers, setShowMembers] = useState(false)
+  const [columnLimitError, setColumnLimitError] = useState(false)
+  const [draggingColId, setDraggingColId] = useState(null)
+  const [colDragOverId, setColDragOverId] = useState(null)
+  const [detailCard, setDetailCard] = useState(null)
 
   const isOwner = board?.owner_id === user.id
 
@@ -160,7 +165,25 @@ export default function BoardView({ boardId, user, onBack }) {
     ))
   }
 
+  async function reactCard(columnId, cardId, emoji) {
+    const res = await apiFetch(`/api/cards/${cardId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ emoji }),
+    })
+    const { reactions } = await res.json()
+    setColumns(cols => cols.map(col =>
+      col.id === columnId
+        ? { ...col, cards: col.cards.map(c => c.id === cardId ? { ...c, reactions } : c) }
+        : col
+    ))
+  }
+
   async function addColumn() {
+    if (columns.length >= 10) {
+      setColumnLimitError(true)
+      setTimeout(() => setColumnLimitError(false), 3000)
+      return
+    }
     const position = columns.length
     const res = await apiFetch('/api/columns', {
       method: 'POST',
@@ -191,6 +214,23 @@ export default function BoardView({ boardId, user, onBack }) {
     await apiFetch(`/api/cards/${cardId}`, { method: 'DELETE' })
     setColumns(cols => cols.map(col =>
       col.id === columnId ? { ...col, cards: col.cards.filter(c => c.id !== cardId) } : col
+    ))
+  }
+
+  async function moveColumn(draggedColId, targetColId) {
+    if (draggedColId === targetColId) return
+    const from = columns.findIndex(c => c.id === draggedColId)
+    const to = columns.findIndex(c => c.id === targetColId)
+    if (from === -1 || to === -1) return
+    const reordered = [...columns]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(from < to ? to - 1 : to, 0, moved)
+    setColumns(reordered)
+    await Promise.all(reordered.map((col, i) =>
+      apiFetch(`/api/columns/${col.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ position: i }),
+      })
     ))
   }
 
@@ -243,18 +283,26 @@ export default function BoardView({ boardId, user, onBack }) {
     }
 
     const toPatch = sameColumn
-      ? updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i }))
+      ? updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i, track_edit: c.id === cardId }))
       : [
-          ...updatedSourceCards.map((c, i) => ({ id: c.id, column_id: sourceCol.id, position: i })),
-          ...updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i })),
+          ...updatedSourceCards.map((c, i) => ({ id: c.id, column_id: sourceCol.id, position: i, track_edit: c.id === cardId })),
+          ...updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i, track_edit: c.id === cardId })),
         ]
 
-    await Promise.all(toPatch.map(({ id, column_id, position }) =>
+    const responses = await Promise.all(toPatch.map(({ id, column_id, position, track_edit }) =>
       apiFetch(`/api/cards/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ column_id, position }),
-      })
+        body: JSON.stringify({ column_id, position, track_edit }),
+      }).then(r => r.json())
     ))
+
+    const movedCard = responses.find(r => r.id === cardId)
+    if (movedCard?.last_edited_by_username) {
+      setColumns(cols => cols.map(col => ({
+        ...col,
+        cards: col.cards.map(c => c.id === cardId ? { ...c, last_edited_by_username: movedCard.last_edited_by_username } : c),
+      })))
+    }
   }
 
   const totalCards = columns.reduce((sum, col) => sum + col.cards.length, 0)
@@ -312,8 +360,22 @@ export default function BoardView({ boardId, user, onBack }) {
         </div>
       )}
 
+      {detailCard && (
+        <CardDetailModal
+          card={detailCard}
+          currentUserId={user.id}
+          onClose={() => setDetailCard(null)}
+        />
+      )}
+
       <main className="board">
-        {columns.map((col, i) => (
+        {columns.map((col, i) => {
+          const draggingIdx = columns.findIndex(c => c.id === draggingColId)
+          const overIdx = columns.findIndex(c => c.id === colDragOverId)
+          const colDragDirection = draggingColId && colDragOverId && draggingIdx !== overIdx
+            ? (draggingIdx < overIdx ? 'right' : 'left')
+            : null
+          return (
           <Column
             key={col.id}
             column={col}
@@ -322,18 +384,42 @@ export default function BoardView({ boardId, user, onBack }) {
             onDeleteCard={deleteCard}
             onToggleStar={(cardId, starred) => toggleStar(col.id, cardId, starred)}
             onEdit={editCard}
+            onReact={(cardId, emoji) => reactCard(col.id, cardId, emoji)}
+            currentUserId={user.id}
             onRenameColumn={renameColumn}
             onDeleteColumn={deleteColumn}
-            onDragOver={setDragOverColId}
+            onDragOver={colId => {
+              if (draggingColId !== null) setColDragOverId(colId)
+              else setDragOverColId(colId)
+            }}
             onDrop={moveCard}
-            isDragOver={dragOverColId === col.id}
-            onDragOverCard={setDragOverCardId}
+            isDragOver={draggingColId === null && dragOverColId === col.id}
+            isDraggingCol={col.id === draggingColId}
+            isColDropTarget={draggingColId !== null && draggingColId !== col.id && colDragOverId === col.id}
+            colDragDirection={colDragDirection}
+            anyColDragging={draggingColId !== null}
+            onDragOverCard={cardId => { if (draggingColId === null) setDragOverCardId(cardId) }}
             dragOverCardId={dragOverCardId}
+            onColumnDragStart={setDraggingColId}
+            onColumnDrop={(e, targetColId) => {
+              const draggedColId = Number(e.dataTransfer.getData('columnId'))
+              setDraggingColId(null)
+              setColDragOverId(null)
+              moveColumn(draggedColId, targetColId)
+            }}
+            onColumnDragEnd={() => { setDraggingColId(null); setColDragOverId(null) }}
+            onOpenDetail={card => setDetailCard(card)}
           />
-        ))}
+          )
+        })}
         <button className="add-column-btn" onClick={addColumn}>
           <span>+</span> Add column
         </button>
+        {columnLimitError && (
+          <p style={{ color: 'red', alignSelf: 'flex-end', margin: '0 0 8px 8px', fontSize: '0.9rem' }}>
+            Maximum of 10 columns reached
+          </p>
+        )}
       </main>
     </div>
   )

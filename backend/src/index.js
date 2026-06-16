@@ -229,6 +229,10 @@ app.post("/api/columns", requireAuth, async (req, res) => {
   if (!await canAccessBoard(req.session.userId, board_id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
+  const countResult = await pool.query("SELECT COUNT(*) FROM columns WHERE board_id = $1", [board_id]);
+  if (parseInt(countResult.rows[0].count) >= 10) {
+    return res.status(400).json({ error: "Column limit reached (max 10)" });
+  }
   const result = await pool.query(
     "INSERT INTO columns (board_id, title, position) VALUES ($1, $2, $3) RETURNING *",
     [board_id, title, position]
@@ -250,10 +254,16 @@ app.patch("/api/columns/:id", requireAuth, async (req, res) => {
   if (!col.rows[0] || !await canAccessBoard(req.session.userId, col.rows[0].board_id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
-  const { title } = req.body;
+  const { title, position } = req.body;
+  const fields = [];
+  const values = [];
+  if (title !== undefined) { fields.push(`title = $${values.length + 1}`); values.push(title); }
+  if (position !== undefined) { fields.push(`position = $${values.length + 1}`); values.push(position); }
+  if (fields.length === 0) return res.status(400).json({ error: "Nothing to update" });
+  values.push(req.params.id);
   const result = await pool.query(
-    "UPDATE columns SET title = $1 WHERE id = $2 RETURNING *",
-    [title, req.params.id]
+    `UPDATE columns SET ${fields.join(', ')} WHERE id = $${values.length} RETURNING *`,
+    values
   );
   res.json(result.rows[0]);
 });
@@ -266,9 +276,18 @@ app.get("/api/columns/:columnId/cards", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   const result = await pool.query(
-    `SELECT cards.*, labels.name AS label_name, labels.color AS label_color
+    `SELECT cards.*, labels.name AS label_name, labels.color AS label_color,
+            creator.username AS created_by_username,
+            editor.username AS last_edited_by_username,
+            COALESCE(
+              (SELECT json_agg(jsonb_build_object('emoji', cr.emoji, 'userId', cr.user_id))
+               FROM card_reactions cr WHERE cr.card_id = cards.id),
+              '[]'::json
+            ) AS reactions
      FROM cards
      LEFT JOIN labels ON labels.card_id = cards.id
+     LEFT JOIN users creator ON creator.id = cards.created_by
+     LEFT JOIN users editor ON editor.id = cards.last_edited_by
      WHERE cards.column_id = $1
      ORDER BY cards.position`,
     [req.params.columnId]
@@ -284,8 +303,8 @@ app.post("/api/cards", requireAuth, async (req, res) => {
   }
 
   const cardResult = await pool.query(
-    "INSERT INTO cards (column_id, title, description, position) VALUES ($1, $2, $3, $4) RETURNING *",
-    [column_id, title, description, position]
+    "INSERT INTO cards (column_id, title, description, position, created_by, updated_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *",
+    [column_id, title, description, position, req.session.userId]
   );
   const card = cardResult.rows[0];
 
@@ -296,7 +315,8 @@ app.post("/api/cards", requireAuth, async (req, res) => {
     );
   }
 
-  res.json({ ...card, label_name: label_name || null, label_color: label_color || null });
+  const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+  res.json({ ...card, label_name: label_name || null, label_color: label_color || null, created_by_username: user.rows[0]?.username || null });
 });
 
 app.delete("/api/cards/:id", requireAuth, async (req, res) => {
@@ -321,7 +341,7 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
 
-  const { column_id, position, starred, title, description, label_name, label_color } = req.body;
+  const { column_id, position, starred, title, description, label_name, label_color, track_edit } = req.body;
 
   if (starred !== undefined) {
     const result = await pool.query(
@@ -333,8 +353,8 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
 
   if (title !== undefined) {
     const result = await pool.query(
-      "UPDATE cards SET title = $1, description = $2 WHERE id = $3 RETURNING *",
-      [title, description || null, req.params.id]
+      "UPDATE cards SET title = $1, description = $2, last_edited_by = $3, updated_at = NOW() WHERE id = $4 RETURNING *",
+      [title, description || null, req.session.userId, req.params.id]
     );
     await pool.query("DELETE FROM labels WHERE card_id = $1", [req.params.id]);
     if (label_name) {
@@ -343,7 +363,17 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
         [req.params.id, label_name, label_color]
       );
     }
-    return res.json({ ...result.rows[0], label_name: label_name || null, label_color: label_color || null });
+    const editor = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+    return res.json({ ...result.rows[0], label_name: label_name || null, label_color: label_color || null, last_edited_by_username: editor.rows[0]?.username || null });
+  }
+
+  if (track_edit) {
+    const result = await pool.query(
+      "UPDATE cards SET column_id = $1, position = $2, last_edited_by = $3, updated_at = NOW() WHERE id = $4 RETURNING *",
+      [column_id, position, req.session.userId, req.params.id]
+    );
+    const editor = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+    return res.json({ ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null });
   }
 
   const result = await pool.query(
@@ -351,6 +381,113 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
     [column_id, position, req.params.id]
   );
   res.json(result.rows[0]);
+});
+
+// POST /api/cards/:id/reactions — toggle an emoji reaction for the current user
+app.post("/api/cards/:id/reactions", requireAuth, async (req, res) => {
+  const card = await pool.query(
+    "SELECT columns.board_id FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1",
+    [req.params.id]
+  );
+  if (!card.rows[0] || !await canAccessBoard(req.session.userId, card.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const { emoji } = req.body;
+  const existing = await pool.query(
+    "SELECT 1 FROM card_reactions WHERE card_id = $1 AND user_id = $2 AND emoji = $3",
+    [req.params.id, req.session.userId, emoji]
+  );
+
+  if (existing.rowCount > 0) {
+    await pool.query(
+      "DELETE FROM card_reactions WHERE card_id = $1 AND user_id = $2 AND emoji = $3",
+      [req.params.id, req.session.userId, emoji]
+    );
+  } else {
+    await pool.query(
+      "INSERT INTO card_reactions (card_id, user_id, emoji) VALUES ($1, $2, $3)",
+      [req.params.id, req.session.userId, emoji]
+    );
+  }
+
+  const reactions = await pool.query(
+    `SELECT emoji, user_id AS "userId" FROM card_reactions WHERE card_id = $1`,
+    [req.params.id]
+  );
+  res.json({ reactions: reactions.rows });
+});
+
+// ── Comments ──────────────────────────────────────────────────────────────────
+
+app.get("/api/cards/:id/comments", requireAuth, async (req, res) => {
+  const card = await pool.query(
+    "SELECT columns.board_id FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1",
+    [req.params.id]
+  );
+  if (!card.rows[0] || !await canAccessBoard(req.session.userId, card.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const result = await pool.query(
+    `SELECT cc.*, u.username FROM card_comments cc
+     JOIN users u ON u.id = cc.user_id
+     WHERE cc.card_id = $1
+     ORDER BY cc.created_at ASC`,
+    [req.params.id]
+  );
+  res.json(result.rows);
+});
+
+app.post("/api/cards/:id/comments", requireAuth, async (req, res) => {
+  const card = await pool.query(
+    "SELECT columns.board_id FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1",
+    [req.params.id]
+  );
+  if (!card.rows[0] || !await canAccessBoard(req.session.userId, card.rows[0].board_id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { body } = req.body;
+  if (!body?.trim()) return res.status(400).json({ error: "Comment body is required" });
+
+  const result = await pool.query(
+    "INSERT INTO card_comments (card_id, user_id, body) VALUES ($1, $2, $3) RETURNING *",
+    [req.params.id, req.session.userId, body.trim()]
+  );
+  const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+  res.json({ ...result.rows[0], username: user.rows[0].username });
+});
+
+app.patch("/api/comments/:id", requireAuth, async (req, res) => {
+  const comment = await pool.query(
+    `SELECT cc.*, columns.board_id FROM card_comments cc
+     JOIN cards ON cards.id = cc.card_id
+     JOIN columns ON columns.id = cards.column_id
+     WHERE cc.id = $1`,
+    [req.params.id]
+  );
+  if (!comment.rows[0]) return res.status(404).json({ error: "Not found" });
+  if (comment.rows[0].user_id !== req.session.userId) {
+    return res.status(403).json({ error: "You can only edit your own comments" });
+  }
+  const { body } = req.body;
+  if (!body?.trim()) return res.status(400).json({ error: "Comment body is required" });
+
+  const result = await pool.query(
+    "UPDATE card_comments SET body = $1, edited_at = NOW() WHERE id = $2 RETURNING *",
+    [body.trim(), req.params.id]
+  );
+  const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+  res.json({ ...result.rows[0], username: user.rows[0].username });
+});
+
+app.delete("/api/comments/:id", requireAuth, async (req, res) => {
+  const comment = await pool.query("SELECT user_id FROM card_comments WHERE id = $1", [req.params.id]);
+  if (!comment.rows[0]) return res.status(404).json({ error: "Not found" });
+  if (comment.rows[0].user_id !== req.session.userId) {
+    return res.status(403).json({ error: "You can only delete your own comments" });
+  }
+  await pool.query("DELETE FROM card_comments WHERE id = $1", [req.params.id]);
+  res.json({ success: true });
 });
 
 // ── Migrations ────────────────────────────────────────────────────────────────
@@ -391,6 +528,38 @@ async function migrate() {
 
   await pool.query(`
     ALTER TABLE cards ADD COLUMN IF NOT EXISTS starred BOOLEAN NOT NULL DEFAULT false
+  `);
+
+  await pool.query(`
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id)
+  `);
+
+  await pool.query(`
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS last_edited_by INTEGER REFERENCES users(id)
+  `);
+
+  await pool.query(`
+    ALTER TABLE cards ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS card_reactions (
+      card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      emoji VARCHAR(10) NOT NULL,
+      PRIMARY KEY (card_id, user_id, emoji)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS card_comments (
+      id SERIAL PRIMARY KEY,
+      card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      edited_at TIMESTAMPTZ
+    )
   `);
 }
 

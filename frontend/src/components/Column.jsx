@@ -27,11 +27,12 @@ function AddCardForm({ onAdd, onCancel }) {
         onChange={e => setTitle(e.target.value)}
         autoFocus
       />
-      <input
-        className="card-input"
+      <textarea
+        className="card-input card-desc-input"
         placeholder="Description (optional)"
         value={desc}
         onChange={e => setDesc(e.target.value)}
+        rows={3}
       />
       <div className="add-card-actions">
         <button className="btn-primary" type="submit">Add card</button>
@@ -46,10 +47,11 @@ function AddCardForm({ onAdd, onCancel }) {
 // onDrop: when a card is dropped, passes the event
 // isDragOver: when true, applies the purple border/background highlight to the column
 // onDragOverCard / dragOverCardId: passed through to each Card so the insertion indicator works
-export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, onDragOverCard, dragOverCardId }) {
+export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onReact, currentUserId, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, isDraggingCol, isColDropTarget, colDragDirection, anyColDragging, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd, onOpenDetail }) {
   const [adding, setAdding] = useState(false)
   const [editingTitle, setEditingTitle] = useState(!!column.editingTitle)
   const [confirming, setConfirming] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
 
   async function handleAdd(cardData) {
     await onAddCard(column.id, cardData, column.cards.length + 1)
@@ -58,11 +60,32 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
 
   return (
     <div
-      className={`kanban-column${isDragOver ? ' drag-over' : ''}`}
+      draggable
+      className={`kanban-column${isDragOver ? ' drag-over' : ''}${collapsed ? ' collapsed' : ''}${isDraggingCol ? ' col-dragging' : ''}${anyColDragging && !isDraggingCol && !isColDropTarget ? ' col-dim' : ''}`}
+      onDragStart={e => {
+        if (e.target !== e.currentTarget) return
+        e.dataTransfer.setData('type', 'column')
+        e.dataTransfer.setData('columnId', String(column.id))
+        onColumnDragStart(column.id)
+      }}
+      onDragEnd={() => onColumnDragEnd?.()}
       onDragOver={e => { e.preventDefault(); onDragOver(column.id) }}
       onDragLeave={() => onDragOver(null)}
-      onDrop={e => onDrop(e, column.id)}
+      onDrop={e => {
+        if (e.dataTransfer.getData('type') === 'column') onColumnDrop(e, column.id)
+        else onDrop(e, column.id)
+      }}
     >
+      {isDraggingCol && colDragDirection && (
+        <div className="col-drag-overlay col-drag-overlay--source">
+          <span className="col-drag-arrow">{colDragDirection === 'right' ? '→' : '←'}</span>
+        </div>
+      )}
+      {isColDropTarget && colDragDirection && (
+        <div className="col-drag-overlay col-drag-overlay--target">
+          <span className="col-drag-arrow">{colDragDirection === 'right' ? '←' : '→'}</span>
+        </div>
+      )}
       <div className="column-header">
         {confirming ? (
           <div className="column-confirm">
@@ -73,28 +96,33 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
         ) : (
           <>
             <span className="column-dot" style={{ background: COLUMN_PALETTE[colorIndex % COLUMN_PALETTE.length] }} />
-            {editingTitle ? (
-              <input
-                className="column-title-input"
-                defaultValue={column.title}
-                autoFocus
-                onBlur={e => { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }
-                  if (e.key === 'Escape') setEditingTitle(false)
-                }}
-              />
-            ) : (
-              <h2 className="column-title" onClick={() => setEditingTitle(true)} title="Click to rename">
-                {column.title}
-              </h2>
-            )}
-            <span className="column-count">{column.cards.length}</span>
-            <button className="column-delete" onClick={() => setConfirming(true)} title="Delete column">✕</button>
+            <div className="column-title-group">
+              {editingTitle ? (
+                <input
+                  className="column-title-input"
+                  defaultValue={column.title}
+                  autoFocus
+                  onBlur={e => { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { onRenameColumn(column.id, e.target.value); setEditingTitle(false) }
+                    if (e.key === 'Escape') setEditingTitle(false)
+                  }}
+                />
+              ) : (
+                <h2 className="column-title" onClick={() => setEditingTitle(true)} title="Click to rename">
+                  {column.title}
+                </h2>
+              )}
+              <span className="column-count">{column.cards.length}</span>
+            </div>
+            <button draggable={false} className="column-collapse" onClick={() => setCollapsed(c => !c)} title={collapsed ? 'Expand column' : 'Collapse column'}>
+              {collapsed ? '▶' : '▼'}
+            </button>
+            <button draggable={false} className="column-delete" onClick={() => setConfirming(true)} title="Delete column">✕</button>
           </>
         )}
       </div>
-      <div className="column-cards">
+      <div className={`column-cards${collapsed ? ' column-cards--collapsed' : ''}`}>
         {column.cards.map(card => (
           <Card
             key={card.id}
@@ -102,9 +130,12 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
             onDelete={id => onDeleteCard(column.id, id)}
             onToggleStar={onToggleStar}
             onEdit={(cardId, data) => onEdit(column.id, cardId, data)}
+            onReact={onReact}
+            currentUserId={currentUserId}
             onDragStart={e => e.dataTransfer.setData('cardId', card.id)}
             onDragOverCard={onDragOverCard}
             isDropTarget={dragOverCardId === card.id}
+            onOpenDetail={() => onOpenDetail(card)}
           />
         ))}
         {adding
