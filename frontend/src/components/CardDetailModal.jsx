@@ -45,7 +45,7 @@ function groupReactions(reactions) {
   }, {})
 }
 
-export default function CardDetailModal({ card, currentUserId, onClose }) {
+export default function CardDetailModal({ card, currentUserId, onClose, onCommentCountChange }) {
   const [comments, setComments] = useState([])
   const [commentBody, setCommentBody] = useState('')
   const [editingCommentId, setEditingCommentId] = useState(null)
@@ -150,6 +150,7 @@ export default function CardDetailModal({ card, currentUserId, onClose }) {
       setComments(c => [...c, data])
       setCommentBody('')
       setPendingImage(null)
+      onCommentCountChange?.(comments.length + 1)
     }
     setSubmitting(false)
   }
@@ -169,7 +170,10 @@ export default function CardDetailModal({ card, currentUserId, onClose }) {
 
   async function handleDeleteComment(commentId) {
     const res = await apiFetch(`/api/comments/${commentId}`, { method: 'DELETE' })
-    if (res.ok) setComments(c => c.filter(cm => cm.id !== commentId))
+    if (res.ok) {
+      setComments(c => c.filter(cm => cm.id !== commentId))
+      onCommentCountChange?.(comments.length - 1)
+    }
   }
 
   return (

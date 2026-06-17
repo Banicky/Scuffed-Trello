@@ -358,6 +358,10 @@ export default function BoardView({ boardId, user, onBack }) {
           card={detailCard}
           currentUserId={user.id}
           onClose={() => setDetailCard(null)}
+          onCommentCountChange={count => setColumns(cols => cols.map(col => ({
+            ...col,
+            cards: col.cards.map(c => c.id === detailCard.id ? { ...c, comment_count: count } : c),
+          })))}
         />
       )}
 

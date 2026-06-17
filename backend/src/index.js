@@ -302,7 +302,8 @@ app.get("/api/columns/:columnId/cards", requireAuth, async (req, res) => {
   const result = await pool.query(
     `SELECT cards.*, labels.name AS label_name, labels.color AS label_color,
             creator.username AS created_by_username,
-            editor.username AS last_edited_by_username
+            editor.username AS last_edited_by_username,
+            (SELECT COUNT(*)::int FROM card_comments cc WHERE cc.card_id = cards.id) AS comment_count
      FROM cards
      LEFT JOIN labels ON labels.card_id = cards.id
      LEFT JOIN users creator ON creator.id = cards.created_by
