@@ -88,6 +88,12 @@ export default function BoardView({ boardId, user, onBack }) {
         apiFetch(`/api/boards/${boardId}/columns`),
         apiFetch(`/api/boards/${boardId}`),
       ])
+      
+      // escalates to main dashboard if the id is invalid or user doesn't have access, instead of showing an error message on this page
+      if (!boardRes.ok || !colRes.ok) {
+        onBack()
+        return
+      }
       const cols = await colRes.json()
       const boardData = await boardRes.json()
       setBoard(boardData)
