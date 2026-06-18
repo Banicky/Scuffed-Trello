@@ -383,12 +383,17 @@ export default function BoardView({ boardId, user, onBack }) {
           </div>
         </div>
         <div className="topbar-search">
-          <input
-            className="search-input"
-            placeholder="Search cards…"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
+          <div className="search-input-wrap">
+            <input
+              className="search-input"
+              placeholder="Search cards…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="search-clear" onClick={() => setSearchQuery('')} title="Clear search">✕</button>
+            )}
+          </div>
           <button
             className={`search-toggle${caseSensitive ? ' active' : ''}`}
             onClick={() => setCaseSensitive(v => !v)}
