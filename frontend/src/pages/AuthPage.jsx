@@ -65,12 +65,68 @@ export default function AuthPage({ onLogin }) {
 
   return (
     <div className="auth-shell">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <div className="board-icon" style={{ width: 44, height: 44, fontSize: 20, borderRadius: 12 }}>S</div>
+      <div className="auth-visual">
+        <div className="auth-visual-brand">
+          <div className="board-icon board-icon--brand" style={{ width: 36, height: 36, borderRadius: 10 }}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+              <rect x="3" y="4" width="5" height="16" rx="1.6" fill="currentColor" />
+              <rect x="9.5" y="4" width="5" height="10" rx="1.6" fill="currentColor" opacity="0.85" />
+              <rect x="16" y="4" width="5" height="13" rx="1.6" fill="currentColor" opacity="0.65" />
+            </svg>
+          </div>
           <span className="auth-brand">Scuffed Trello</span>
         </div>
 
+        <h1 className="auth-visual-heading">Organize anything, together.</h1>
+        <p className="auth-visual-sub">Boards, columns, and cards that keep your whole team in sync — from sprint planning to weekend chores.</p>
+
+        <div className="auth-mock-board" aria-hidden="true">
+          <div className="auth-mock-col">
+            <div className="auth-mock-col-title">To do</div>
+            <div className="auth-mock-card">
+              <span className="auth-mock-tag" />
+              <span className="auth-mock-line" style={{ width: '80%' }} />
+              <span className="auth-mock-line" style={{ width: '55%' }} />
+            </div>
+            <div className="auth-mock-card">
+              <span className="auth-mock-tag auth-mock-tag--alt" />
+              <span className="auth-mock-line" style={{ width: '65%' }} />
+            </div>
+          </div>
+          <div className="auth-mock-col">
+            <div className="auth-mock-col-title">In progress</div>
+            <div className="auth-mock-card auth-mock-card--active">
+              <span className="auth-mock-tag" />
+              <span className="auth-mock-line" style={{ width: '70%' }} />
+              <span className="auth-mock-line" style={{ width: '40%' }} />
+            </div>
+          </div>
+          <div className="auth-mock-col">
+            <div className="auth-mock-col-title">Done</div>
+            <div className="auth-mock-card auth-mock-card--done">
+              <span className="auth-mock-tag auth-mock-tag--alt" />
+              <span className="auth-mock-line" style={{ width: '60%' }} />
+            </div>
+            <div className="auth-mock-card auth-mock-card--done">
+              <span className="auth-mock-tag" />
+              <span className="auth-mock-line" style={{ width: '75%' }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="auth-form-panel">
+      <div className="auth-card">
+        <div className="auth-mobile-brand">
+          <div className="board-icon board-icon--brand" style={{ width: 36, height: 36, borderRadius: 10 }}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+              <rect x="3" y="4" width="5" height="16" rx="1.6" fill="currentColor" />
+              <rect x="9.5" y="4" width="5" height="10" rx="1.6" fill="currentColor" opacity="0.85" />
+              <rect x="16" y="4" width="5" height="13" rx="1.6" fill="currentColor" opacity="0.65" />
+            </svg>
+          </div>
+          <span className="auth-brand">Scuffed Trello</span>
+        </div>
         <div className="auth-tabs">
           <button
             className={`auth-tab${tab === 'login' ? ' active' : ''}`}
@@ -134,10 +190,10 @@ export default function AuthPage({ onLogin }) {
             )
           ) : (
           <form className="auth-form" onSubmit={handleLogin}>
-            <label className="auth-label">Username or email</label>
+            <label className="auth-label">Username / Email</label>
             <input
               className="card-input"
-              placeholder="username or email"
+              placeholder="Enter username or email"
               value={loginForm.username}
               onChange={e => setLoginForm(f => ({ ...f, username: e.target.value }))}
               maxLength={255}
@@ -148,7 +204,7 @@ export default function AuthPage({ onLogin }) {
             <input
               className="card-input"
               type="password"
-              placeholder="password"
+              placeholder="Enter password"
               value={loginForm.password}
               onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
               maxLength={255}
@@ -201,6 +257,7 @@ export default function AuthPage({ onLogin }) {
             </button>
           </form>
         )}
+      </div>
       </div>
     </div>
   )

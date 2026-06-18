@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Column from '../components/Column.jsx'
+import CardDetailModal from '../components/CardDetailModal.jsx'
 import { apiFetch } from '../api.js'
 import { COLUMN_PALETTE } from '../constants.js'
 
@@ -67,7 +68,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
   )
 }
 
-export default function BoardView({ boardId, user, onBack }) {
+export default function BoardView({ boardId, user, onBack, onReady }) {
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
   const [board, setBoard] = useState(null)
@@ -75,8 +76,60 @@ export default function BoardView({ boardId, user, onBack }) {
   const [dragOverColId, setDragOverColId] = useState(null)
   const [dragOverCardId, setDragOverCardId] = useState(null)
   const [showMembers, setShowMembers] = useState(false)
+  const [columnLimitError, setColumnLimitError] = useState(false)
+  const [draggingColId, setDraggingColId] = useState(null)
+  const [colDragOverId, setColDragOverId] = useState(null)
+  const [detailCard, setDetailCard] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [caseSensitive, setCaseSensitive] = useState(false)
+  const [wholeWord, setWholeWord] = useState(false)
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0)
+  const cardRefs = useRef(new Map())
 
   const isOwner = board?.owner_id === user.id
+
+  const matches = useMemo(() => {
+    const query = searchQuery.trim()
+    if (!query) return []
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const pattern = wholeWord ? `\\b${escaped}\\b` : escaped
+    let regex
+    try {
+      regex = new RegExp(pattern, caseSensitive ? '' : 'i')
+    } catch {
+      return []
+    }
+    const found = []
+    columns.forEach(col => {
+      col.cards.forEach(card => {
+        if (regex.test(card.title) || regex.test(card.description || '')) found.push(card.id)
+      })
+    })
+    return found
+  }, [searchQuery, caseSensitive, wholeWord, columns])
+
+  useEffect(() => {
+    setActiveMatchIndex(0)
+  }, [searchQuery, caseSensitive, wholeWord])
+
+  useEffect(() => {
+    if (!matches.length) return
+    const idx = Math.min(activeMatchIndex, matches.length - 1)
+    const el = cardRefs.current.get(matches[idx])
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [matches, activeMatchIndex])
+
+  function registerCardRef(cardId, node) {
+    if (node) cardRefs.current.set(cardId, node)
+    else cardRefs.current.delete(cardId)
+  }
+
+  const activeMatchCardId = matches.length ? matches[Math.min(activeMatchIndex, matches.length - 1)] : null
+
+  function goToMatch(delta) {
+    if (!matches.length) return
+    setActiveMatchIndex(i => (i + delta + matches.length) % matches.length)
+  }
 
   useEffect(() => {
     async function load() {
@@ -84,6 +137,12 @@ export default function BoardView({ boardId, user, onBack }) {
         apiFetch(`/api/boards/${boardId}/columns`),
         apiFetch(`/api/boards/${boardId}`),
       ])
+      
+      // escalates to main dashboard if the id is invalid or user doesn't have access, instead of showing an error message on this page
+      if (!boardRes.ok || !colRes.ok) {
+        onBack()
+        return
+      }
       const cols = await colRes.json()
       const boardData = await boardRes.json()
       setBoard(boardData)
@@ -100,6 +159,16 @@ export default function BoardView({ boardId, user, onBack }) {
     }
     load()
   }, [boardId])
+
+  // Tell the portal the board has painted (one rAF after loading clears) so it
+  // holds the veil over the heavy first render, then fades to reveal it.
+  const readyFired = useRef(false)
+  useEffect(() => {
+    if (loading || readyFired.current) return
+    readyFired.current = true
+    const id = requestAnimationFrame(() => onReady?.())
+    return () => cancelAnimationFrame(id)
+  }, [loading, onReady])
 
   async function renameBoard(newTitle) {
     if (!newTitle.trim() || newTitle === board.title) return
@@ -162,6 +231,11 @@ export default function BoardView({ boardId, user, onBack }) {
   }
 
   async function addColumn() {
+    if (columns.length >= 10) {
+      setColumnLimitError(true)
+      setTimeout(() => setColumnLimitError(false), 3000)
+      return
+    }
     const position = columns.length
     const res = await apiFetch('/api/columns', {
       method: 'POST',
@@ -192,6 +266,23 @@ export default function BoardView({ boardId, user, onBack }) {
     await apiFetch(`/api/cards/${cardId}`, { method: 'DELETE' })
     setColumns(cols => cols.map(col =>
       col.id === columnId ? { ...col, cards: col.cards.filter(c => c.id !== cardId) } : col
+    ))
+  }
+
+  async function moveColumn(draggedColId, targetColId) {
+    if (draggedColId === targetColId) return
+    const from = columns.findIndex(c => c.id === draggedColId)
+    const to = columns.findIndex(c => c.id === targetColId)
+    if (from === -1 || to === -1) return
+    const reordered = [...columns]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(from < to ? to - 1 : to, 0, moved)
+    setColumns(reordered)
+    await Promise.all(reordered.map((col, i) =>
+      apiFetch(`/api/columns/${col.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ position: i }),
+      })
     ))
   }
 
@@ -244,18 +335,26 @@ export default function BoardView({ boardId, user, onBack }) {
     }
 
     const toPatch = sameColumn
-      ? updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i }))
+      ? updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i, track_edit: c.id === cardId }))
       : [
-          ...updatedSourceCards.map((c, i) => ({ id: c.id, column_id: sourceCol.id, position: i })),
-          ...updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i })),
+          ...updatedSourceCards.map((c, i) => ({ id: c.id, column_id: sourceCol.id, position: i, track_edit: c.id === cardId })),
+          ...updatedTargetCards.map((c, i) => ({ id: c.id, column_id: targetColumnId, position: i, track_edit: c.id === cardId })),
         ]
 
-    await Promise.all(toPatch.map(({ id, column_id, position }) =>
+    const responses = await Promise.all(toPatch.map(({ id, column_id, position, track_edit }) =>
       apiFetch(`/api/cards/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ column_id, position }),
-      })
+        body: JSON.stringify({ column_id, position, track_edit }),
+      }).then(r => r.json())
     ))
+
+    const movedCard = responses.find(r => r.id === cardId)
+    if (movedCard?.last_edited_by_username) {
+      setColumns(cols => cols.map(col => ({
+        ...col,
+        cards: col.cards.map(c => c.id === cardId ? { ...c, last_edited_by_username: movedCard.last_edited_by_username } : c),
+      })))
+    }
   }
 
   const totalCards = columns.reduce((sum, col) => sum + col.cards.length, 0)
@@ -264,7 +363,7 @@ export default function BoardView({ boardId, user, onBack }) {
 
   if (loading) return (
     <div className="app-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
-      Loading…
+      Teleporting…
     </div>
   )
 
@@ -295,6 +394,41 @@ export default function BoardView({ boardId, user, onBack }) {
             <div className="board-meta">{totalCards} cards · {doneCount} done</div>
           </div>
         </div>
+        <div className="topbar-search">
+          <div className="search-input-wrap">
+            <input
+              className="search-input"
+              placeholder="Search cards…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="search-clear" onClick={() => setSearchQuery('')} title="Clear search">✕</button>
+            )}
+          </div>
+          <button
+            className={`search-toggle${caseSensitive ? ' active' : ''}`}
+            onClick={() => setCaseSensitive(v => !v)}
+            title="Case sensitive"
+          >
+            Aa
+          </button>
+          <button
+            className={`search-toggle${wholeWord ? ' active' : ''}`}
+            onClick={() => setWholeWord(v => !v)}
+            title="Match whole word"
+          >
+            “ab”
+          </button>
+          {searchQuery.trim() && (
+            <div className="search-nav">
+              <span className="search-count">{matches.length ? `${activeMatchIndex + 1}/${matches.length}` : '0/0'}</span>
+              <button className="search-nav-btn" onClick={() => goToMatch(-1)} disabled={!matches.length} title="Previous match">↑</button>
+              <button className="search-nav-btn" onClick={() => goToMatch(1)} disabled={!matches.length} title="Next match">↓</button>
+            </div>
+          )}
+        </div>
+
         <div className="topbar-right">
           <button
             className={`btn-ghost members-toggle${showMembers ? ' active' : ''}`}
@@ -314,8 +448,26 @@ export default function BoardView({ boardId, user, onBack }) {
         </div>
       )}
 
+      {detailCard && (
+        <CardDetailModal
+          card={detailCard}
+          currentUserId={user.id}
+          onClose={() => setDetailCard(null)}
+          onCommentCountChange={count => setColumns(cols => cols.map(col => ({
+            ...col,
+            cards: col.cards.map(c => c.id === detailCard.id ? { ...c, comment_count: count } : c),
+          })))}
+        />
+      )}
+
       <main className="board">
-        {columns.map((col, i) => (
+        {columns.map((col, i) => {
+          const draggingIdx = columns.findIndex(c => c.id === draggingColId)
+          const overIdx = columns.findIndex(c => c.id === colDragOverId)
+          const colDragDirection = draggingColId && colDragOverId && draggingIdx !== overIdx
+            ? (draggingIdx < overIdx ? 'right' : 'left')
+            : null
+          return (
           <Column
             key={col.id}
             column={col}
@@ -326,16 +478,43 @@ export default function BoardView({ boardId, user, onBack }) {
             onEdit={editCard}
             onRenameColumn={renameColumn}
             onDeleteColumn={deleteColumn}
-            onDragOver={setDragOverColId}
+            onDragOver={colId => {
+              if (draggingColId !== null) setColDragOverId(colId)
+              else setDragOverColId(colId)
+            }}
             onDrop={moveCard}
-            isDragOver={dragOverColId === col.id}
-            onDragOverCard={setDragOverCardId}
+            isDragOver={draggingColId === null && dragOverColId === col.id}
+            isDraggingCol={col.id === draggingColId}
+            isColDropTarget={draggingColId !== null && draggingColId !== col.id && colDragOverId === col.id}
+            colDragDirection={colDragDirection}
+            anyColDragging={draggingColId !== null}
+            onDragOverCard={cardId => { if (draggingColId === null) setDragOverCardId(cardId) }}
             dragOverCardId={dragOverCardId}
+            onColumnDragStart={setDraggingColId}
+            onColumnDrop={(e, targetColId) => {
+              const draggedColId = Number(e.dataTransfer.getData('columnId'))
+              setDraggingColId(null)
+              setColDragOverId(null)
+              moveColumn(draggedColId, targetColId)
+            }}
+            onColumnDragEnd={() => { setDraggingColId(null); setColDragOverId(null) }}
+            onOpenDetail={card => setDetailCard(card)}
+            searchQuery={searchQuery.trim()}
+            caseSensitive={caseSensitive}
+            wholeWord={wholeWord}
+            onCardRef={registerCardRef}
+            activeMatchCardId={activeMatchCardId}
           />
-        ))}
+          )
+        })}
         <button className="add-column-btn" onClick={addColumn}>
           <span>+</span> Add column
         </button>
+        {columnLimitError && (
+          <p style={{ color: 'red', alignSelf: 'flex-end', margin: '0 0 8px 8px', fontSize: '0.9rem' }}>
+            Maximum of 10 columns reached
+          </p>
+        )}
       </main>
     </div>
   )

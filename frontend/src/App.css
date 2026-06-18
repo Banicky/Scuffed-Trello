@@ -38,6 +38,11 @@
   flex-shrink: 0;
 }
 
+.board-icon--brand {
+  background: linear-gradient(135deg, var(--accent), var(--accent-border));
+  box-shadow: 0 6px 16px var(--accent-bg);
+}
+
 .board-name {
   font-weight: 600;
   font-size: 15px;
@@ -63,6 +68,132 @@
   font-size: 12px;
   color: var(--text);
   line-height: 1.2;
+}
+
+.topbar-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 220px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 28px 6px 10px;
+  font-size: 13px;
+  color: var(--text-h);
+  font-family: var(--sans);
+  outline: none;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--accent);
+  }
+
+  &::placeholder {
+    color: var(--text);
+    opacity: 0.7;
+  }
+}
+
+.search-clear {
+  position: absolute;
+  right: 6px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 11px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+
+  &:hover {
+    color: var(--text-h);
+    background: var(--border);
+  }
+}
+
+.search-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+
+  &.active {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+  }
+
+  &:hover:not(.active) {
+    color: var(--text-h);
+  }
+}
+
+.search-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 2px;
+}
+
+.search-count {
+  font-size: 12px;
+  color: var(--text);
+  min-width: 40px;
+  text-align: center;
+}
+
+.search-nav-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+
+  &:hover:not(:disabled) {
+    color: var(--text-h);
+    background: var(--code-bg);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+.search-highlight {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.search-highlight.active {
+  background: #f59e0b;
+  color: #08060d;
 }
 
 .topbar-right {
@@ -107,11 +238,44 @@
   border-radius: 12px;
   border: 1px solid var(--border);
   max-height: 100%;
-  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+  transition: border-color 0.15s, background 0.15s, opacity 0.15s;
 }
 .kanban-column.drag-over {
   border-color: #6366f1;
   background: rgba(99, 102, 241, 0.06);
+}
+.kanban-column.col-dragging {
+  opacity: 0.45;
+  position: relative;
+}
+.kanban-column.col-dim {
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.col-drag-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+}
+.col-drag-overlay--source {
+  background: rgba(99, 102, 241, 0.08);
+  border: 2px dashed #6366f1;
+}
+.col-drag-overlay--target {
+  background: rgba(99, 102, 241, 0.12);
+  border: 2px solid #6366f1;
+}
+.col-drag-arrow {
+  font-size: 36px;
+  color: #6366f1;
+  opacity: 0.85;
+  line-height: 1;
 }
 
 .column-header {
@@ -129,25 +293,54 @@
   flex-shrink: 0;
 }
 
+.column-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
 .column-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-h);
   margin: 0;
-  flex: 1;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .column-count {
   font-size: 12px;
   font-weight: 500;
-  color: var(--text);
-  background: var(--border);
-  border-radius: 10px;
-  padding: 1px 7px;
-  line-height: 18px;
+  color: var(--text-muted, #888);
+  flex-shrink: 0;
 }
+
+.column-collapse {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #888);
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.kanban-column:hover .column-collapse,
+.kanban-column.collapsed .column-collapse {
+  opacity: 1;
+}
+.column-collapse:hover {
+  background: var(--border);
+  color: var(--text-h);
+}
+
 
 .column-cards {
   display: flex;
@@ -156,6 +349,16 @@
   padding: 4px 10px 12px;
   overflow-y: auto;
   flex: 1;
+  max-height: 2000px;
+  opacity: 1;
+  transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
+}
+.column-cards--collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
 }
 
 /* ── Card ── */
@@ -249,8 +452,72 @@
 
 .card-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: flex-end;
   margin-top: 8px;
+}
+
+.card-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-comment-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 1px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.card-comment-count:hover {
+  color: var(--text-h);
+}
+.card-comment-count svg {
+  display: block;
+}
+
+.card-by-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.card-last-edited {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease, opacity 0.2s ease;
+}
+
+.kanban-card:hover .card-last-edited {
+  max-height: 80px;
+  opacity: 1;
+}
+
+.card-updated-at {
+  text-align: right;
+}
+
+.card-by {
+  overflow-wrap: anywhere;
+}
+
+.card-by {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  font-style: italic;
 }
 
 .card-edit {
@@ -289,6 +556,75 @@
   color: var(--text);
   margin: 0;
   line-height: 1.5;
+}
+
+.card-image-thumb {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+/* Image upload control inside the add/edit card forms */
+.card-image-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-image-add {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.card-image-hint {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  opacity: 0.8;
+}
+
+.card-image-error {
+  font-size: 11px;
+  color: #ef4444;
+  flex-basis: 100%;
+}
+
+.card-image-preview {
+  position: relative;
+  display: inline-block;
+}
+.card-image-preview img {
+  max-width: 100%;
+  max-height: 140px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+.card-image-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-image-remove:hover {
+  color: #ef4444;
+  border-color: #ef4444;
 }
 
 /* ── Add column button ── */
@@ -459,6 +795,12 @@
   }
 }
 
+.card-desc-input {
+  resize: vertical;
+  min-height: 64px;
+  line-height: 1.5;
+}
+
 select.card-input {
   cursor: pointer;
   appearance: auto;
@@ -505,32 +847,133 @@ select.card-input {
 .auth-shell {
   min-height: 100svh;
   display: flex;
+}
+
+.auth-visual {
+  flex: 1.1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: 56px;
+  background: #0b0c10;
+  color: #f3f4f6;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-visual-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.auth-visual-heading {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  max-width: 420px;
+}
+
+.auth-visual-sub {
+  font-size: 14px;
+  color: #a3a5b0;
+  max-width: 380px;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.auth-mock-board {
+  display: flex;
+  gap: 14px;
+}
+
+.auth-mock-col {
+  flex: 1;
+  max-width: 150px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-mock-col-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b8d98;
+}
+
+.auth-mock-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.auth-mock-card--active {
+  background: rgba(192, 132, 252, 0.16);
+  border: 1px solid rgba(192, 132, 252, 0.35);
+}
+
+.auth-mock-card--done {
+  opacity: 0.6;
+}
+
+.auth-mock-tag {
+  width: 22px;
+  height: 5px;
+  border-radius: 3px;
+  background: #c084fc;
+}
+
+.auth-mock-tag--alt {
+  background: #5eead4;
+}
+
+.auth-mock-line {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.auth-form-panel {
+  flex: 1;
+  display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--code-bg);
+  padding: 24px;
+  background: var(--bg);
 }
 
 .auth-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 36px 32px;
   width: 100%;
   max-width: 380px;
-  box-shadow: var(--shadow);
 }
 
-.auth-logo {
-  display: flex;
+.auth-mobile-brand {
+  display: none;
   align-items: center;
   gap: 10px;
   margin-bottom: 24px;
 }
 
-.auth-brand {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-h);
+@media (max-width: 900px) {
+  .auth-visual {
+    display: none;
+  }
+
+  .auth-mobile-brand {
+    display: flex;
+  }
 }
 
 .auth-tabs {
@@ -589,30 +1032,33 @@ select.card-input {
 
 /* ── Dashboard tabs ── */
 .dash-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 28px;
+  display: inline-flex;
   gap: 4px;
+  margin-bottom: 24px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
 }
 
 .dash-tab {
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
-  padding: 10px 18px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
   color: var(--text);
   cursor: pointer;
-  margin-bottom: -1px;
   display: flex;
   align-items: center;
   gap: 7px;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
 
   &.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
+    color: var(--text-h);
+    background: var(--bg);
+    box-shadow: rgba(0, 0, 0, 0.08) 0 1px 2px;
   }
 
   &:hover:not(.active) {
@@ -622,7 +1068,7 @@ select.card-input {
 
 .dash-tab-count {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   background: var(--accent-bg);
   color: var(--accent);
   border-radius: 10px;
@@ -706,55 +1152,220 @@ select.card-input {
   gap: 6px;
 }
 
+/* Let the dashboard header merge into the glow instead of sitting on a flat
+   black bar — scoped so the board view's topbar is unaffected. */
+.dashboard-shell .topbar {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+
 /* ── Dashboard ── */
 .dashboard-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100svh;
+  /* astral atlas: a sparse silvered starfield drifting over a faint pegboard grid,
+     so the colourful realm-tomes sit on a surface that reads as a night sky */
+  background-image:
+    radial-gradient(color-mix(in srgb, var(--metal) 30%, transparent) 1.2px, transparent 1.3px),
+    radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 96px 96px, 22px 22px;
+  background-position: 12px 28px, -1px -1px;
+}
+
+/* Prototype #1: a soft single-hue brand glow behind the hero only. It's
+   anchored to the top and fades to transparent before the board grid, so the
+   colorful tiles stay the hero and the text keeps its contrast. */
+.dashboard-shell::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 460px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(58% 70% at 20% -8%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 68%),
+    radial-gradient(46% 64% at 82% -16%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%);
+}
+
+.dashboard-shell::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 360px;
+  z-index: -1;
+  pointer-events: none;
+  /* anchor the breathing to the glow's own corner so it never drifts off-edge */
+  transform-origin: 100% 100%;
+  background:
+    radial-gradient(54% 66% at 84% 112%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dashboard-shell::before {
+    animation: aurora-drift-a 24s ease-in-out infinite alternate;
+  }
+  .dashboard-shell::after {
+    animation: aurora-drift-b 30s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes aurora-drift-a {
+  from { transform: translate3d(-2%, -1%, 0) scale(1);    opacity: 0.85; }
+  to   { transform: translate3d(3%, 2%, 0)  scale(1.07);  opacity: 1; }
+}
+
+/* corner-anchored breathing (scale + opacity only) so the bottom glow
+   stays pinned to its corner and never exposes an empty edge */
+@keyframes aurora-drift-b {
+  from { transform: scale(1);    opacity: 0.8; }
+  to   { transform: scale(1.12); opacity: 1; }
+}
+
+/* ── Sky comet: an arcane shooting star with a rune-trail ──
+   Streaks diagonally across the upper sky in a brief window of the loop, then
+   rests off-screen, so a comet passes every several seconds. Sits behind the
+   page content. The leading point follows the keyframe path; the streak (a
+   rotated bar) trails behind it. */
+.sky-comet {
+  position: absolute;
+  top: 70px;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: comet-streak 8s linear infinite;
+}
+
+/* the tail: a tapering arcane streak whose bright (right) end is the comet
+   head; anchored so that bright end sits on the comet's travelling point */
+.sky-comet-streak {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 120px;
+  height: 5px;
+  transform-origin: right center;
+  transform: translate(-100%, -50%) rotate(14deg);
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 28%, transparent) 48%,
+    color-mix(in srgb, var(--accent) 72%, #fff) 94%,
+    transparent 100%
+  );
+}
+
+/* the glowing head at the leading end */
+.sky-comet-streak::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--accent) 80%, #fff) 45%, transparent 72%);
+  box-shadow:
+    0 0 14px 4px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 0 6px 2px rgba(255, 255, 255, 0.9);
+}
+
+/* faint platinum runes shimmering along the trail */
+.sky-comet-streak::before {
+  content: '';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  width: 96px;
+  height: 2px;
+  transform: translateY(-50%);
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0 6px,
+    color-mix(in srgb, var(--metal) 75%, transparent) 6px 8px
+  );
+  -webkit-mask: linear-gradient(to right, transparent, #000 65%, transparent);
+  mask: linear-gradient(to right, transparent, #000 65%, transparent);
+  opacity: 0.7;
+}
+
+@keyframes comet-streak {
+  0%   { transform: translate(-12vw, -4vw); opacity: 0; }
+  4%   { opacity: 1; }
+  16%  { transform: translate(116vw, 28vw); opacity: 0; }
+  100% { transform: translate(116vw, 28vw); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sky-comet { display: none; }
 }
 
 .dashboard-main {
   flex: 1;
-  padding: 32px 40px;
-  max-width: 1100px;
+  padding: 40px 40px 56px;
+  max-width: 1120px;
   width: 100%;
   margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+  .dashboard-main {
+    padding: 28px 20px 40px;
+  }
+}
+
+/* ── Hero ── */
+.dash-hero {
+  margin-bottom: 28px;
+}
+
+.dash-hero-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 8px;
+}
+
+.dash-hero-greeting {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(30px, 4.5vw, 46px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--text-h);
+  margin: 0 0 10px;
+}
+
+.dash-hero-summary {
+  font-size: 15px;
+  color: var(--text);
+  margin: 0;
+  max-width: 60ch;
 }
 
 .dashboard-section {
   margin-bottom: 40px;
 }
 
-.section-heading-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.section-heading {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-h);
-  margin: 0 0 16px;
-  letter-spacing: 0.01em;
-}
-
-.section-heading-row .section-heading {
-  margin-bottom: 0;
-}
-
-.add-board-btn {
-  font-size: 13px;
-  padding: 5px 12px;
-}
-
 .new-board-form {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   align-items: center;
-  max-width: 400px;
+  max-width: 440px;
 }
 
 .new-board-form .card-input {
@@ -762,90 +1373,601 @@ select.card-input {
 }
 
 .dashboard-empty {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   margin: 0;
+  padding: 28px 0;
 }
 
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  grid-auto-rows: 160px;
+  align-items: stretch;
+  gap: 18px;
 }
 
-.board-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: visible;
-  cursor: pointer;
-  transition: box-shadow 0.15s, border-color 0.15s;
+/* ── Board tile (the signature: each board as a tiny kanban) ── */
+.board-tile {
+  --tile: var(--accent);
+  box-sizing: border-box;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  color: #fff;
+  /* faceted gem fill: lit from the top-left, deepening toward the bottom-right,
+     so each realm-tome reads as an enamelled, dimensional object */
+  background:
+    radial-gradient(135% 120% at 20% 10%, color-mix(in srgb, var(--tile) 55%, #fff) 0%, transparent 44%),
+    linear-gradient(152deg, color-mix(in srgb, var(--tile) 86%, #fff) 0%, var(--tile) 42%, color-mix(in srgb, var(--tile) 68%, #000) 100%);
+  /* layered resting shadow + a faint halo in the tile's own colour, so the
+     glow emanates from the boards themselves rather than the empty page */
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.28),
+    0 6px 14px -6px rgba(0, 0, 0, 0.5),
+    0 14px 30px -12px rgba(0, 0, 0, 0.45),
+    0 10px 34px -14px color-mix(in srgb, var(--tile) 55%, transparent);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  /* orchestrated entrance: each tile rises in, staggered by its position.
+     `backwards` fill hides it during the delay but releases control after,
+     so the hover transform still works once it has landed. */
+  animation: tile-in 0.42s ease backwards;
+  animation-delay: calc(min(var(--stagger, 0), 8) * 45ms);
+}
 
-  &:hover {
-    box-shadow: var(--shadow);
-    border-color: var(--accent-border);
+@keyframes tile-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.board-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.26) 0%,
+    rgba(255, 255, 255, 0.04) 18%,
+    rgba(0, 0, 0, 0) 50%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* clipped layer for the decorative bars + monogram, so the settings popover
+   (a sibling) can still overflow the tile without being cut off */
+.board-tile-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* heraldic rule: a thin inset platinum frame, like the chased border of a
+   knight's shield */
+.board-tile-face::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--metal) 60%, transparent);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+}
+
+/* moonlight: a soft cool highlight that tracks the cursor (--mx/--my set in JS),
+   clipped to the rounded face so it reads as light gliding across the steel */
+.board-tile-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    220px 220px at var(--mx, 50%) var(--my, 0%),
+    rgba(244, 248, 255, 0.40),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.board-tile:hover .board-tile-face::after,
+.board-tile:focus-visible .board-tile-face::after {
+  opacity: 1;
+}
+
+.board-tile:hover,
+.board-tile:focus-visible {
+  transform: translateY(-4px);
+  box-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.3),
+    0 12px 24px -8px rgba(0, 0, 0, 0.55),
+    0 28px 48px -14px rgba(0, 0, 0, 0.5),
+    0 16px 40px -12px color-mix(in srgb, var(--tile) 75%, transparent);
+  outline: none;
+  /* lift above neighbouring tiles so the hover preview isn't clipped by them */
+  z-index: 30;
+}
+
+/* tactile press feedback when a board is clicked, mirroring the New board pop */
+.board-tile:active {
+  transform: translateY(-1px) scale(0.97);
+  transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.board-tile:focus-visible {
+  outline: 2px solid var(--text-h);
+  outline-offset: 2px;
+}
+
+/* three translucent column bars echoing a kanban board */
+.board-tile-columns {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0 16px 0;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.board-tile-columns span {
+  flex: 1;
+  min-width: 0;
+  border-radius: 6px 6px 0 0;
+  background: rgba(255, 255, 255, 0.16);
+  /* height is set inline, scaled to each column's card count */
+}
+
+.board-tile-monogram {
+  position: absolute;
+  top: -16px;
+  right: -4px;
+  /* illuminated drop-cap: an engraved initial leafed in gold, the way a
+     manuscript opens a chapter */
+  font-family: var(--fantasy);
+  font-weight: 800;
+  font-size: 104px;
+  line-height: 1;
+  background: linear-gradient(
+    158deg,
+    color-mix(in srgb, var(--metal) 92%, #fff) 0%,
+    var(--metal) 46%,
+    var(--metal-deep) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  opacity: 0.5;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.28));
+  pointer-events: none;
+  user-select: none;
+}
+
+.board-tile-top {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* above the hover preview (z-index 5) so the gear stays reachable on hover */
+  z-index: 6;
+}
+
+.board-tile-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 20px;
+  padding: 3px 9px;
+}
+
+.board-tile-actions {
+  margin-left: auto;
+}
+
+.board-tile-btn {
+  background: rgba(0, 0, 0, 0.22);
+  border: none;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  font-size: 14px;
+  color: #fff;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s, background 0.15s;
+
+  .board-tile:hover &,
+  &.active {
+    opacity: 1;
+  }
+  &:hover, &.active {
+    background: rgba(0, 0, 0, 0.4);
   }
 }
 
-.board-card-stripe {
-  height: 6px;
-  width: 100%;
-}
-
-.board-card-body {
-  padding: 14px 14px 12px;
+.board-tile-info {
+  position: relative;
+  z-index: 2;
   display: flex;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
+  min-width: 0;
 }
 
-.board-card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-h);
-  line-height: 1.3;
+.board-tile-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
   flex: 1;
 }
 
-.board-card-actions {
+/* overlapping member avatars (initials), owner first */
+.board-tile-members {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  padding-left: 7px; /* room for the first avatar's overlap margin */
+}
+.board-tile-avatar {
+  width: 24px;
+  height: 24px;
+  margin-left: -7px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.24);
+  /* a ring in a darkened shade of the tile so overlapping discs stay distinct */
+  border: 1.5px solid color-mix(in srgb, var(--tile) 55%, #000);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  user-select: none;
+}
+.board-tile-avatar--more {
+  background: rgba(0, 0, 0, 0.38);
+  font-size: 9.5px;
+}
+
+.board-tile-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  /* keep the title on a single line, truncating with an ellipsis */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-tile-meta {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Create tile (an empty, steel-edged plinth awaiting a new realm) ── */
+.board-tile--create {
+  background: transparent;
+  /* keep the label in the readable UI text colour; the metal lives in the edge */
+  color: var(--text);
+  border: 1.5px dashed color-mix(in srgb, var(--metal) 60%, var(--border));
+  box-shadow: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+.board-tile--create::after { content: none; }
+.board-tile--create:hover,
+.board-tile--create:focus-visible {
+  transform: translateY(-3px);
+  border-color: var(--metal);
+  color: var(--text-h);
+  background: color-mix(in srgb, var(--metal) 14%, transparent);
+  box-shadow: 0 10px 30px -16px color-mix(in srgb, var(--metal) 70%, transparent);
+  outline: none;
+}
+/* summoning circle: the glyph sits inside an arcane ring that is forever
+   alive — breathing a glow, pulsing, and wobbling as if barely contained —
+   encircled by a dashed rune-band that orbits it */
+.board-tile-plus {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--metal) 55%, transparent);
+  font-family: var(--fantasy);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1;
+  /* resting glow — also the value reduced-motion users keep */
+  box-shadow:
+    0 0 14px -2px color-mix(in srgb, var(--accent) 50%, transparent),
+    inset 0 0 10px -4px color-mix(in srgb, var(--accent) 38%, transparent);
+  transition: border-color 0.22s ease;
+  animation: summon-pulse 3.2s ease-in-out infinite;
+}
+
+/* the orbiting rune-band — always turning */
+.board-tile-plus::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--metal) 45%, transparent);
+  opacity: 0.6;
+  transition: opacity 0.22s ease;
+  animation: summon-spin 12s linear infinite;
+}
+
+.board-tile--create:hover .board-tile-plus,
+.board-tile--create:focus-visible .board-tile-plus {
+  border-color: var(--metal);
+}
+.board-tile--create:hover .board-tile-plus::before,
+.board-tile--create:focus-visible .board-tile-plus::before {
+  opacity: 1;
+  animation-duration: 5s; /* the band whirls faster as you reach in */
+}
+
+/* constant pulse (scale + glow) and wiggle (drift + tilt) */
+@keyframes summon-pulse {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    box-shadow:
+      0 0 13px -3px color-mix(in srgb, var(--accent) 45%, transparent),
+      inset 0 0 10px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  25% { transform: translate(-2.5px, -1.5px) rotate(-5deg) scale(1.04); }
+  50% {
+    transform: translate(2.5px, 1.5px) rotate(5deg) scale(1.07);
+    box-shadow:
+      0 0 26px 1px color-mix(in srgb, var(--accent) 70%, transparent),
+      inset 0 0 15px -3px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  75% { transform: translate(-1.5px, 2px) rotate(-3deg) scale(1.03); }
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    box-shadow:
+      0 0 13px -3px color-mix(in srgb, var(--accent) 45%, transparent),
+      inset 0 0 10px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+}
+
+@keyframes summon-spin {
+  to { transform: rotate(360deg); }
+}
+
+.board-tile-create-label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+/* ── Board hover preview: a shrunk-down replica of the board, inside the tile ── */
+.board-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: 16px;
+  overflow: hidden;
+  pointer-events: none;
+  padding: 9px;
+  /* a dark "board surface" tinted faintly with the tile's colour */
+  background: color-mix(in srgb, var(--tile) 12%, #0c0d12);
+  animation: preview-in 0.18s ease both;
+}
+
+@keyframes preview-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.board-preview-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.board-preview-board {
+  display: flex;
+  gap: 5px;
+  height: 100%;
+  align-items: stretch;
+}
+
+.mini-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.mini-col-head {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.mini-col-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
-.board-card-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 3px 5px;
-  border-radius: 4px;
-  font-size: 14px;
-  color: var(--text);
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s, color 0.15s;
-
-  .board-card:hover & {
-    opacity: 1;
-  }
-
-  &:hover, &.active {
-    background: var(--code-bg);
-    opacity: 1;
-    color: var(--text-h);
-  }
-
-  &.danger:hover {
-    background: rgba(239, 68, 68, 0.12);
-    color: #ef4444;
-  }
+.mini-col-title {
+  font-size: 6.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.board-card-confirm {
+.mini-col-count {
+  margin-left: auto;
+  font-size: 6px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.mini-col-cards {
   display: flex;
-  gap: 4px;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+  /* fade the overflowing cards at the bottom to hint there's more */
+  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
+  mask-image: linear-gradient(to bottom, #000 78%, transparent);
+}
+
+.mini-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  padding: 3px;
+  overflow: hidden;
+}
+
+.mini-card-tag {
+  display: block;
+  width: 11px;
+  height: 2.5px;
+  border-radius: 2px;
+  margin-bottom: 2.5px;
+}
+
+.mini-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 6.5px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* ── Loading skeleton tiles ── */
+.board-tile--skeleton {
+  background: var(--code-bg);
+  gap: 9px;
+  cursor: default;
+  pointer-events: none;
+  overflow: hidden;
+  box-shadow: 0 6px 14px -8px rgba(0, 0, 0, 0.4);
+  animation: none; /* skeletons appear immediately, no staggered entrance */
+}
+.board-tile--skeleton::after { content: none; }
+/* sweeping highlight over the placeholder bars */
+.board-tile--skeleton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--text-h) 9%, transparent) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: skeleton-sweep 1.5s ease-in-out infinite;
+}
+
+.skeleton-bar {
+  display: block;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-h) 12%, transparent);
+}
+.skeleton-bar--title { width: 62%; height: 16px; }
+.skeleton-bar--meta { width: 40%; height: 11px; }
+
+@keyframes skeleton-sweep {
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-tile,
+  .board-tile--create,
+  .board-tile-plus {
+    transition: none;
+  }
+  .board-tile {
+    animation: none;
+  }
+  .board-tile--skeleton::before {
+    animation: none;
+  }
+  .board-preview {
+    animation: none;
+  }
+  .board-tile:hover,
+  .board-tile:focus-visible,
+  .board-tile:active,
+  .board-tile--create:hover,
+  .board-tile--create:focus-visible {
+    transform: none;
+  }
+  .board-tile--create:hover .board-tile-plus,
+  .board-tile--create:focus-visible .board-tile-plus {
+    transform: none;
+  }
+  /* still summoning circle: no pulse, wiggle, or orbit — just the resting glow */
+  .board-tile-plus,
+  .board-tile-plus::before {
+    animation: none;
+    transform: none;
+  }
 }
 
 /* ── Dashboard topbar extras ── */
@@ -857,6 +1979,115 @@ select.card-input {
 .logout-btn {
   font-size: 13px;
   padding: 5px 12px;
+}
+
+/* ── Portal: particle settle (board materialises from drifting motes) ── */
+.portal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+/* gather phase: a soft, board-tinted veil held fully opaque while the board
+   renders behind it, so its heavy first paint is never seen as a stutter */
+.portal--settle {
+  background: radial-gradient(
+    circle at 50% 46%,
+    color-mix(in srgb, var(--portal-color, #c084fc) 24%, #07070c) 0%,
+    #07070c 78%
+  );
+  /* own compositor layer so the reveal fade can't be stalled by main-thread
+     work happening behind it */
+  transform: translateZ(0);
+  opacity: 1;
+}
+
+/* reveal phase: board has painted — fade the veil away to show it */
+.portal--reveal {
+  will-change: opacity;
+  animation: portal-reveal 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes portal-reveal {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* each mote drifts gently inward, glows softly, then fades — looping for the
+   length of the gather so the veil never looks frozen while a board loads.
+   Positions/sizes/timing are randomised per-mote in PortalTransition so the
+   scatter reads as organic, not a grid. */
+.portal-mote {
+  position: absolute;
+  width: var(--size, 12px);
+  height: var(--size, 12px);
+  border-radius: 50%;
+  /* glow is baked into the bitmap (gradient, not box-shadow) so the mote is
+     painted once and then only transformed/faded — every animated property
+     stays on the compositor, which is what keeps it at a smooth 60fps */
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--portal-color, #c084fc) 26%, #fff) 0%,
+    color-mix(in srgb, var(--portal-color, #c084fc) 78%, transparent) 36%,
+    transparent 72%
+  );
+  opacity: 0;
+  transform: translate3d(0, 0, 0) scale(0.6);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  animation: portal-mote var(--dur, 1s) ease-in-out var(--delay, 0s) infinite;
+}
+
+@keyframes portal-mote {
+  0%   { opacity: 0; transform: translate3d(calc(var(--mx, 0px) * -1), calc(var(--my, 0px) * -1), 0) scale(0.55); }
+  35%  { opacity: var(--mote-opacity, 0.7); }
+  70%  { opacity: var(--mote-opacity, 0.7); }
+  100% { opacity: 0; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+/* the status word at the centre of the gather, gently breathing. Only opacity
+   animates (the glow is a static text-shadow), so it stays on the compositor. */
+.portal-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  /* Cinzel — engraved Roman capitals, for an epic "gateway" feel; set in caps
+     with wide tracking so it reads as an inscription, not a label */
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(1.3rem, 3.6vw, 2.3rem);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em; /* balance the trailing tracking so caps stay centred */
+  color: color-mix(in srgb, var(--portal-color, #c084fc) 28%, #fff);
+  text-shadow: 0 0 26px color-mix(in srgb, var(--portal-color, #c084fc) 60%, transparent);
+  white-space: nowrap;
+  will-change: opacity;
+  animation: portal-label 1.8s ease-in-out infinite;
+}
+
+@keyframes portal-label {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* no drifting motes or breathing; the veil simply holds, then fades once the
+     board is in */
+  .portal-mote { display: none; }
+  .portal-label { animation: none; opacity: 0.92; }
+  .portal--reveal {
+    animation: portal-fade 0.3s ease forwards;
+  }
+}
+
+@keyframes portal-fade {
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
 /* ── Members panel ── */
@@ -1002,71 +2233,434 @@ select.card-input {
   }
 }
 
-/* ── Forgot password ── */
-.auth-forgot {
-  background: none;
-  border: none;
-  padding: 0;
+/* ── Card title clickable hint ── */
+.card-title--clickable {
   cursor: pointer;
-  color: var(--accent);
-  font-size: 12px;
-  text-align: left;
-  width: fit-content;
-
-  &:hover {
-    text-decoration: underline;
-  }
+  &:hover { color: var(--accent); }
+}
+.card-desc--clickable {
+  cursor: pointer;
 }
 
-.auth-reset-success {
-  font-size: 13px;
-  color: var(--text);
-  margin-bottom: 4px;
-}
-
-/* ── Change password modal ── */
-.modal-overlay {
+/* ── Card detail modal ── */
+.card-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
+  z-index: 300;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  z-index: 200;
+  padding: 40px 16px;
+  overflow-y: auto;
 }
 
-.modal-card {
+.card-modal {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 28px 28px 24px;
+  border-radius: 14px;
   width: 100%;
-  max-width: 360px;
+  max-width: 600px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  position: relative;
+  flex-shrink: 0;
 }
 
-.modal-header {
+.card-modal-header {
+  padding: 24px 24px 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.card-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+  line-height: 1.3;
+  padding-right: 28px;
+}
+
+.card-modal-body {
+  padding: 16px 24px 24px;
+}
+
+.card-modal-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card-modal-desc {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.card-modal-desc--empty {
+  color: var(--text-muted, #888);
+  font-style: italic;
+}
+
+.card-modal-section-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+/* ── Comments ── */
+.card-modal-comments {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   margin-bottom: 16px;
 }
 
-.modal-title {
-  font-size: 15px;
+.comment-empty {
+  font-size: 13px;
+  color: var(--text-muted, #888);
+  font-style: italic;
+  margin: 0;
+}
+
+.comment-item {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.comment-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.comment-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.comment-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.comment-author {
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-h);
 }
 
-.modal-actions {
+.comment-date {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+}
+
+.comment-body {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comment-reactions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.comment-reaction-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--border);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 1px 7px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.15s, border-color 0.15s;
+}
+.comment-reaction-pill:hover {
+  border-color: #6366f1;
+}
+.comment-reaction-pill.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: #6366f1;
+  color: var(--text-h);
+}
+.comment-reaction-pill span {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.comment-reaction-add-wrap {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+/* Reveal on hovering the comment, or keep visible while its picker is open */
+.comment-item:hover .comment-reaction-add-wrap,
+.comment-reaction-add-wrap:focus-within {
+  opacity: 1;
+}
+
+.comment-reaction-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  height: 26px;
+  padding: 0 7px;
+  cursor: pointer;
+  color: var(--text-muted, #888);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.comment-reaction-add:hover {
+  color: var(--text-h);
+  border-color: #6366f1;
+}
+
+.comment-actions {
   display: flex;
   gap: 8px;
   margin-top: 4px;
 }
 
-.modal-success {
+.comment-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  padding: 0;
+  transition: color 0.15s;
+
+  &:hover { color: var(--text-h); }
+}
+
+.comment-action-btn--danger:hover {
+  color: #ef4444;
+}
+
+.comment-edit-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  font-size: 13px;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.comment-edit-input {
+  min-height: 48px;
+  resize: vertical;
+}
+
+.comment-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-input {
+  min-height: 60px;
+  resize: vertical;
+  line-height: 1.5;
+  width: 100%;
+}
+
+.comment-input-wrap {
+  position: relative;
+  display: flex;
+}
+
+.comment-input-wrap .comment-input {
+  padding-right: 66px;
+}
+
+.comment-input-tools {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.emoji-picker-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.emoji-trigger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  border-radius: 6px;
+  color: var(--text-muted, #888);
+  transition: color 0.15s, background 0.15s;
+}
+.emoji-trigger-btn:hover {
+  color: var(--text-h);
+  background: var(--border);
+}
+.emoji-trigger-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  width: 288px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: var(--shadow);
+  z-index: 50;
+}
+
+.emoji-picker-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: 0 auto;
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+.emoji-picker-option:hover {
+  background: var(--border);
+}
+
+/* Card's own image shown in the detail modal */
+.card-modal-image-link {
+  display: block;
+  margin-bottom: 16px;
+}
+.card-modal-image {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+/* Image in a posted comment */
+.comment-image-link {
+  display: inline-block;
+  margin-top: 6px;
+}
+.comment-image {
+  max-width: 240px;
+  max-height: 240px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+/* Pending image preview in the composer */
+.comment-image-preview {
+  position: relative;
+  display: inline-block;
+  margin-top: 2px;
+}
+.comment-image-preview img {
+  max-width: 160px;
+  max-height: 160px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+.comment-image-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg);
   color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.comment-image-remove:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.comment-upload-disclaimer {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  opacity: 0.8;
+  margin: 0;
+}
+
+.comment-upload-status {
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  margin: 0;
+}
+.comment-upload-status--error {
+  color: #ef4444;
 }
