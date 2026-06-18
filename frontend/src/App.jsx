@@ -4,6 +4,7 @@ import { apiFetch } from './api.js'
 import AuthPage from './pages/AuthPage.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import BoardView from './pages/BoardView.jsx'
+import PortalTransition from './components/PortalTransition.jsx'
 
 // Derive the current route from the URL hash so it survives a page refresh.
 // #/board/<id> → a board, anything else → the dashboard.
@@ -17,6 +18,7 @@ export default function App() {
   const [status, setStatus] = useState('loading') // loading | auth | ready
   const [user, setUser] = useState(null)
   const [route, setRoute] = useState(parseHash)
+  const [portal, setPortal] = useState(null) // { color } while opening a board
 
   useEffect(() => {
     apiFetch('/api/auth/me').then(res => {
@@ -44,13 +46,18 @@ export default function App() {
     setStatus('auth')
   }
 
-  function openBoard(boardId) {
+  function openBoard(boardId, color) {
+    setPortal({ color: color || '#c084fc' })
     window.location.hash = `#/board/${boardId}`
   }
 
   function goDashboard() {
     window.location.hash = '#/'
   }
+
+  const portalEl = portal && (
+    <PortalTransition color={portal.color} onDone={() => setPortal(null)} />
+  )
 
   if (status === 'loading') {
     return (
@@ -63,18 +70,24 @@ export default function App() {
   if (status === 'auth') return <AuthPage onLogin={handleLogin} />
 
   if (route.view === 'board') return (
-    <BoardView
-      boardId={route.boardId}
-      user={user}
-      onBack={goDashboard}
-    />
+    <>
+      <BoardView
+        boardId={route.boardId}
+        user={user}
+        onBack={goDashboard}
+      />
+      {portalEl}
+    </>
   )
 
   return (
-    <Dashboard
-      user={user}
-      onOpenBoard={openBoard}
-      onLogout={handleLogout}
-    />
+    <>
+      <Dashboard
+        user={user}
+        onOpenBoard={openBoard}
+        onLogout={handleLogout}
+      />
+      {portalEl}
+    </>
   )
 }

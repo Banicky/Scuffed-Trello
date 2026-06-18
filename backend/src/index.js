@@ -137,11 +137,27 @@ app.get("/api/auth/me", async (req, res) => {
 
 // returns boards owned by or shared with the logged-in user
 app.get("/api/boards", requireAuth, async (req, res) => {
+  // per-board ordered list of card counts per column, for the tile previews
+  const columnCounts = `(
+    SELECT COALESCE(jsonb_agg(x.cnt ORDER BY x.position), '[]'::jsonb)
+    FROM (
+      SELECT col.position, COUNT(cards.id)::int AS cnt
+      FROM columns col
+      LEFT JOIN cards ON cards.column_id = col.id
+      WHERE col.board_id = b.id
+      GROUP BY col.id, col.position
+    ) x
+  )`;
   const result = await pool.query(
-    `SELECT b.*, 'owner' AS role FROM boards b WHERE b.owner_id = $1
+    `SELECT b.*, 'owner' AS role, ba.accessed_at AS last_accessed_at, ${columnCounts} AS column_counts
+       FROM boards b
+       LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $1
+       WHERE b.owner_id = $1
      UNION
-     SELECT b.*, 'member' AS role FROM boards b
+     SELECT b.*, 'member' AS role, ba.accessed_at AS last_accessed_at, ${columnCounts} AS column_counts
+       FROM boards b
        JOIN board_members bm ON bm.board_id = b.id
+       LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $1
        WHERE bm.user_id = $1
      ORDER BY id`,
     [req.session.userId]
@@ -162,8 +178,39 @@ app.get("/api/boards/:id", requireAuth, async (req, res) => {
   if (!await canAccessBoard(req.session.userId, req.params.id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
+  // record this user's most recent visit to the board
+  await pool.query(
+    `INSERT INTO board_access (board_id, user_id, accessed_at) VALUES ($1, $2, NOW())
+     ON CONFLICT (board_id, user_id) DO UPDATE SET accessed_at = NOW()`,
+    [req.params.id, req.session.userId]
+  );
   const result = await pool.query("SELECT * FROM boards WHERE id = $1", [req.params.id]);
   res.json(result.rows[0]);
+});
+
+// GET /api/boards/:id/preview — columns with a few card titles each, for the
+// dashboard hover preview. Capped so the payload stays small.
+app.get("/api/boards/:id/preview", requireAuth, async (req, res) => {
+  if (!await canAccessBoard(req.session.userId, req.params.id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const result = await pool.query(
+    `SELECT col.id, col.title,
+            (SELECT COUNT(*)::int FROM cards WHERE cards.column_id = col.id) AS card_count,
+            COALESCE((
+              SELECT jsonb_agg(jsonb_build_object('id', c.id, 'title', c.title, 'color', c.color) ORDER BY c.position)
+              FROM (
+                SELECT cards.id, cards.title, cards.position, labels.color
+                FROM cards LEFT JOIN labels ON labels.card_id = cards.id
+                WHERE cards.column_id = col.id ORDER BY cards.position LIMIT 8
+              ) c
+            ), '[]'::jsonb) AS cards
+     FROM columns col
+     WHERE col.board_id = $1
+     ORDER BY col.position`,
+    [req.params.id]
+  );
+  res.json({ columns: result.rows });
 });
 
 app.patch("/api/boards/:id", requireAuth, async (req, res) => {
@@ -564,6 +611,15 @@ async function migrate() {
     CREATE TABLE IF NOT EXISTS board_members (
       board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      PRIMARY KEY (board_id, user_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS board_access (
+      board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      accessed_at TIMESTAMPTZ DEFAULT NOW(),
       PRIMARY KEY (board_id, user_id)
     )
   `);
