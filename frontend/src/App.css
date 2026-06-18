@@ -38,6 +38,11 @@
   flex-shrink: 0;
 }
 
+.board-icon--brand {
+  background: linear-gradient(135deg, var(--accent), var(--accent-border));
+  box-shadow: 0 6px 16px var(--accent-bg);
+}
+
 .board-name {
   font-weight: 600;
   font-size: 15px;
@@ -842,32 +847,133 @@ select.card-input {
 .auth-shell {
   min-height: 100svh;
   display: flex;
+}
+
+.auth-visual {
+  flex: 1.1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: 56px;
+  background: #0b0c10;
+  color: #f3f4f6;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-visual-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.auth-visual-heading {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  max-width: 420px;
+}
+
+.auth-visual-sub {
+  font-size: 14px;
+  color: #a3a5b0;
+  max-width: 380px;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.auth-mock-board {
+  display: flex;
+  gap: 14px;
+}
+
+.auth-mock-col {
+  flex: 1;
+  max-width: 150px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-mock-col-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b8d98;
+}
+
+.auth-mock-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.auth-mock-card--active {
+  background: rgba(192, 132, 252, 0.16);
+  border: 1px solid rgba(192, 132, 252, 0.35);
+}
+
+.auth-mock-card--done {
+  opacity: 0.6;
+}
+
+.auth-mock-tag {
+  width: 22px;
+  height: 5px;
+  border-radius: 3px;
+  background: #c084fc;
+}
+
+.auth-mock-tag--alt {
+  background: #5eead4;
+}
+
+.auth-mock-line {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.auth-form-panel {
+  flex: 1;
+  display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--code-bg);
+  padding: 24px;
+  background: var(--bg);
 }
 
 .auth-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 36px 32px;
   width: 100%;
   max-width: 380px;
-  box-shadow: var(--shadow);
 }
 
-.auth-logo {
-  display: flex;
+.auth-mobile-brand {
+  display: none;
   align-items: center;
   gap: 10px;
   margin-bottom: 24px;
 }
 
-.auth-brand {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-h);
+@media (max-width: 900px) {
+  .auth-visual {
+    display: none;
+  }
+
+  .auth-mobile-brand {
+    display: flex;
+  }
 }
 
 .auth-tabs {
