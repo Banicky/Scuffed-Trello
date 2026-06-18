@@ -51,7 +51,7 @@ function AddCardForm({ onAdd, onCancel }) {
 // onDrop: when a card is dropped, passes the event
 // isDragOver: when true, applies the purple border/background highlight to the column
 // onDragOverCard / dragOverCardId: passed through to each Card so the insertion indicator works
-export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, isDraggingCol, isColDropTarget, colDragDirection, anyColDragging, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd, onOpenDetail }) {
+export default function Column({ column, colorIndex, onAddCard, onDeleteCard, onToggleStar, onEdit, onRenameColumn, onDeleteColumn, onDragOver, onDrop, isDragOver, isDraggingCol, isColDropTarget, colDragDirection, anyColDragging, onDragOverCard, dragOverCardId, onColumnDragStart, onColumnDrop, onColumnDragEnd, onOpenDetail, searchQuery, caseSensitive, wholeWord, onCardRef, activeMatchCardId }) {
   const [adding, setAdding] = useState(false)
   const [editingTitle, setEditingTitle] = useState(!!column.editingTitle)
   const [confirming, setConfirming] = useState(false)
@@ -138,6 +138,11 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
             onDragOverCard={onDragOverCard}
             isDropTarget={dragOverCardId === card.id}
             onOpenDetail={() => onOpenDetail(card)}
+            searchQuery={searchQuery}
+            caseSensitive={caseSensitive}
+            wholeWord={wholeWord}
+            cardRef={onCardRef}
+            isActiveMatch={activeMatchCardId === card.id}
           />
         ))}
         {adding

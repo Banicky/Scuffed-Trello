@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Column from '../components/Column.jsx'
 import CardDetailModal from '../components/CardDetailModal.jsx'
 import { apiFetch } from '../api.js'
@@ -79,8 +79,56 @@ export default function BoardView({ boardId, user, onBack }) {
   const [draggingColId, setDraggingColId] = useState(null)
   const [colDragOverId, setColDragOverId] = useState(null)
   const [detailCard, setDetailCard] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [caseSensitive, setCaseSensitive] = useState(false)
+  const [wholeWord, setWholeWord] = useState(false)
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0)
+  const cardRefs = useRef(new Map())
 
   const isOwner = board?.owner_id === user.id
+
+  const matches = useMemo(() => {
+    const query = searchQuery.trim()
+    if (!query) return []
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const pattern = wholeWord ? `\\b${escaped}\\b` : escaped
+    let regex
+    try {
+      regex = new RegExp(pattern, caseSensitive ? '' : 'i')
+    } catch {
+      return []
+    }
+    const found = []
+    columns.forEach(col => {
+      col.cards.forEach(card => {
+        if (regex.test(card.title) || regex.test(card.description || '')) found.push(card.id)
+      })
+    })
+    return found
+  }, [searchQuery, caseSensitive, wholeWord, columns])
+
+  useEffect(() => {
+    setActiveMatchIndex(0)
+  }, [searchQuery, caseSensitive, wholeWord])
+
+  useEffect(() => {
+    if (!matches.length) return
+    const idx = Math.min(activeMatchIndex, matches.length - 1)
+    const el = cardRefs.current.get(matches[idx])
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [matches, activeMatchIndex])
+
+  function registerCardRef(cardId, node) {
+    if (node) cardRefs.current.set(cardId, node)
+    else cardRefs.current.delete(cardId)
+  }
+
+  const activeMatchCardId = matches.length ? matches[Math.min(activeMatchIndex, matches.length - 1)] : null
+
+  function goToMatch(delta) {
+    if (!matches.length) return
+    setActiveMatchIndex(i => (i + delta + matches.length) % matches.length)
+  }
 
   useEffect(() => {
     async function load() {
@@ -334,6 +382,36 @@ export default function BoardView({ boardId, user, onBack }) {
             <div className="board-meta">{totalCards} cards · {doneCount} done</div>
           </div>
         </div>
+        <div className="topbar-search">
+          <input
+            className="search-input"
+            placeholder="Search cards…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+          <button
+            className={`search-toggle${caseSensitive ? ' active' : ''}`}
+            onClick={() => setCaseSensitive(v => !v)}
+            title="Case sensitive"
+          >
+            Aa
+          </button>
+          <button
+            className={`search-toggle${wholeWord ? ' active' : ''}`}
+            onClick={() => setWholeWord(v => !v)}
+            title="Match whole word"
+          >
+            “ab”
+          </button>
+          {searchQuery.trim() && (
+            <div className="search-nav">
+              <span className="search-count">{matches.length ? `${activeMatchIndex + 1}/${matches.length}` : '0/0'}</span>
+              <button className="search-nav-btn" onClick={() => goToMatch(-1)} disabled={!matches.length} title="Previous match">↑</button>
+              <button className="search-nav-btn" onClick={() => goToMatch(1)} disabled={!matches.length} title="Next match">↓</button>
+            </div>
+          )}
+        </div>
+
         <div className="topbar-right">
           <button
             className={`btn-ghost members-toggle${showMembers ? ' active' : ''}`}
@@ -404,6 +482,11 @@ export default function BoardView({ boardId, user, onBack }) {
             }}
             onColumnDragEnd={() => { setDraggingColId(null); setColDragOverId(null) }}
             onOpenDetail={card => setDetailCard(card)}
+            searchQuery={searchQuery.trim()}
+            caseSensitive={caseSensitive}
+            wholeWord={wholeWord}
+            onCardRef={registerCardRef}
+            activeMatchCardId={activeMatchCardId}
           />
           )
         })}

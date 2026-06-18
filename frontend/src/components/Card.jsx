@@ -4,6 +4,31 @@ import ImageUploadField from './ImageUploadField.jsx'
 import { TAG_COLORS } from '../constants.js'
 import { assetUrl } from '../api.js'
 
+function highlightMatches(text, query, caseSensitive, wholeWord, isActive) {
+  if (!text || !query) return text
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = wholeWord ? `\\b${escaped}\\b` : escaped
+  let regex
+  try {
+    regex = new RegExp(pattern, caseSensitive ? 'g' : 'gi')
+  } catch {
+    return text
+  }
+  const parts = []
+  let lastIndex = 0
+  let match
+  while ((match = regex.exec(text))) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
+    parts.push(
+      <mark key={match.index} className={`search-highlight${isActive ? ' active' : ''}`}>{match[0]}</mark>
+    )
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex === 0) return text
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex))
+  return parts
+}
+
 function EditCardForm({ card, onSave, onCancel }) {
   const [title, setTitle] = useState(card.title)
   const [desc, setDesc] = useState(card.description || '')
@@ -46,7 +71,7 @@ function EditCardForm({ card, onSave, onCancel }) {
 // onDragStart: stores this card's id in the drag event so the drop target knows which card was picked up
 // onDragOverCard: tells App which card is currently being hovered over, used to determine insertion point
 // isDropTarget: when true, renders a purple top border showing where the dragged card will be inserted
-export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart, onDragOverCard, isDropTarget, onOpenDetail }) {
+export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart, onDragOverCard, isDropTarget, onOpenDetail, searchQuery, caseSensitive, wholeWord, cardRef, isActiveMatch }) {
   const [editing, setEditing] = useState(false)
 
   if (editing) {
@@ -63,6 +88,7 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
 
   return (
     <div
+      ref={node => cardRef?.(card.id, node)}
       className={`kanban-card${isDropTarget ? ' drop-target' : ''}${card.starred ? ' starred' : ''}`}
       draggable
       onDragStart={onDragStart}
@@ -83,8 +109,14 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
           </button>
         </div>
       </div>
-      <p className="card-title card-title--clickable" onClick={onOpenDetail}>{card.title}</p>
-      {card.description && <p className="card-desc card-desc--clickable" onClick={onOpenDetail}>{card.description}</p>}
+      <p className="card-title card-title--clickable" onClick={onOpenDetail}>
+        {highlightMatches(card.title, searchQuery, caseSensitive, wholeWord, isActiveMatch)}
+      </p>
+      {card.description && (
+        <p className="card-desc card-desc--clickable" onClick={onOpenDetail}>
+          {highlightMatches(card.description, searchQuery, caseSensitive, wholeWord, isActiveMatch)}
+        </p>
+      )}
       {card.image_url && (
         <img
           className="card-image-thumb"
