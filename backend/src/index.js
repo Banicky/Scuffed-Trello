@@ -148,13 +148,24 @@ app.get("/api/boards", requireAuth, async (req, res) => {
       GROUP BY col.id, col.position
     ) x
   )`;
+  // everyone on the board — the owner first, then invited members — for the
+  // member avatars on each tile
+  const members = `(
+    SELECT COALESCE(
+      jsonb_agg(jsonb_build_object('id', u.id, 'username', u.username)
+                ORDER BY (u.id <> b.owner_id), u.username),
+      '[]'::jsonb)
+    FROM users u
+    WHERE u.id = b.owner_id
+       OR u.id IN (SELECT user_id FROM board_members WHERE board_id = b.id)
+  )`;
   const result = await pool.query(
-    `SELECT b.*, 'owner' AS role, ba.accessed_at AS last_accessed_at, ${columnCounts} AS column_counts
+    `SELECT b.*, 'owner' AS role, ba.accessed_at AS last_accessed_at, ${columnCounts} AS column_counts, ${members} AS members
        FROM boards b
        LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $1
        WHERE b.owner_id = $1
      UNION
-     SELECT b.*, 'member' AS role, ba.accessed_at AS last_accessed_at, ${columnCounts} AS column_counts
+     SELECT b.*, 'member' AS role, ba.accessed_at AS last_accessed_at, ${columnCounts} AS column_counts, ${members} AS members
        FROM boards b
        JOIN board_members bm ON bm.board_id = b.id
        LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $1

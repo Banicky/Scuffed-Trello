@@ -81,6 +81,12 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
   const monogram = (board.title.trim()[0] || '?').toUpperCase()
   const lastOpened = relativeTime(board.last_accessed_at)
 
+  // Everyone on the board (owner first), for the member avatars. Show a few and
+  // roll the rest into a "+N" chip so a crowded board still reads cleanly.
+  const members = board.members || []
+  const shownMembers = members.slice(0, 4)
+  const extraMembers = members.length - shownMembers.length
+
   // Real mini-kanban preview: a bar per column, height scaled to its card count.
   // Empty boards fall back to three short stubs so the tile still reads as a board.
   const counts = board.column_counts?.length ? board.column_counts.slice(0, 6) : [0, 0, 0]
@@ -112,9 +118,22 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
     clearTimeout(hoverTimer.current)
     hoverTimer.current = setTimeout(() => { setPreviewOpen(true); loadPreview() }, 320)
   }
-  function closePreview() {
+  function closePreview(e) {
     clearTimeout(hoverTimer.current)
     setPreviewOpen(false)
+    // recentre the torchlight so it fades from the middle, not its last spot
+    e?.currentTarget?.style.setProperty('--mx', '50%')
+    e?.currentTarget?.style.setProperty('--my', '0%')
+  }
+
+  // Torchlight: a specular highlight on the tile that follows the cursor, so
+  // each board reads as an enchanted relic catching candlelight on the atlas.
+  function trackTorch(e) {
+    const r = e.currentTarget.getBoundingClientRect()
+    const x = ((e.clientX - r.left) / r.width) * 100
+    const y = ((e.clientY - r.top) / r.height) * 100
+    e.currentTarget.style.setProperty('--mx', `${x}%`)
+    e.currentTarget.style.setProperty('--my', `${y}%`)
   }
 
   return (
@@ -124,6 +143,7 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
       onClick={() => !showSettings && onOpen(board.id, color)}
       onMouseEnter={openPreview}
       onMouseLeave={closePreview}
+      onMouseMove={trackTorch}
       role="button"
       tabIndex={0}
       onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !showSettings) { e.preventDefault(); onOpen(board.id, color) } }}
@@ -155,10 +175,29 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
       </div>
 
       <div className="board-tile-info">
-        <span className="board-tile-title">{board.title}</span>
-        <span className="board-tile-meta">
-          {lastOpened ? `Opened ${lastOpened}` : 'Not opened yet'}
-        </span>
+        <div className="board-tile-info-text">
+          <span className="board-tile-title">{board.title}</span>
+          <span className="board-tile-meta">
+            {lastOpened ? `Opened ${lastOpened}` : 'Not opened yet'}
+          </span>
+        </div>
+        {members.length > 0 && (
+          <div
+            className="board-tile-members"
+            aria-label={`Members: ${members.map(m => m.username).join(', ')}`}
+          >
+            {shownMembers.map(m => (
+              <span key={m.id} className="board-tile-avatar" title={m.username}>
+                {(m.username[0] || '?').toUpperCase()}
+              </span>
+            ))}
+            {extraMembers > 0 && (
+              <span className="board-tile-avatar board-tile-avatar--more" title={`${extraMembers} more`}>
+                +{extraMembers}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {previewOpen && !showSettings && (
@@ -296,6 +335,11 @@ export default function Dashboard({ user, onOpenBoard, onLogout }) {
 
   return (
     <div className="dashboard-shell">
+      {/* an arcane comet streaks across the sky every several seconds */}
+      <div className="sky-comet" aria-hidden="true">
+        <div className="sky-comet-streak" />
+      </div>
+
       <header className="topbar">
         <div className="topbar-left">
           <div className="board-icon">S</div>
@@ -355,7 +399,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout }) {
               {!addingBoard && (
                 <button className="board-tile board-tile--create" style={{ '--stagger': 0 }} onClick={() => setAddingBoard(true)}>
                   <span className="board-tile-plus" aria-hidden="true">+</span>
-                  <span className="board-tile-create-label">New Board</span>
+                  <span className="board-tile-create-label">Create a New World</span>
                 </button>
               )}
               {loading

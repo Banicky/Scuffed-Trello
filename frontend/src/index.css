@@ -14,7 +14,14 @@
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --display: 'Bricolage Grotesque', system-ui, 'Segoe UI', sans-serif;
+  --fantasy: 'Cinzel', Georgia, serif; /* engraved epic-fantasy caps */
   --mono: ui-monospace, Consolas, monospace;
+
+  /* ── Fantasy theme accents (wizards · knights · dragons) ── */
+  --metal: #d8dfe9;       /* polished platinum for frames/runes on colored surfaces */
+  --metal-deep: #8b94a3;  /* steel, deeper tone for accents */
+  --parchment: #efe6d0;   /* aged paper for scroll-like surfaces */
+  --ember: #d2461b;       /* dragonfire — reserved for danger only */
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
@@ -44,6 +51,7 @@
     --social-bg: rgba(47, 48, 58, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+    --ember: #e2552b;
   }
 
   #social .button-icon {

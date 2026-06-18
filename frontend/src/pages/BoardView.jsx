@@ -67,7 +67,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
   )
 }
 
-export default function BoardView({ boardId, user, onBack }) {
+export default function BoardView({ boardId, user, onBack, onReady }) {
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
   const [board, setBoard] = useState(null)
@@ -158,6 +158,16 @@ export default function BoardView({ boardId, user, onBack }) {
     }
     load()
   }, [boardId])
+
+  // Tell the portal the board has painted (one rAF after loading clears) so it
+  // holds the veil over the heavy first render, then fades to reveal it.
+  const readyFired = useRef(false)
+  useEffect(() => {
+    if (loading || readyFired.current) return
+    readyFired.current = true
+    const id = requestAnimationFrame(() => onReady?.())
+    return () => cancelAnimationFrame(id)
+  }, [loading, onReady])
 
   async function renameBoard(newTitle) {
     if (!newTitle.trim() || newTitle === board.title) return
@@ -352,7 +362,7 @@ export default function BoardView({ boardId, user, onBack }) {
 
   if (loading) return (
     <div className="app-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
-      Loading…
+      Teleporting…
     </div>
   )
 

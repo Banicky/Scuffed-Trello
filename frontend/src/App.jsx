@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import { apiFetch } from './api.js'
 import AuthPage from './pages/AuthPage.jsx'
@@ -19,6 +19,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [route, setRoute] = useState(parseHash)
   const [portal, setPortal] = useState(null) // { color } while opening a board
+  const [boardReady, setBoardReady] = useState(false) // board has rendered behind the portal
 
   useEffect(() => {
     apiFetch('/api/auth/me').then(res => {
@@ -47,16 +48,21 @@ export default function App() {
   }
 
   function openBoard(boardId, color) {
+    setBoardReady(false)
     setPortal({ color: color || '#c084fc' })
     window.location.hash = `#/board/${boardId}`
   }
+
+  // BoardView fires this once its content has painted, so the portal can hold
+  // the veil opaque over the heavy first render, then fade to reveal it.
+  const handleBoardReady = useCallback(() => setBoardReady(true), [])
 
   function goDashboard() {
     window.location.hash = '#/'
   }
 
   const portalEl = portal && (
-    <PortalTransition color={portal.color} onDone={() => setPortal(null)} />
+    <PortalTransition color={portal.color} ready={boardReady} onDone={() => setPortal(null)} />
   )
 
   if (status === 'loading') {
@@ -75,6 +81,7 @@ export default function App() {
         boardId={route.boardId}
         user={user}
         onBack={goDashboard}
+        onReady={handleBoardReady}
       />
       {portalEl}
     </>

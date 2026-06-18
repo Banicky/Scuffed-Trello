@@ -1165,10 +1165,13 @@ select.card-input {
   display: flex;
   flex-direction: column;
   min-height: 100svh;
-  /* faint pegboard dot-grid so the colorful tiles read as objects on a surface */
-  background-image: radial-gradient(var(--border) 1px, transparent 1px);
-  background-size: 22px 22px;
-  background-position: -1px -1px;
+  /* astral atlas: a sparse silvered starfield drifting over a faint pegboard grid,
+     so the colourful realm-tomes sit on a surface that reads as a night sky */
+  background-image:
+    radial-gradient(color-mix(in srgb, var(--metal) 30%, transparent) 1.2px, transparent 1.3px),
+    radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 96px 96px, 22px 22px;
+  background-position: 12px 28px, -1px -1px;
 }
 
 /* Prototype #1: a soft single-hue brand glow behind the hero only. It's
@@ -1222,6 +1225,90 @@ select.card-input {
 @keyframes aurora-drift-b {
   from { transform: scale(1);    opacity: 0.8; }
   to   { transform: scale(1.12); opacity: 1; }
+}
+
+/* ── Sky comet: an arcane shooting star with a rune-trail ──
+   Streaks diagonally across the upper sky in a brief window of the loop, then
+   rests off-screen, so a comet passes every several seconds. Sits behind the
+   page content. The leading point follows the keyframe path; the streak (a
+   rotated bar) trails behind it. */
+.sky-comet {
+  position: absolute;
+  top: 70px;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: comet-streak 8s linear infinite;
+}
+
+/* the tail: a tapering arcane streak whose bright (right) end is the comet
+   head; anchored so that bright end sits on the comet's travelling point */
+.sky-comet-streak {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 120px;
+  height: 5px;
+  transform-origin: right center;
+  transform: translate(-100%, -50%) rotate(14deg);
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 28%, transparent) 48%,
+    color-mix(in srgb, var(--accent) 72%, #fff) 94%,
+    transparent 100%
+  );
+}
+
+/* the glowing head at the leading end */
+.sky-comet-streak::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--accent) 80%, #fff) 45%, transparent 72%);
+  box-shadow:
+    0 0 14px 4px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 0 6px 2px rgba(255, 255, 255, 0.9);
+}
+
+/* faint platinum runes shimmering along the trail */
+.sky-comet-streak::before {
+  content: '';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  width: 96px;
+  height: 2px;
+  transform: translateY(-50%);
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0 6px,
+    color-mix(in srgb, var(--metal) 75%, transparent) 6px 8px
+  );
+  -webkit-mask: linear-gradient(to right, transparent, #000 65%, transparent);
+  mask: linear-gradient(to right, transparent, #000 65%, transparent);
+  opacity: 0.7;
+}
+
+@keyframes comet-streak {
+  0%   { transform: translate(-12vw, -4vw); opacity: 0; }
+  4%   { opacity: 1; }
+  16%  { transform: translate(116vw, 28vw); opacity: 0; }
+  100% { transform: translate(116vw, 28vw); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sky-comet { display: none; }
 }
 
 .dashboard-main {
@@ -1315,7 +1402,11 @@ select.card-input {
   cursor: pointer;
   text-align: left;
   color: #fff;
-  background: var(--tile);
+  /* faceted gem fill: lit from the top-left, deepening toward the bottom-right,
+     so each realm-tome reads as an enamelled, dimensional object */
+  background:
+    radial-gradient(135% 120% at 20% 10%, color-mix(in srgb, var(--tile) 55%, #fff) 0%, transparent 44%),
+    linear-gradient(152deg, color-mix(in srgb, var(--tile) 86%, #fff) 0%, var(--tile) 42%, color-mix(in srgb, var(--tile) 68%, #000) 100%);
   /* layered resting shadow + a faint halo in the tile's own colour, so the
      glow emanates from the boards themselves rather than the empty page */
   box-shadow:
@@ -1366,6 +1457,38 @@ select.card-input {
   z-index: 0;
 }
 
+/* heraldic rule: a thin inset platinum frame, like the chased border of a
+   knight's shield */
+.board-tile-face::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--metal) 60%, transparent);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+}
+
+/* moonlight: a soft cool highlight that tracks the cursor (--mx/--my set in JS),
+   clipped to the rounded face so it reads as light gliding across the steel */
+.board-tile-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    220px 220px at var(--mx, 50%) var(--my, 0%),
+    rgba(244, 248, 255, 0.40),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.board-tile:hover .board-tile-face::after,
+.board-tile:focus-visible .board-tile-face::after {
+  opacity: 1;
+}
+
 .board-tile:hover,
 .board-tile:focus-visible {
   transform: translateY(-4px);
@@ -1411,13 +1534,25 @@ select.card-input {
 
 .board-tile-monogram {
   position: absolute;
-  top: -18px;
-  right: -6px;
-  font-family: var(--display);
+  top: -16px;
+  right: -4px;
+  /* illuminated drop-cap: an engraved initial leafed in gold, the way a
+     manuscript opens a chapter */
+  font-family: var(--fantasy);
   font-weight: 800;
   font-size: 104px;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(
+    158deg,
+    color-mix(in srgb, var(--metal) 92%, #fff) 0%,
+    var(--metal) 46%,
+    var(--metal-deep) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  opacity: 0.5;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.28));
   pointer-events: none;
   user-select: none;
 }
@@ -1477,9 +1612,49 @@ select.card-input {
   position: relative;
   z-index: 2;
   display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.board-tile-info-text {
+  display: flex;
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  flex: 1;
+}
+
+/* overlapping member avatars (initials), owner first */
+.board-tile-members {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  padding-left: 7px; /* room for the first avatar's overlap margin */
+}
+.board-tile-avatar {
+  width: 24px;
+  height: 24px;
+  margin-left: -7px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.24);
+  /* a ring in a darkened shade of the tile so overlapping discs stay distinct */
+  border: 1.5px solid color-mix(in srgb, var(--tile) 55%, #000);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  user-select: none;
+}
+.board-tile-avatar--more {
+  background: rgba(0, 0, 0, 0.38);
+  font-size: 9.5px;
 }
 
 .board-tile-title {
@@ -1506,11 +1681,12 @@ select.card-input {
   text-overflow: ellipsis;
 }
 
-/* ── Create tile ── */
+/* ── Create tile (an empty, steel-edged plinth awaiting a new realm) ── */
 .board-tile--create {
   background: transparent;
+  /* keep the label in the readable UI text colour; the metal lives in the edge */
   color: var(--text);
-  border: 1.5px dashed var(--border);
+  border: 1.5px dashed color-mix(in srgb, var(--metal) 60%, var(--border));
   box-shadow: none;
   align-items: center;
   justify-content: center;
@@ -1521,23 +1697,86 @@ select.card-input {
 .board-tile--create:hover,
 .board-tile--create:focus-visible {
   transform: translateY(-3px);
-  border-color: var(--accent-border);
-  color: var(--accent);
-  background: var(--accent-bg);
-  box-shadow: none;
+  border-color: var(--metal);
+  color: var(--text-h);
+  background: color-mix(in srgb, var(--metal) 14%, transparent);
+  box-shadow: 0 10px 30px -16px color-mix(in srgb, var(--metal) 70%, transparent);
   outline: none;
 }
+/* summoning circle: the glyph sits inside an arcane ring that is forever
+   alive — breathing a glow, pulsing, and wobbling as if barely contained —
+   encircled by a dashed rune-band that orbits it */
 .board-tile-plus {
-  font-family: var(--display);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--metal) 55%, transparent);
+  font-family: var(--fantasy);
   font-weight: 700;
-  font-size: 34px;
+  font-size: 24px;
   line-height: 1;
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* resting glow — also the value reduced-motion users keep */
+  box-shadow:
+    0 0 14px -2px color-mix(in srgb, var(--accent) 50%, transparent),
+    inset 0 0 10px -4px color-mix(in srgb, var(--accent) 38%, transparent);
+  transition: border-color 0.22s ease;
+  animation: summon-pulse 3.2s ease-in-out infinite;
 }
+
+/* the orbiting rune-band — always turning */
+.board-tile-plus::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--metal) 45%, transparent);
+  opacity: 0.6;
+  transition: opacity 0.22s ease;
+  animation: summon-spin 12s linear infinite;
+}
+
 .board-tile--create:hover .board-tile-plus,
 .board-tile--create:focus-visible .board-tile-plus {
-  transform: rotate(90deg) scale(1.18);
+  border-color: var(--metal);
 }
+.board-tile--create:hover .board-tile-plus::before,
+.board-tile--create:focus-visible .board-tile-plus::before {
+  opacity: 1;
+  animation-duration: 5s; /* the band whirls faster as you reach in */
+}
+
+/* constant pulse (scale + glow) and wiggle (drift + tilt) */
+@keyframes summon-pulse {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    box-shadow:
+      0 0 13px -3px color-mix(in srgb, var(--accent) 45%, transparent),
+      inset 0 0 10px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  25% { transform: translate(-2.5px, -1.5px) rotate(-5deg) scale(1.04); }
+  50% {
+    transform: translate(2.5px, 1.5px) rotate(5deg) scale(1.07);
+    box-shadow:
+      0 0 26px 1px color-mix(in srgb, var(--accent) 70%, transparent),
+      inset 0 0 15px -3px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  75% { transform: translate(-1.5px, 2px) rotate(-3deg) scale(1.03); }
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    box-shadow:
+      0 0 13px -3px color-mix(in srgb, var(--accent) 45%, transparent),
+      inset 0 0 10px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+}
+
+@keyframes summon-spin {
+  to { transform: rotate(360deg); }
+}
+
 .board-tile-create-label {
   font-size: 13.5px;
   font-weight: 600;
@@ -1723,6 +1962,12 @@ select.card-input {
   .board-tile--create:focus-visible .board-tile-plus {
     transform: none;
   }
+  /* still summoning circle: no pulse, wiggle, or orbit — just the resting glow */
+  .board-tile-plus,
+  .board-tile-plus::before {
+    animation: none;
+    transform: none;
+  }
 }
 
 /* ── Dashboard topbar extras ── */
@@ -1736,72 +1981,108 @@ select.card-input {
   padding: 5px 12px;
 }
 
-/* ── Portal iris transition (opening a board) ── */
-@property --portal-r {
-  syntax: '<length>';
-  inherits: false;
-  initial-value: 0px;
-}
-
+/* ── Portal: particle settle (board materialises from drifting motes) ── */
 .portal {
   position: fixed;
   inset: 0;
   z-index: 1000;
   pointer-events: none;
-  --portal-r: 0px;
-  /* dark portal surface, tinted with the board's colour */
-  background: radial-gradient(
-    circle at 50% 50%,
-    color-mix(in srgb, var(--portal-color, #c084fc) 32%, #07070c) 0%,
-    #06060b 70%
-  );
-  /* an expanding transparent hole reveals the board behind, with a soft
-     feathered edge so it eases open rather than snapping */
-  -webkit-mask: radial-gradient(circle at 50% 50%, transparent var(--portal-r), #000 calc(var(--portal-r) + 80px));
-  mask: radial-gradient(circle at 50% 50%, transparent var(--portal-r), #000 calc(var(--portal-r) + 80px));
-  /* isolate onto its own layer so the reveal doesn't stutter while the board
-     mounts behind it */
   isolation: isolate;
-  will-change: mask, -webkit-mask;
+}
+
+/* gather phase: a soft, board-tinted veil held fully opaque while the board
+   renders behind it, so its heavy first paint is never seen as a stutter */
+.portal--settle {
+  background: radial-gradient(
+    circle at 50% 46%,
+    color-mix(in srgb, var(--portal-color, #c084fc) 24%, #07070c) 0%,
+    #07070c 78%
+  );
+  /* own compositor layer so the reveal fade can't be stalled by main-thread
+     work happening behind it */
   transform: translateZ(0);
-  animation: portal-open 1.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 1;
 }
 
-@keyframes portal-open {
-  0%   { --portal-r: 0px; }
-  100% { --portal-r: 165vmax; }
+/* reveal phase: board has painted — fade the veil away to show it */
+.portal--reveal {
+  will-change: opacity;
+  animation: portal-reveal 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* the rim that leads the opening edge — soft and dim, not a bright flash */
-.portal-ring {
+@keyframes portal-reveal {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* each mote drifts gently inward, glows softly, then fades — looping for the
+   length of the gather so the veil never looks frozen while a board loads.
+   Positions/sizes/timing are randomised per-mote in PortalTransition so the
+   scatter reads as organic, not a grid. */
+.portal-mote {
+  position: absolute;
+  width: var(--size, 12px);
+  height: var(--size, 12px);
+  border-radius: 50%;
+  /* glow is baked into the bitmap (gradient, not box-shadow) so the mote is
+     painted once and then only transformed/faded — every animated property
+     stays on the compositor, which is what keeps it at a smooth 60fps */
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--portal-color, #c084fc) 26%, #fff) 0%,
+    color-mix(in srgb, var(--portal-color, #c084fc) 78%, transparent) 36%,
+    transparent 72%
+  );
+  opacity: 0;
+  transform: translate3d(0, 0, 0) scale(0.6);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  animation: portal-mote var(--dur, 1s) ease-in-out var(--delay, 0s) infinite;
+}
+
+@keyframes portal-mote {
+  0%   { opacity: 0; transform: translate3d(calc(var(--mx, 0px) * -1), calc(var(--my, 0px) * -1), 0) scale(0.55); }
+  35%  { opacity: var(--mote-opacity, 0.7); }
+  70%  { opacity: var(--mote-opacity, 0.7); }
+  100% { opacity: 0; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+/* the status word at the centre of the gather, gently breathing. Only opacity
+   animates (the glow is a static text-shadow), so it stays on the compositor. */
+.portal-label {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1.5px solid color-mix(in srgb, var(--portal-color, #c084fc) 45%, #fff);
-  box-shadow:
-    0 0 38px 6px color-mix(in srgb, var(--portal-color, #c084fc) 40%, transparent),
-    inset 0 0 16px color-mix(in srgb, var(--portal-color, #c084fc) 35%, transparent);
-  transform: translate(-50%, -50%) scale(0);
-  will-change: transform, opacity;
-  animation: portal-ring 1.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  /* Cinzel — engraved Roman capitals, for an epic "gateway" feel; set in caps
+     with wide tracking so it reads as an inscription, not a label */
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(1.3rem, 3.6vw, 2.3rem);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em; /* balance the trailing tracking so caps stay centred */
+  color: color-mix(in srgb, var(--portal-color, #c084fc) 28%, #fff);
+  text-shadow: 0 0 26px color-mix(in srgb, var(--portal-color, #c084fc) 60%, transparent);
+  white-space: nowrap;
+  will-change: opacity;
+  animation: portal-label 1.8s ease-in-out infinite;
 }
 
-@keyframes portal-ring {
-  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-  20%  { opacity: 0.55; }
-  100% { transform: translate(-50%, -50%) scale(185); opacity: 0; }
+@keyframes portal-label {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .portal {
-    -webkit-mask: none;
-    mask: none;
-    animation: portal-fade 0.25s ease forwards;
+  /* no drifting motes or breathing; the veil simply holds, then fades once the
+     board is in */
+  .portal-mote { display: none; }
+  .portal-label { animation: none; opacity: 0.92; }
+  .portal--reveal {
+    animation: portal-fade 0.3s ease forwards;
   }
-  .portal-ring { display: none; }
 }
 
 @keyframes portal-fade {
