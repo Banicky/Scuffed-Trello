@@ -1167,6 +1167,17 @@ async function migrate() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS card_activity_board_idx ON card_activity (board_id, created_at DESC)
   `);
+
+  // labels references cards(id), so it must be created inside migrate() *after*
+  // the cards table — not stranded at module scope where it ran first.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS labels (
+      id SERIAL PRIMARY KEY,
+      card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      name VARCHAR(100),
+      color VARCHAR(50)
+    )
+  `);
 }
 
 // JSON error handler — covers multer upload errors (size/type)
@@ -1176,15 +1187,6 @@ app.use((err, req, res, next) => {
     : err.message || "Upload failed";
   res.status(400).json({ error: message });
 });
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS labels (
-      id SERIAL PRIMARY KEY,
-      card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-      name VARCHAR(100),
-      color VARCHAR(50)
-    )
-  `);
 
 const PORT = process.env.PORT || 4000;
 migrate().then(() => app.listen(PORT, () => console.log(`Server running on port ${PORT}`)));
