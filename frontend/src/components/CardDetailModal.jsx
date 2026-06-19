@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Tag from './Tag.jsx'
 import { apiFetch, uploadImage, assetUrl } from '../api.js'
+import UserAvatar from './UserAvatar.jsx'
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -211,7 +212,7 @@ export default function CardDetailModal({ card, currentUserId, onClose, onCommen
                 )}
                 {comments.map(cm => (
                   <div key={cm.id} className="comment-item">
-                    <div className="comment-avatar">{cm.username.charAt(0).toUpperCase()}</div>
+                    <UserAvatar user={{ username: cm.username, avatar_url: cm.avatar_url }} className="comment-avatar" />
                     {editingCommentId !== cm.id && (
                       <div className="comment-reaction-add-wrap" ref={reactionPickerId === cm.id ? reactionPickerRef : null}>
                         <button

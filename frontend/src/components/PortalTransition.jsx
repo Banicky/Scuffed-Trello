@@ -90,7 +90,7 @@ export default function PortalTransition({ color, ready, onDone }) {
           }}
         />
       ))}
-      <span className="portal-label">Teleporting…</span>
+      <span className="portal-label">Journeying…</span>
     </div>
   )
 }
