@@ -719,6 +719,7 @@ function readSkeletonCount(key, fallback) {
   }
 }
 
+export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings }) {
 const DASH_STARS = [
   { left: '21%', top: 72,  size: 4, dur: 6.4, delay: 0.0 },
   { left: '33%', top: 92,  size: 3, dur: 5.8, delay: 2.6 },
@@ -1083,6 +1084,14 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
           <h1 className="topbar-page-title">{isPersonal ? 'My Boards' : (guildDetails?.name || 'Guild')}</h1>
         </div>
         <div className="topbar-right">
+          <button
+            className="dashboard-username dashboard-username--link"
+            onClick={onOpenSettings}
+            title="Account settings"
+          >
+            {user.username}
+          </button>
+          <button className="btn-ghost logout-btn" onClick={onLogout}>Log out</button>
           <div
             className={`dash-searchbar-wrap${searchOpen ? ' open' : ''}`}
             ref={searchRef}

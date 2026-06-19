@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import Column from '../components/Column.jsx'
 import CardDetailModal from '../components/CardDetailModal.jsx'
+import NotificationBell from '../components/NotificationBell.jsx'
 import ImageUploadField from '../components/ImageUploadField.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
 import { apiFetch, assetUrl } from '../api.js'
@@ -60,6 +61,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
             placeholder="Username or email"
             value={invite}
             onChange={e => setInvite(e.target.value)}
+            maxLength={255}
           />
           <button className="btn-primary" type="submit">Invite</button>
         </form>
@@ -69,7 +71,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
   )
 }
 
-export default function BoardView({ boardId, user, onBack, onReady }) {
+export default function BoardView({ boardId, user, onBack, onReady, onOpenSettings }) {
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
   const [board, setBoard] = useState(null)
@@ -405,6 +407,7 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
               <input
                 className="board-name-input"
                 defaultValue={board.title}
+                maxLength={255}
                 autoFocus
                 onBlur={e => { renameBoard(e.target.value); setEditingTitle(false) }}
                 onKeyDown={e => {
@@ -419,6 +422,7 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
             )}
             <div className="board-meta">{totalCards} cards · {doneCount} done</div>
           </div>
+          <NotificationBell boardId={boardId} />
         </div>
         <div className="topbar-search">
           <div className="search-input-wrap">
@@ -469,6 +473,15 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
             onClick={() => setShowMembers(v => !v)}
           >
             👥 Members
+          </button>
+          <button
+            className="avatar avatar--btn"
+            title="Account settings"
+            onClick={onOpenSettings}
+          >
+            {user.avatar_url
+              ? <img src={assetUrl(user.avatar_url)} alt="" className="avatar-img" />
+              : user.username.charAt(0).toUpperCase()}
           </button>
           <UserAvatar user={user} className="avatar" />
         </div>

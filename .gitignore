@@ -1,13 +1,7 @@
 node_modules/
-<<<<<<< HEAD
-.env
-dist/
-.DS_Store
-=======
 dist/
 .env
 .vite/
 *.log
 .DS_Store
 Thumbs.db
->>>>>>> main
