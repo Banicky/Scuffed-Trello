@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { apiFetch, uploadImage, assetUrl } from '../api.js'
+import { hexToRgb } from '../utils.js'
 
 const AVATAR_PRESETS = [
   { key: '⚔', label: 'Knight' },
@@ -36,11 +37,6 @@ export function applyAccentTheme(value, userId) {
   root.style.setProperty('--accent', theme.accent)
   root.style.setProperty('--accent-bg', theme.accBg)
   root.style.setProperty('--accent-border', theme.accBorder)
-}
-
-function hexToRgb(hex) {
-  const n = parseInt(hex.slice(1), 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
 function applyCustomAccent(hex) {
@@ -284,11 +280,7 @@ function CustomizationSection({ userId }) {
     setActiveTheme('custom')
     localStorage.setItem(`accent-custom-${userId}`, hex)
     localStorage.setItem(`accent-theme-${userId}`, 'custom')
-    const [r, g, b] = [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]
-    const root = document.documentElement
-    root.style.setProperty('--accent', hex)
-    root.style.setProperty('--accent-bg', `rgba(${r},${g},${b},0.12)`)
-    root.style.setProperty('--accent-border', `rgba(${r},${g},${b},0.35)`)
+    applyCustomAccent(hex)
   }, [userId])
 
   function toggleReducedMotion(e) {

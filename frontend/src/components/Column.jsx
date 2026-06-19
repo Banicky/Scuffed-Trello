@@ -58,7 +58,8 @@ export default function Column({ column, colorIndex, onAddCard, onDeleteCard, on
   const [collapsed, setCollapsed] = useState(false)
 
   async function handleAdd(cardData) {
-    await onAddCard(column.id, cardData, column.cards.length + 1)
+    // position is 0-based to match the reordering logic in moveCard/toggleStar
+    await onAddCard(column.id, cardData, column.cards.length)
     setAdding(false)
   }
 

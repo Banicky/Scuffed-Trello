@@ -3,17 +3,12 @@ import Tag from './Tag.jsx'
 import ImageUploadField from './ImageUploadField.jsx'
 import { TAG_COLORS } from '../constants.js'
 import { assetUrl } from '../api.js'
+import { buildSearchRegex } from '../utils.js'
 
 function highlightMatches(text, query, caseSensitive, wholeWord, isActive) {
   if (!text || !query) return text
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const pattern = wholeWord ? `\\b${escaped}\\b` : escaped
-  let regex
-  try {
-    regex = new RegExp(pattern, caseSensitive ? 'g' : 'gi')
-  } catch {
-    return text
-  }
+  const regex = buildSearchRegex(query, { caseSensitive, wholeWord, flags: 'g' })
+  if (!regex) return text
   const parts = []
   let lastIndex = 0
   let match

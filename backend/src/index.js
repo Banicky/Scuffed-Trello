@@ -66,6 +66,30 @@ async function canAccessBoard(userId, boardId) {
   return result.rowCount > 0;
 }
 
+// per-board ordered list of card counts per column, for the tile previews
+const COLUMN_COUNTS_SQL = `(
+  SELECT COALESCE(jsonb_agg(x.cnt ORDER BY x.position), '[]'::jsonb)
+  FROM (
+    SELECT col.position, COUNT(cards.id)::int AS cnt
+    FROM columns col
+    LEFT JOIN cards ON cards.column_id = col.id
+    WHERE col.board_id = b.id
+    GROUP BY col.id, col.position
+  ) x
+)`;
+
+// everyone on the board — the owner first, then invited members — for the
+// member avatars on each tile
+const BOARD_MEMBERS_SQL = `(
+  SELECT COALESCE(
+    jsonb_agg(jsonb_build_object('id', u.id, 'username', u.username, 'avatar_url', u.avatar_url)
+              ORDER BY (u.id <> b.owner_id), u.username),
+    '[]'::jsonb)
+  FROM users u
+  WHERE u.id = b.owner_id
+     OR u.id IN (SELECT user_id FROM board_members WHERE board_id = b.id)
+)`;
+
 async function isOwner(userId, boardId) {
   const result = await pool.query(
     "SELECT 1 FROM boards WHERE id = $1 AND owner_id = $2",
@@ -169,32 +193,10 @@ app.post("/api/users/password", requireAuth, async (req, res) => {
 
 // returns boards owned by or shared with the logged-in user
 app.get("/api/boards", requireAuth, async (req, res) => {
-  // per-board ordered list of card counts per column, for the tile previews
-  const columnCounts = `(
-    SELECT COALESCE(jsonb_agg(x.cnt ORDER BY x.position), '[]'::jsonb)
-    FROM (
-      SELECT col.position, COUNT(cards.id)::int AS cnt
-      FROM columns col
-      LEFT JOIN cards ON cards.column_id = col.id
-      WHERE col.board_id = b.id
-      GROUP BY col.id, col.position
-    ) x
-  )`;
-  // everyone on the board — the owner first, then invited members — for the
-  // member avatars on each tile
-  const members = `(
-    SELECT COALESCE(
-      jsonb_agg(jsonb_build_object('id', u.id, 'username', u.username, 'avatar_url', u.avatar_url)
-                ORDER BY (u.id <> b.owner_id), u.username),
-      '[]'::jsonb)
-    FROM users u
-    WHERE u.id = b.owner_id
-       OR u.id IN (SELECT user_id FROM board_members WHERE board_id = b.id)
-  )`;
   const result = await pool.query(
     `SELECT b.*, 'owner' AS role, ba.accessed_at AS last_accessed_at,
             g.name AS guild_name, g.icon_color AS guild_icon_color,
-            ${columnCounts} AS column_counts, ${members} AS members
+            ${COLUMN_COUNTS_SQL} AS column_counts, ${BOARD_MEMBERS_SQL} AS members
        FROM boards b
        LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $1
        LEFT JOIN guilds g ON g.id = b.guild_id
@@ -202,7 +204,7 @@ app.get("/api/boards", requireAuth, async (req, res) => {
      UNION
      SELECT b.*, 'member' AS role, ba.accessed_at AS last_accessed_at,
             g.name AS guild_name, g.icon_color AS guild_icon_color,
-            ${columnCounts} AS column_counts, ${members} AS members
+            ${COLUMN_COUNTS_SQL} AS column_counts, ${BOARD_MEMBERS_SQL} AS members
        FROM boards b
        JOIN board_members bm ON bm.board_id = b.id
        LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $1
@@ -581,31 +583,12 @@ app.get("/api/guilds/:id/boards", requireAuth, async (req, res) => {
   if (!await canAccessGuild(req.session.userId, req.params.id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
-  const columnCounts = `(
-    SELECT COALESCE(jsonb_agg(x.cnt ORDER BY x.position), '[]'::jsonb)
-    FROM (
-      SELECT col.position, COUNT(cards.id)::int AS cnt
-      FROM columns col
-      LEFT JOIN cards ON cards.column_id = col.id
-      WHERE col.board_id = b.id
-      GROUP BY col.id, col.position
-    ) x
-  )`;
-  const members = `(
-    SELECT COALESCE(
-      jsonb_agg(jsonb_build_object('id', u.id, 'username', u.username, 'avatar_url', u.avatar_url)
-                ORDER BY (u.id <> b.owner_id), u.username),
-      '[]'::jsonb)
-    FROM users u
-    WHERE u.id = b.owner_id
-       OR u.id IN (SELECT user_id FROM board_members WHERE board_id = b.id)
-  )`;
   const result = await pool.query(
     `SELECT b.*,
        CASE WHEN b.owner_id = $2 THEN 'owner' ELSE 'member' END AS role,
        ba.accessed_at AS last_accessed_at,
-       ${columnCounts} AS column_counts,
-       ${members} AS members
+       ${COLUMN_COUNTS_SQL} AS column_counts,
+       ${BOARD_MEMBERS_SQL} AS members
      FROM boards b
      LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $2
      WHERE b.guild_id = $1
@@ -1060,12 +1043,17 @@ async function migrate() {
   `);
 }
 
-// JSON error handler — covers multer upload errors (size/type)
+// JSON error handler — multer upload errors (size/type) map to 400; anything
+// else is an unexpected server error.
 app.use((err, req, res, next) => {
-  const message = err.code === "LIMIT_FILE_SIZE"
-    ? "Image is too large (max 5 MB)"
-    : err.message || "Upload failed";
-  res.status(400).json({ error: message });
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({ error: "Image is too large (max 5 MB)" });
+  }
+  if (err instanceof multer.MulterError || /image files are allowed/i.test(err.message || "")) {
+    return res.status(400).json({ error: err.message || "Upload failed" });
+  }
+  console.error(err);
+  res.status(500).json({ error: "Something went wrong" });
 });
 
 const PORT = process.env.PORT || 4000;

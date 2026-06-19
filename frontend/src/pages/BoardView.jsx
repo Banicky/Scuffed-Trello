@@ -4,7 +4,7 @@ import CardDetailModal from '../components/CardDetailModal.jsx'
 import ImageUploadField from '../components/ImageUploadField.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
 import { apiFetch, assetUrl } from '../api.js'
-import { COLUMN_PALETTE } from '../constants.js'
+import { buildSearchRegex } from '../utils.js'
 
 function MembersPanel({ boardId, isOwner, onClose }) {
   const [members, setMembers] = useState([])
@@ -91,16 +91,8 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
   const isOwner = board?.owner_id === user.id
 
   const matches = useMemo(() => {
-    const query = searchQuery.trim()
-    if (!query) return []
-    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const pattern = wholeWord ? `\\b${escaped}\\b` : escaped
-    let regex
-    try {
-      regex = new RegExp(pattern, caseSensitive ? '' : 'i')
-    } catch {
-      return []
-    }
+    const regex = buildSearchRegex(searchQuery.trim(), { caseSensitive, wholeWord })
+    if (!regex) return []
     const found = []
     columns.forEach(col => {
       col.cards.forEach(card => {

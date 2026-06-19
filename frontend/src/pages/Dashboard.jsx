@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { apiFetch, assetUrl } from '../api.js'
 import { COLUMN_PALETTE } from '../constants.js'
+import { relativeTime } from '../utils.js'
 import UserAvatar from '../components/UserAvatar.jsx'
 
 const GUILD_COLORS = [
@@ -366,23 +367,6 @@ function UserMenu({ user, onOpenSettings, onLogout }) {
 }
 
 const previewCache = new Map()
-
-function relativeTime(iso) {
-  if (!iso) return null
-  const sec = Math.round((Date.now() - new Date(iso).getTime()) / 1000)
-  if (sec < 45) return 'just now'
-  const min = Math.round(sec / 60)
-  if (min < 60) return `${min}m ago`
-  const hr = Math.round(min / 60)
-  if (hr < 24) return `${hr}h ago`
-  const day = Math.round(hr / 24)
-  if (day < 7) return `${day}d ago`
-  const wk = Math.round(day / 7)
-  if (wk < 5) return `${wk}w ago`
-  const mo = Math.round(day / 30)
-  if (mo < 12) return `${mo}mo ago`
-  return `${Math.round(day / 365)}y ago`
-}
 
 function BoardSettingsPopover({ board, onRename, onDelete, onClose }) {
   const [renameVal, setRenameVal] = useState(board.title)
