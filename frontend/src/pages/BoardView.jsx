@@ -60,6 +60,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
             placeholder="Username or email"
             value={invite}
             onChange={e => setInvite(e.target.value)}
+            maxLength={255}
           />
           <button className="btn-primary" type="submit">Invite</button>
         </form>
@@ -69,7 +70,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
   )
 }
 
-export default function BoardView({ boardId, user, onBack, onReady }) {
+export default function BoardView({ boardId, user, onBack, onReady, onOpenSettings }) {
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
   const [board, setBoard] = useState(null)
@@ -397,6 +398,7 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
               <input
                 className="board-name-input"
                 defaultValue={board.title}
+                maxLength={255}
                 autoFocus
                 onBlur={e => { renameBoard(e.target.value); setEditingTitle(false) }}
                 onKeyDown={e => {
@@ -462,7 +464,13 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
           >
             👥 Members
           </button>
-          <UserAvatar user={user} className="avatar" />
+          <button
+            className="avatar avatar--btn"
+            title="Account settings"
+            onClick={() => onOpenSettings?.()}
+          >
+            <UserAvatar user={user} className="avatar" />
+          </button>
         </div>
       </header>
 

@@ -84,6 +84,140 @@
   line-height: 1.2;
 }
 
+/* ── Notification bell ── */
+.notif {
+  position: relative;
+}
+
+.notif-bell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.notif-bell:hover,
+.notif-bell.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--text-h);
+}
+
+.notif-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--ember, #d2461b);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  z-index: 300;
+}
+
+.notif-header {
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--code-bg);
+}
+
+.notif-empty {
+  padding: 24px 14px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+}
+
+.notif-item {
+  display: flex;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+}
+
+.notif-item:hover {
+  background: var(--bg);
+}
+
+.notif-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--metal-deep, #8b94a3);
+}
+
+.notif-dot--created { background: #22c55e; }
+.notif-dot--edited  { background: var(--accent); }
+.notif-dot--moved   { background: #3b82f6; }
+.notif-dot--deleted { background: var(--ember, #d2461b); }
+
+.notif-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.notif-line {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.notif-line strong {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.notif-card {
+  color: var(--text-h);
+}
+
+.notif-time {
+  font-size: 11px;
+  color: var(--metal-deep, #8b94a3);
+}
+
 .topbar-search {
   display: flex;
   align-items: center;
@@ -1043,6 +1177,61 @@ select.card-input {
   font-size: 12px;
   color: #ef4444;
   margin: 0;
+}
+
+/* ── OAuth sign-in ── */
+.auth-oauth {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0 2px;
+  color: var(--text-muted, #888);
+  font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.btn-oauth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  /* border-box so the 1px border is counted *inside* width:100%, matching the
+     inputs and the Log in button (which both use border-box) — otherwise the
+     border pushes these 2px wider and they hang past the form edge */
+  box-sizing: border-box;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+  background: var(--social-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-oauth:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.btn-oauth svg {
+  flex-shrink: 0;
 }
 
 /* ── Dashboard tabs ── */
@@ -2565,6 +2754,158 @@ select.card-input {
   height: 20px;
   margin-top: 2px;
   flex-shrink: 0;
+}
+
+/* ── Account settings ── */
+.settings-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.settings-main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 48px 24px;
+}
+
+.settings-stack {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-title--sm {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+/* ── Two-factor auth ── */
+.twofa-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.twofa-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.twofa-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.twofa-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.twofa-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text);
+}
+
+.twofa-badge.on {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.twofa-btn {
+  align-self: flex-start;
+}
+
+.twofa-danger {
+  align-self: flex-start;
+  color: #ef4444;
+}
+
+.twofa-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.twofa-step {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.twofa-qr {
+  width: 168px;
+  height: 168px;
+  align-self: center;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+}
+
+.twofa-secret {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--text-h);
+  background: var(--code-bg);
+  padding: 8px 10px;
+  border-radius: 6px;
+  word-break: break-all;
+  user-select: all;
+}
+
+.twofa-code {
+  letter-spacing: 4px;
+  font-size: 16px;
+  text-align: center;
+}
+
+.twofa-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.auth-2fa-prompt {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.auth-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.auth-remember input {
+  width: 15px;
+  height: 15px;
+
   accent-color: var(--accent);
   cursor: pointer;
 }

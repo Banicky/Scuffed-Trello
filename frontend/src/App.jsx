@@ -8,7 +8,7 @@ import PortalTransition from './components/PortalTransition.jsx'
 import SettingsPage, { applyAccentTheme } from './pages/SettingsPage.jsx'
 
 // Derive the current route from the URL hash so it survives a page refresh.
-// #/board/<id> → a board, anything else → the dashboard.
+// #/board/<id> → a board, else → the dashboard. (Settings is overlaid via state.)
 function parseHash() {
   const match = window.location.hash.match(/^#\/board\/(\d+)/)
   if (match) return { view: 'board', boardId: Number(match[1]) }
@@ -36,7 +36,7 @@ export default function App() {
         }
       })
       setStatus('auth')
-    })
+    }).catch(() => setStatus('auth'))
   }, [])
 
   // Keep the route in sync with browser navigation (refresh, back/forward).
@@ -121,6 +121,7 @@ export default function App() {
         user={user}
         onBack={goDashboard}
         onReady={handleBoardReady}
+        onOpenSettings={openSettings}
       />
       {portalEl}
     </>
