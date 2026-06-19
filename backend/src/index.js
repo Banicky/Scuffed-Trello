@@ -116,7 +116,7 @@ app.post("/api/auth/login", async (req, res) => {
   if (!match) return res.status(401).json({ error: "Invalid credentials" });
 
   req.session.userId = user.id;
-  res.json({ id: user.id, username: user.username, email: user.email });
+  res.json({ id: user.id, username: user.username, email: user.email, avatar_url: user.avatar_url ?? null });
 });
 
 app.post("/api/auth/logout", (req, res) => {
@@ -126,11 +126,36 @@ app.post("/api/auth/logout", (req, res) => {
 app.get("/api/auth/me", async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
   const result = await pool.query(
-    "SELECT id, username, email FROM users WHERE id = $1",
+    "SELECT id, username, email, avatar_url FROM users WHERE id = $1",
     [req.session.userId]
   );
   if (!result.rows[0]) return res.status(401).json({ error: "Unauthorized" });
   res.json(result.rows[0]);
+});
+
+// PATCH /api/users/me — update avatar (preset key or uploaded image path)
+app.patch("/api/users/me", requireAuth, async (req, res) => {
+  const { avatar_url } = req.body;
+  const result = await pool.query(
+    "UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, username, email, avatar_url",
+    [avatar_url ?? null, req.session.userId]
+  );
+  res.json(result.rows[0]);
+});
+
+// POST /api/users/password — change password (requires current password)
+app.post("/api/users/password", requireAuth, async (req, res) => {
+  const { current_password, new_password } = req.body;
+  if (!current_password || !new_password)
+    return res.status(400).json({ error: "Both fields required" });
+  if (new_password.length < 6)
+    return res.status(400).json({ error: "New password must be at least 6 characters" });
+  const result = await pool.query("SELECT password_hash FROM users WHERE id = $1", [req.session.userId]);
+  const match = await bcrypt.compare(current_password, result.rows[0].password_hash);
+  if (!match) return res.status(401).json({ error: "Current password is incorrect" });
+  const hash = await bcrypt.hash(new_password, 10);
+  await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, req.session.userId]);
+  res.json({ success: true });
 });
 
 // ── Boards ───────────────────────────────────────────────────────────────────
@@ -152,7 +177,7 @@ app.get("/api/boards", requireAuth, async (req, res) => {
   // member avatars on each tile
   const members = `(
     SELECT COALESCE(
-      jsonb_agg(jsonb_build_object('id', u.id, 'username', u.username)
+      jsonb_agg(jsonb_build_object('id', u.id, 'username', u.username, 'avatar_url', u.avatar_url)
                 ORDER BY (u.id <> b.owner_id), u.username),
       '[]'::jsonb)
     FROM users u
@@ -228,10 +253,27 @@ app.patch("/api/boards/:id", requireAuth, async (req, res) => {
   if (!await canAccessBoard(req.session.userId, req.params.id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
-  const { title } = req.body;
+  // partial update: only the provided fields change (title and/or the
+  // decorative background). background_image may be set to null to clear it.
+  const { title, background_image, background_opacity } = req.body;
+  const sets = [];
+  const values = [];
+  let i = 1;
+  if (title !== undefined) { sets.push(`title = $${i++}`); values.push(title); }
+  if (background_image !== undefined) { sets.push(`background_image = $${i++}`); values.push(background_image); }
+  if (background_opacity !== undefined) {
+    const clamped = Math.max(0, Math.min(100, Number(background_opacity) || 0));
+    sets.push(`background_opacity = $${i++}`);
+    values.push(clamped);
+  }
+  if (sets.length === 0) {
+    const current = await pool.query("SELECT * FROM boards WHERE id = $1", [req.params.id]);
+    return res.json(current.rows[0]);
+  }
+  values.push(req.params.id);
   const result = await pool.query(
-    "UPDATE boards SET title = $1 WHERE id = $2 RETURNING *",
-    [title, req.params.id]
+    `UPDATE boards SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`,
+    values
   );
   res.json(result.rows[0]);
 });
@@ -251,7 +293,7 @@ app.get("/api/boards/:boardId/members", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   const result = await pool.query(
-    `SELECT u.id, u.username, u.email FROM users u
+    `SELECT u.id, u.username, u.email, u.avatar_url FROM users u
      JOIN board_members bm ON bm.user_id = u.id
      WHERE bm.board_id = $1`,
     [req.params.boardId]
@@ -472,7 +514,7 @@ app.get("/api/cards/:id/comments", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   const result = await pool.query(
-    `SELECT cc.*, u.username,
+    `SELECT cc.*, u.username, u.avatar_url,
             COALESCE(
               (SELECT json_agg(jsonb_build_object('emoji', cr.emoji, 'userId', cr.user_id))
                FROM comment_reactions cr WHERE cr.comment_id = cc.id),
@@ -616,6 +658,19 @@ async function migrate() {
 
   await pool.query(`
     ALTER TABLE boards ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id)
+  `);
+
+  // optional decorative background image for a board, shown as a translucent
+  // overlay behind the columns; opacity is a 0–100 percentage
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT
+  `);
+
+  await pool.query(`
+    ALTER TABLE boards ADD COLUMN IF NOT EXISTS background_image TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE boards ADD COLUMN IF NOT EXISTS background_opacity SMALLINT NOT NULL DEFAULT 10
   `);
 
   await pool.query(`

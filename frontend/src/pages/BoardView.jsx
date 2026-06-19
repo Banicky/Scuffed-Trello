@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import Column from '../components/Column.jsx'
 import CardDetailModal from '../components/CardDetailModal.jsx'
-import { apiFetch } from '../api.js'
+import ImageUploadField from '../components/ImageUploadField.jsx'
+import UserAvatar from '../components/UserAvatar.jsx'
+import { apiFetch, assetUrl } from '../api.js'
 import { COLUMN_PALETTE } from '../constants.js'
 
 function MembersPanel({ boardId, isOwner, onClose }) {
@@ -42,7 +44,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
       <ul className="members-list">
         {members.map(u => (
           <li key={u.id} className="member-row">
-            <div className="avatar member-avatar" title={u.username}>{u.username.charAt(0).toUpperCase()}</div>
+            <UserAvatar user={u} className="avatar member-avatar" />
             <span className="member-name">{u.username}</span>
             {isOwner && (
               <button className="member-remove" onClick={() => handleRemove(u.id)} title="Remove">✕</button>
@@ -75,6 +77,7 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
   const [dragOverColId, setDragOverColId] = useState(null)
   const [dragOverCardId, setDragOverCardId] = useState(null)
   const [showMembers, setShowMembers] = useState(false)
+  const [showDesign, setShowDesign] = useState(false)
   const [columnLimitError, setColumnLimitError] = useState(false)
   const [draggingColId, setDraggingColId] = useState(null)
   const [colDragOverId, setColDragOverId] = useState(null)
@@ -177,6 +180,21 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
     })
     const updated = await res.json()
     setBoard(updated)
+  }
+
+  // Apply a board-design change (background image or opacity). Updates locally
+  // at once for a live preview, then saves — debounced for the opacity slider so
+  // dragging it doesn't fire a request per step.
+  const designSaveTimer = useRef(null)
+  function setDesign(patch, { debounce = false } = {}) {
+    setBoard(b => ({ ...b, ...patch }))
+    clearTimeout(designSaveTimer.current)
+    const save = () => apiFetch(`/api/boards/${board.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    })
+    if (debounce) designSaveTimer.current = setTimeout(save, 350)
+    else save()
   }
 
   async function addCard(columnId, cardData, position) {
@@ -368,6 +386,16 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
 
   return (
     <div className="app-shell">
+      {board?.background_image && (
+        <div
+          className="board-bg-overlay"
+          aria-hidden="true"
+          style={{
+            backgroundImage: `url(${assetUrl(board.background_image)})`,
+            opacity: (board.background_opacity ?? 10) / 100,
+          }}
+        />
+      )}
       <header className="topbar">
         <div className="topbar-left">
           <button className="back-btn" onClick={onBack} title="Back to dashboard">←</button>
@@ -428,15 +456,57 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
         </div>
 
         <div className="topbar-right">
+          {isOwner && (
+            <button
+              className={`btn-ghost members-toggle${showDesign ? ' active' : ''}`}
+              onClick={() => setShowDesign(v => !v)}
+            >
+              🎨 Design
+            </button>
+          )}
           <button
             className={`btn-ghost members-toggle${showMembers ? ' active' : ''}`}
             onClick={() => setShowMembers(v => !v)}
           >
             👥 Members
           </button>
-          <div className="avatar" title={user.username}>{user.username.charAt(0).toUpperCase()}</div>
+          <UserAvatar user={user} className="avatar" />
         </div>
       </header>
+
+      {showDesign && (
+        <div className="board-members-overlay" onClick={() => setShowDesign(false)}>
+          <div onClick={e => e.stopPropagation()}>
+            <div className="members-panel board-members-panel board-design-panel">
+              <div className="members-panel-header">
+                <span className="members-panel-title">Board design</span>
+                <button className="members-panel-close" onClick={() => setShowDesign(false)}>✕</button>
+              </div>
+              <p className="board-design-hint">
+                Add an image to drape over your board. It sits behind the lists,
+                so your cards stay readable.
+              </p>
+              <ImageUploadField
+                value={board.background_image}
+                onChange={url => setDesign({ background_image: url })}
+              />
+              {board.background_image && (
+                <label className="board-design-opacity">
+                  <span>Overlay strength</span>
+                  <input
+                    type="range"
+                    min="5"
+                    max="100"
+                    value={board.background_opacity ?? 10}
+                    onChange={e => setDesign({ background_opacity: Number(e.target.value) }, { debounce: true })}
+                  />
+                  <span className="board-design-opacity-val">{board.background_opacity ?? 10}%</span>
+                </label>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showMembers && (
         <div className="board-members-overlay" onClick={() => setShowMembers(false)}>

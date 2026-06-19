@@ -5,6 +5,7 @@ import AuthPage from './pages/AuthPage.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import BoardView from './pages/BoardView.jsx'
 import PortalTransition from './components/PortalTransition.jsx'
+import SettingsPage, { applyAccentTheme } from './pages/SettingsPage.jsx'
 
 // Derive the current route from the URL hash so it survives a page refresh.
 // #/board/<id> → a board, anything else → the dashboard.
@@ -20,10 +21,20 @@ export default function App() {
   const [route, setRoute] = useState(parseHash)
   const [portal, setPortal] = useState(null) // { color } while opening a board
   const [boardReady, setBoardReady] = useState(false) // board has rendered behind the portal
+  const [settingsSection, setSettingsSection] = useState(null) // null | 'avatar' | 'security' | 'customization'
 
   useEffect(() => {
     apiFetch('/api/auth/me').then(res => {
-      if (res.ok) return res.json().then(u => { setUser(u); setStatus('ready') })
+      if (res.ok) return res.json().then(u => {
+        setUser(u)
+        setStatus('ready')
+        // restore accent theme only when the user is confirmed logged in
+        const theme = localStorage.getItem(`accent-theme-${u.id}`)
+        if (theme) applyAccentTheme(theme, u.id)
+        if (localStorage.getItem('force-reduced-motion') === 'true') {
+          document.documentElement.classList.add('force-reduced-motion')
+        }
+      })
       setStatus('auth')
     })
   }, [])
@@ -38,12 +49,21 @@ export default function App() {
   function handleLogin(u) {
     setUser(u)
     setStatus('ready')
+    // apply the user's saved accent theme now that they're authenticated
+    const theme = localStorage.getItem(`accent-theme-${u.id}`)
+    if (theme) applyAccentTheme(theme, u.id)
+    if (localStorage.getItem('force-reduced-motion') === 'true') {
+      document.documentElement.classList.add('force-reduced-motion')
+    }
   }
 
   async function handleLogout() {
     await apiFetch('/api/auth/logout', { method: 'POST' })
     setUser(null)
     window.location.hash = '#/'
+    // reset to default theme so the login page is always the site default
+    applyAccentTheme('arcane')
+    document.documentElement.classList.remove('force-reduced-motion')
     setStatus('auth')
   }
 
@@ -61,8 +81,27 @@ export default function App() {
     window.location.hash = '#/'
   }
 
+  function openSettings(section) {
+    setSettingsSection(section)
+  }
+
+  function closeSettings() {
+    setSettingsSection(null)
+  }
+
   const portalEl = portal && (
     <PortalTransition color={portal.color} ready={boardReady} onDone={() => setPortal(null)} />
+  )
+
+  if (settingsSection) return (
+    <SettingsPage
+      user={user}
+      section={settingsSection}
+      onSection={setSettingsSection}
+      onBack={closeSettings}
+      onUpdateUser={updates => setUser(prev => ({ ...prev, ...updates }))}
+      onLogout={handleLogout}
+    />
   )
 
   if (status === 'loading') {
@@ -93,6 +132,7 @@ export default function App() {
         user={user}
         onOpenBoard={openBoard}
         onLogout={handleLogout}
+        onOpenSettings={openSettings}
       />
       {portalEl}
     </>

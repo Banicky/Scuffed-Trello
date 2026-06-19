@@ -1,6 +1,72 @@
 import { useState, useEffect, useRef } from 'react'
-import { apiFetch } from '../api.js'
+import { apiFetch, assetUrl } from '../api.js'
 import { COLUMN_PALETTE } from '../constants.js'
+import UserAvatar from '../components/UserAvatar.jsx'
+
+function UserMenu({ user, onOpenSettings, onLogout }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  const isPreset = user.avatar_url?.startsWith('preset:')
+  const presetKey = isPreset ? user.avatar_url.slice(7) : null
+  const hasImage = user.avatar_url && !isPreset
+  const initial = (user.username[0] || '?').toUpperCase()
+
+  return (
+    <div className="user-menu" ref={ref}>
+      <button
+        className="user-menu-trigger"
+        onClick={() => setOpen(v => !v)}
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        <span className="user-menu-avatar">
+          {hasImage
+            ? <img src={assetUrl(user.avatar_url)} alt="" />
+            : <span>{presetKey ?? initial}</span>
+          }
+        </span>
+        <span className="user-menu-name">{user.username}</span>
+        <span className="user-menu-chevron" aria-hidden="true">{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <div className="user-menu-popover" role="menu">
+          <button className="user-menu-item" role="menuitem" onClick={() => { setOpen(false); onOpenSettings('avatar') }}>
+            <span className="user-menu-item-icon" aria-hidden="true">✦</span>
+            Change Avatar
+          </button>
+          <button className="user-menu-item" role="menuitem" onClick={() => { setOpen(false); onOpenSettings('customization') }}>
+            <span className="user-menu-item-icon" aria-hidden="true">⚙</span>
+            Customization
+          </button>
+          <button className="user-menu-item" role="menuitem" onClick={() => { setOpen(false); onOpenSettings('security') }}>
+            <span className="user-menu-item-icon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="11" width="14" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 1 1 8 0v4" />
+              </svg>
+            </span>
+            Security
+          </button>
+          <div className="user-menu-divider" role="separator" />
+          <button className="user-menu-item user-menu-item--danger" role="menuitem" onClick={() => { setOpen(false); onLogout() }}>
+            <span className="user-menu-item-icon" aria-hidden="true">⇥</span>
+            Log out
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Board previews are fetched on hover and cached for the session so a second
 // hover is instant.
@@ -151,6 +217,15 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
       {/* mini-kanban motif: clipped face holds the column bars (one per list,
           height scaled to card count) + ghost monogram */}
       <div className="board-tile-face" aria-hidden="true">
+        {board.background_image && (
+          <div
+            className="board-tile-bg"
+            style={{
+              backgroundImage: `url(${assetUrl(board.background_image)})`,
+              opacity: (board.background_opacity ?? 10) / 100,
+            }}
+          />
+        )}
         <div className="board-tile-columns">
           {counts.map((c, i) => (
             <span key={i} style={{ height: `${18 + (c / maxCount) * 62}%` }} />
@@ -187,9 +262,7 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
             aria-label={`Members: ${members.map(m => m.username).join(', ')}`}
           >
             {shownMembers.map(m => (
-              <span key={m.id} className="board-tile-avatar" title={m.username}>
-                {(m.username[0] || '?').toUpperCase()}
-              </span>
+              <UserAvatar key={m.id} user={m} className="board-tile-avatar" />
             ))}
             {extraMembers > 0 && (
               <span className="board-tile-avatar board-tile-avatar--more" title={`${extraMembers} more`}>
@@ -264,7 +337,7 @@ function readSkeletonCount(key, fallback) {
   }
 }
 
-export default function Dashboard({ user, onOpenBoard, onLogout }) {
+export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings }) {
   const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('mine')
@@ -346,8 +419,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout }) {
           <span className="board-name" style={{ cursor: 'default' }}>Scuffed Trello</span>
         </div>
         <div className="topbar-right">
-          <span className="dashboard-username">{user.username}</span>
-          <button className="btn-ghost logout-btn" onClick={onLogout}>Log out</button>
+          <UserMenu user={user} onOpenSettings={onOpenSettings} onLogout={onLogout} />
         </div>
       </header>
 
