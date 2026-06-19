@@ -380,7 +380,7 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
 
   if (loading) return (
     <div className="app-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
-      Teleporting…
+      Journeying…
     </div>
   )
 

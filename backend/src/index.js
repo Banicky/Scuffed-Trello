@@ -48,12 +48,19 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// helper: check if user owns or is a member of the board
+// helper: check if user owns, is a direct member, or is a guild member of the board
 async function canAccessBoard(userId, boardId) {
   const result = await pool.query(
     `SELECT 1 FROM boards WHERE id = $1 AND owner_id = $2
      UNION
-     SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2`,
+     SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2
+     UNION
+     SELECT 1 FROM boards b
+       JOIN guilds g ON g.id = b.guild_id
+       WHERE b.id = $1
+         AND (g.owner_id = $2 OR EXISTS (
+           SELECT 1 FROM guild_members WHERE guild_id = g.id AND user_id = $2
+         ))`,
     [boardId, userId]
   );
   return result.rowCount > 0;
@@ -185,15 +192,21 @@ app.get("/api/boards", requireAuth, async (req, res) => {
        OR u.id IN (SELECT user_id FROM board_members WHERE board_id = b.id)
   )`;
   const result = await pool.query(
-    `SELECT b.*, 'owner' AS role, ba.accessed_at AS last_accessed_at, ${columnCounts} AS column_counts, ${members} AS members
+    `SELECT b.*, 'owner' AS role, ba.accessed_at AS last_accessed_at,
+            g.name AS guild_name, g.icon_color AS guild_icon_color,
+            ${columnCounts} AS column_counts, ${members} AS members
        FROM boards b
        LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $1
+       LEFT JOIN guilds g ON g.id = b.guild_id
        WHERE b.owner_id = $1
      UNION
-     SELECT b.*, 'member' AS role, ba.accessed_at AS last_accessed_at, ${columnCounts} AS column_counts, ${members} AS members
+     SELECT b.*, 'member' AS role, ba.accessed_at AS last_accessed_at,
+            g.name AS guild_name, g.icon_color AS guild_icon_color,
+            ${columnCounts} AS column_counts, ${members} AS members
        FROM boards b
        JOIN board_members bm ON bm.board_id = b.id
        LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $1
+       LEFT JOIN guilds g ON g.id = b.guild_id
        WHERE bm.user_id = $1
      ORDER BY id`,
     [req.session.userId]
@@ -202,10 +215,18 @@ app.get("/api/boards", requireAuth, async (req, res) => {
 });
 
 app.post("/api/boards", requireAuth, async (req, res) => {
-  const { title } = req.body;
+  const { title, guild_id } = req.body;
+  if (guild_id) {
+    const access = await pool.query(
+      `SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2
+       UNION SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2`,
+      [guild_id, req.session.userId]
+    );
+    if (!access.rowCount) return res.status(403).json({ error: "Not a guild member" });
+  }
   const result = await pool.query(
-    "INSERT INTO boards (title, owner_id) VALUES ($1, $2) RETURNING *",
-    [title, req.session.userId]
+    "INSERT INTO boards (title, owner_id, guild_id) VALUES ($1, $2, $3) RETURNING *",
+    [title, req.session.userId, guild_id || null]
   );
   res.json({ ...result.rows[0], role: "owner" });
 });
@@ -333,6 +354,265 @@ app.delete("/api/boards/:boardId/members/:userId", requireAuth, async (req, res)
     [req.params.boardId, req.params.userId]
   );
   res.json({ success: true });
+});
+
+// ── Guilds ────────────────────────────────────────────────────────────────────
+
+async function canAccessGuild(userId, guildId) {
+  const result = await pool.query(
+    `SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2
+     UNION SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2`,
+    [guildId, userId]
+  );
+  return result.rowCount > 0;
+}
+
+app.get("/api/guilds", requireAuth, async (req, res) => {
+  const result = await pool.query(
+    `SELECT g.id, g.name, g.icon_color, g.owner_id, g.created_at,
+       (SELECT COUNT(*)::int FROM guild_members WHERE guild_id = g.id) + 1 AS member_count,
+       (SELECT COUNT(*)::int FROM boards WHERE guild_id = g.id) AS board_count,
+       CASE WHEN g.owner_id = $1 THEN 'owner' ELSE 'member' END AS role
+     FROM guilds g
+     WHERE g.owner_id = $1
+        OR g.id IN (SELECT guild_id FROM guild_members WHERE user_id = $1)
+     ORDER BY g.created_at`,
+    [req.session.userId]
+  );
+  res.json(result.rows);
+});
+
+app.post("/api/guilds", requireAuth, async (req, res) => {
+  const { name, icon_color } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: "Guild name is required" });
+  const result = await pool.query(
+    "INSERT INTO guilds (name, owner_id, icon_color) VALUES ($1, $2, $3) RETURNING *",
+    [name.trim(), req.session.userId, icon_color || "arcane"]
+  );
+  res.status(201).json({ ...result.rows[0], member_count: 1, board_count: 0, role: "owner" });
+});
+
+app.get("/api/guilds/:id", requireAuth, async (req, res) => {
+  if (!await canAccessGuild(req.session.userId, req.params.id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const guildResult = await pool.query("SELECT * FROM guilds WHERE id = $1", [req.params.id]);
+  if (!guildResult.rows[0]) return res.status(404).json({ error: "Not found" });
+  const membersResult = await pool.query(
+    `SELECT u.id, u.username, u.avatar_url,
+       CASE WHEN g.owner_id = u.id THEN 'owner' ELSE 'member' END AS role
+     FROM guilds g
+     CROSS JOIN users u
+     WHERE g.id = $1
+       AND (u.id = g.owner_id OR u.id IN (SELECT user_id FROM guild_members WHERE guild_id = g.id))
+     ORDER BY (g.owner_id = u.id) DESC, u.username`,
+    [req.params.id]
+  );
+  res.json({ ...guildResult.rows[0], members: membersResult.rows });
+});
+
+app.patch("/api/guilds/:id", requireAuth, async (req, res) => {
+  const g = await pool.query("SELECT owner_id FROM guilds WHERE id = $1", [req.params.id]);
+  if (!g.rows[0]) return res.status(404).json({ error: "Not found" });
+  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the guild owner can edit it" });
+  const { name, icon_color } = req.body;
+  const sets = []; const vals = []; let i = 1;
+  if (name !== undefined) { sets.push(`name = $${i++}`); vals.push(name.trim()); }
+  if (icon_color !== undefined) { sets.push(`icon_color = $${i++}`); vals.push(icon_color); }
+  if (!sets.length) return res.json(g.rows[0]);
+  vals.push(req.params.id);
+  const result = await pool.query(`UPDATE guilds SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
+  res.json(result.rows[0]);
+});
+
+app.delete("/api/guilds/:id", requireAuth, async (req, res) => {
+  const g = await pool.query("SELECT owner_id FROM guilds WHERE id = $1", [req.params.id]);
+  if (!g.rows[0]) return res.status(404).json({ error: "Not found" });
+  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the guild owner can delete it" });
+  await pool.query("DELETE FROM guilds WHERE id = $1", [req.params.id]);
+  res.json({ success: true });
+});
+
+app.post("/api/guilds/:id/members", requireAuth, async (req, res) => {
+  const g = await pool.query("SELECT owner_id FROM guilds WHERE id = $1", [req.params.id]);
+  if (!g.rows[0]) return res.status(404).json({ error: "Not found" });
+  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the guild owner can add members" });
+  const { username } = req.body;
+  const userResult = await pool.query(
+    "SELECT id, username, avatar_url FROM users WHERE username = $1 OR email = $1",
+    [username]
+  );
+  if (!userResult.rows[0]) return res.status(404).json({ error: "User not found" });
+  const invitee = userResult.rows[0];
+  if (invitee.id === req.session.userId) return res.status(400).json({ error: "You already own this guild" });
+  await pool.query(
+    "INSERT INTO guild_members (guild_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [req.params.id, invitee.id]
+  );
+  res.json({ ...invitee, role: "member" });
+});
+
+app.delete("/api/guilds/:id/members/:userId", requireAuth, async (req, res) => {
+  const g = await pool.query("SELECT owner_id FROM guilds WHERE id = $1", [req.params.id]);
+  if (!g.rows[0]) return res.status(404).json({ error: "Not found" });
+  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the guild owner can remove members" });
+  await pool.query(
+    "DELETE FROM guild_members WHERE guild_id = $1 AND user_id = $2",
+    [req.params.id, req.params.userId]
+  );
+  res.json({ success: true });
+});
+
+// POST /api/guilds/:id/invites — dispatch a guild summons (owner only)
+app.post("/api/guilds/:id/invites", requireAuth, async (req, res) => {
+  const g = await pool.query("SELECT * FROM guilds WHERE id = $1", [req.params.id]);
+  if (!g.rows[0]) return res.status(404).json({ error: "Guild not found" });
+  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the guild owner can send invites" });
+
+  const { username } = req.body;
+  const userResult = await pool.query(
+    "SELECT id, username FROM users WHERE username = $1 OR email = $1",
+    [username]
+  );
+  if (!userResult.rows[0]) return res.status(404).json({ error: "User not found" });
+  const invitee = userResult.rows[0];
+
+  if (invitee.id === req.session.userId) return res.status(400).json({ error: "You already own this guild" });
+
+  const already = await pool.query(
+    `SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2
+     UNION SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2`,
+    [req.params.id, invitee.id]
+  );
+  if (already.rowCount > 0) return res.status(400).json({ error: "That warrior is already in the guild" });
+
+  const invite = await pool.query(
+    `INSERT INTO guild_invites (guild_id, inviter_id, invitee_id, status)
+     VALUES ($1, $2, $3, 'pending')
+     ON CONFLICT (guild_id, invitee_id) DO UPDATE SET status = 'pending', created_at = NOW()
+     RETURNING *`,
+    [req.params.id, req.session.userId, invitee.id]
+  );
+
+  const inviter = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, data) VALUES ($1, 'guild_invite', $2)`,
+    [invitee.id, JSON.stringify({
+      invite_id: invite.rows[0].id,
+      guild_id: parseInt(req.params.id),
+      guild_name: g.rows[0].name,
+      guild_icon_color: g.rows[0].icon_color,
+      inviter_username: inviter.rows[0].username,
+    })]
+  );
+
+  res.json({ success: true, invitee: { id: invitee.id, username: invitee.username } });
+});
+
+// GET /api/notifications — all notifications for the current user
+app.get("/api/notifications", requireAuth, async (req, res) => {
+  const result = await pool.query(
+    `SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+    [req.session.userId]
+  );
+  res.json(result.rows);
+});
+
+// POST /api/notifications/read-all
+app.post("/api/notifications/read-all", requireAuth, async (req, res) => {
+  await pool.query("UPDATE notifications SET read = true WHERE user_id = $1", [req.session.userId]);
+  res.json({ success: true });
+});
+
+// PATCH /api/notifications/:id/read — mark one notification read
+app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
+  await pool.query(
+    "UPDATE notifications SET read = true WHERE id = $1 AND user_id = $2",
+    [req.params.id, req.session.userId]
+  );
+  res.json({ success: true });
+});
+
+// POST /api/guild-invites/:id/accept
+app.post("/api/guild-invites/:id/accept", requireAuth, async (req, res) => {
+  const invite = await pool.query("SELECT * FROM guild_invites WHERE id = $1", [req.params.id]);
+  if (!invite.rows[0]) return res.status(404).json({ error: "Invite not found" });
+  if (invite.rows[0].invitee_id !== req.session.userId) return res.status(403).json({ error: "This summons is not for you" });
+  if (invite.rows[0].status !== "pending") return res.status(400).json({ error: "Summons is no longer pending" });
+
+  await pool.query(
+    "INSERT INTO guild_members (guild_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [invite.rows[0].guild_id, req.session.userId]
+  );
+  await pool.query("UPDATE guild_invites SET status = 'accepted' WHERE id = $1", [req.params.id]);
+  await pool.query(
+    `UPDATE notifications SET read = true
+     WHERE user_id = $1 AND type = 'guild_invite' AND (data->>'invite_id')::int = $2`,
+    [req.session.userId, parseInt(req.params.id)]
+  );
+
+  const guild = await pool.query(
+    `SELECT g.id, g.name, g.icon_color, g.owner_id, g.created_at,
+       (SELECT COUNT(*)::int FROM guild_members WHERE guild_id = g.id) + 1 AS member_count,
+       (SELECT COUNT(*)::int FROM boards WHERE guild_id = g.id) AS board_count,
+       'member' AS role
+     FROM guilds g WHERE g.id = $1`,
+    [invite.rows[0].guild_id]
+  );
+  res.json({ success: true, guild: guild.rows[0] });
+});
+
+// POST /api/guild-invites/:id/decline
+app.post("/api/guild-invites/:id/decline", requireAuth, async (req, res) => {
+  const invite = await pool.query("SELECT * FROM guild_invites WHERE id = $1", [req.params.id]);
+  if (!invite.rows[0]) return res.status(404).json({ error: "Invite not found" });
+  if (invite.rows[0].invitee_id !== req.session.userId) return res.status(403).json({ error: "This summons is not for you" });
+
+  await pool.query("UPDATE guild_invites SET status = 'declined' WHERE id = $1", [req.params.id]);
+  await pool.query(
+    `UPDATE notifications SET read = true
+     WHERE user_id = $1 AND type = 'guild_invite' AND (data->>'invite_id')::int = $2`,
+    [req.session.userId, parseInt(req.params.id)]
+  );
+  res.json({ success: true });
+});
+
+app.get("/api/guilds/:id/boards", requireAuth, async (req, res) => {
+  if (!await canAccessGuild(req.session.userId, req.params.id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const columnCounts = `(
+    SELECT COALESCE(jsonb_agg(x.cnt ORDER BY x.position), '[]'::jsonb)
+    FROM (
+      SELECT col.position, COUNT(cards.id)::int AS cnt
+      FROM columns col
+      LEFT JOIN cards ON cards.column_id = col.id
+      WHERE col.board_id = b.id
+      GROUP BY col.id, col.position
+    ) x
+  )`;
+  const members = `(
+    SELECT COALESCE(
+      jsonb_agg(jsonb_build_object('id', u.id, 'username', u.username, 'avatar_url', u.avatar_url)
+                ORDER BY (u.id <> b.owner_id), u.username),
+      '[]'::jsonb)
+    FROM users u
+    WHERE u.id = b.owner_id
+       OR u.id IN (SELECT user_id FROM board_members WHERE board_id = b.id)
+  )`;
+  const result = await pool.query(
+    `SELECT b.*,
+       CASE WHEN b.owner_id = $2 THEN 'owner' ELSE 'member' END AS role,
+       ba.accessed_at AS last_accessed_at,
+       ${columnCounts} AS column_counts,
+       ${members} AS members
+     FROM boards b
+     LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $2
+     WHERE b.guild_id = $1
+     ORDER BY b.id`,
+    [req.params.id, req.session.userId]
+  );
+  res.json(result.rows);
 });
 
 // ── Columns ───────────────────────────────────────────────────────────────────
@@ -732,6 +1012,51 @@ async function migrate() {
 
   await pool.query(`
     ALTER TABLE card_comments ADD COLUMN IF NOT EXISTS image_url TEXT
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS guilds (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      icon_color TEXT NOT NULL DEFAULT 'arcane',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS guild_members (
+      guild_id INTEGER NOT NULL REFERENCES guilds(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      PRIMARY KEY (guild_id, user_id)
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE boards ADD COLUMN IF NOT EXISTS guild_id INTEGER REFERENCES guilds(id) ON DELETE SET NULL
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS guild_invites (
+      id SERIAL PRIMARY KEY,
+      guild_id INTEGER NOT NULL REFERENCES guilds(id) ON DELETE CASCADE,
+      inviter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      invitee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (guild_id, invitee_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      data JSONB NOT NULL DEFAULT '{}',
+      read BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
   `);
 }
 
