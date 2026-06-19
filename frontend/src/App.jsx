@@ -4,13 +4,15 @@ import { apiFetch } from './api.js'
 import AuthPage from './pages/AuthPage.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import BoardView from './pages/BoardView.jsx'
+import SettingsPage from './pages/SettingsPage.jsx'
 import PortalTransition from './components/PortalTransition.jsx'
 
 // Derive the current route from the URL hash so it survives a page refresh.
-// #/board/<id> → a board, anything else → the dashboard.
+// #/board/<id> → a board, #/settings → account settings, else → the dashboard.
 function parseHash() {
   const match = window.location.hash.match(/^#\/board\/(\d+)/)
   if (match) return { view: 'board', boardId: Number(match[1]) }
+  if (window.location.hash.startsWith('#/settings')) return { view: 'settings', boardId: null }
   return { view: 'dashboard', boardId: null }
 }
 
@@ -61,6 +63,10 @@ export default function App() {
     window.location.hash = '#/'
   }
 
+  function openSettings() {
+    window.location.hash = '#/settings'
+  }
+
   const portalEl = portal && (
     <PortalTransition color={portal.color} ready={boardReady} onDone={() => setPortal(null)} />
   )
@@ -75,6 +81,14 @@ export default function App() {
 
   if (status === 'auth') return <AuthPage onLogin={handleLogin} />
 
+  if (route.view === 'settings') return (
+    <SettingsPage
+      user={user}
+      onUserUpdate={setUser}
+      onBack={goDashboard}
+    />
+  )
+
   if (route.view === 'board') return (
     <>
       <BoardView
@@ -82,6 +96,7 @@ export default function App() {
         user={user}
         onBack={goDashboard}
         onReady={handleBoardReady}
+        onOpenSettings={openSettings}
       />
       {portalEl}
     </>
@@ -93,6 +108,7 @@ export default function App() {
         user={user}
         onOpenBoard={openBoard}
         onLogout={handleLogout}
+        onOpenSettings={openSettings}
       />
       {portalEl}
     </>

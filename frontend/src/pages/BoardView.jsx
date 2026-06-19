@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import Column from '../components/Column.jsx'
 import CardDetailModal from '../components/CardDetailModal.jsx'
-import { apiFetch } from '../api.js'
+import NotificationBell from '../components/NotificationBell.jsx'
+import { apiFetch, assetUrl } from '../api.js'
 import { COLUMN_PALETTE } from '../constants.js'
 
 function MembersPanel({ boardId, isOwner, onClose }) {
@@ -68,7 +69,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
   )
 }
 
-export default function BoardView({ boardId, user, onBack, onReady }) {
+export default function BoardView({ boardId, user, onBack, onReady, onOpenSettings }) {
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
   const [board, setBoard] = useState(null)
@@ -393,6 +394,7 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
             )}
             <div className="board-meta">{totalCards} cards · {doneCount} done</div>
           </div>
+          <NotificationBell boardId={boardId} />
         </div>
         <div className="topbar-search">
           <div className="search-input-wrap">
@@ -436,7 +438,15 @@ export default function BoardView({ boardId, user, onBack, onReady }) {
           >
             👥 Members
           </button>
-          <div className="avatar" title={user.username}>{user.username.charAt(0).toUpperCase()}</div>
+          <button
+            className="avatar avatar--btn"
+            title="Account settings"
+            onClick={onOpenSettings}
+          >
+            {user.avatar_url
+              ? <img src={assetUrl(user.avatar_url)} alt="" className="avatar-img" />
+              : user.username.charAt(0).toUpperCase()}
+          </button>
         </div>
       </header>
 

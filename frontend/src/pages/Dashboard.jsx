@@ -264,7 +264,7 @@ function readSkeletonCount(key, fallback) {
   }
 }
 
-export default function Dashboard({ user, onOpenBoard, onLogout }) {
+export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings }) {
   const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('mine')
@@ -346,7 +346,13 @@ export default function Dashboard({ user, onOpenBoard, onLogout }) {
           <span className="board-name" style={{ cursor: 'default' }}>Scuffed Trello</span>
         </div>
         <div className="topbar-right">
-          <span className="dashboard-username">{user.username}</span>
+          <button
+            className="dashboard-username dashboard-username--link"
+            onClick={onOpenSettings}
+            title="Account settings"
+          >
+            {user.username}
+          </button>
           <button className="btn-ghost logout-btn" onClick={onLogout}>Log out</button>
         </div>
       </header>
