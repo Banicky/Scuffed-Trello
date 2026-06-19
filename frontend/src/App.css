@@ -1581,76 +1581,6 @@ select.card-input {
   }
 }
 
-/* ── Dashboard mountains: layered fantasy silhouette, bottom center-right ── */
-.dash-mountains {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 300px;
-  pointer-events: none;
-  z-index: 0;
-  /* fade to transparent on the left so the silhouette emerges center-rightward */
-  mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,0.45) 18%, black 34%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,0.45) 18%, black 34%);
-}
-
-.dash-mountains svg {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.mtn-far {
-  fill: color-mix(in srgb, var(--accent) 5%, #080610);
-}
-
-.mtn-mid {
-  fill: color-mix(in srgb, var(--accent) 9%, #0c0819);
-  filter: drop-shadow(0 -3px 8px color-mix(in srgb, var(--accent) 18%, transparent));
-}
-
-.mtn-near {
-  fill: color-mix(in srgb, var(--accent) 15%, #0f0923);
-  filter: drop-shadow(0 -6px 16px color-mix(in srgb, var(--accent) 32%, transparent));
-}
-
-.mtn-snow {
-  fill: rgba(240, 234, 255, 0.88);
-}
-
-/* Knights traversing the peak — a muted arcane tone so the silhouettes read on
-   both the white snow and the dark mountain face */
-.dash-walker {
-  fill: none;
-  stroke: color-mix(in srgb, var(--accent) 52%, #2a2142);
-  stroke-width: 1.3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.dash-walker-fill {
-  fill: color-mix(in srgb, var(--accent) 52%, #2a2142);
-  stroke: none;
-}
-.dash-walker-pennant {
-  fill: color-mix(in srgb, var(--accent) 80%, #ffffff);
-  stroke: none;
-}
-
-/* ground mist: blends the mountain base into the dark dashboard background */
-.dash-mountains::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 72px;
-  background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
-  pointer-events: none;
-}
-
 /* ── Hero ── */
 .dash-hero {
   margin-bottom: 28px;
@@ -1728,18 +1658,12 @@ select.card-input {
   cursor: pointer;
   text-align: left;
   color: #fff;
-  /* faceted gem fill: lit from the top-left, deepening toward the bottom-right,
-     so each realm-tome reads as an enamelled, dimensional object */
-  background:
-    radial-gradient(135% 120% at 20% 10%, color-mix(in srgb, var(--tile) 55%, #fff) 0%, transparent 44%),
-    linear-gradient(152deg, color-mix(in srgb, var(--tile) 86%, #fff) 0%, var(--tile) 42%, color-mix(in srgb, var(--tile) 68%, #000) 100%);
-  /* layered resting shadow + a faint halo in the tile's own colour, so the
-     glow emanates from the boards themselves rather than the empty page */
+  /* no fill — tile blends with the dashboard background at rest */
+  background: none;
   box-shadow:
     0 1px 1px rgba(0, 0, 0, 0.28),
     0 6px 14px -6px rgba(0, 0, 0, 0.5),
-    0 14px 30px -12px rgba(0, 0, 0, 0.45),
-    0 10px 34px -14px color-mix(in srgb, var(--tile) 55%, transparent);
+    0 14px 30px -12px rgba(0, 0, 0, 0.45);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
   /* orchestrated entrance: each tile rises in, staggered by its position.
      `backwards` fill hides it during the delay but releases control after,
@@ -1751,25 +1675,6 @@ select.card-input {
 @keyframes tile-in {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: none; }
-}
-
-.board-tile::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 16px;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.26) 0%,
-    rgba(255, 255, 255, 0.04) 18%,
-    rgba(0, 0, 0, 0) 50%,
-    rgba(0, 0, 0, 0.5) 100%
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-  z-index: 1;
-  pointer-events: none;
 }
 
 /* clipped layer for the decorative bars + monogram, so the settings popover
@@ -1796,6 +1701,33 @@ select.card-input {
      in the stacking order, so decorations stay visible on top */
 }
 
+/* each tile's background is its own zodiac constellation — stars connected
+   by a faint line, twinkling independently */
+.board-tile-zodiac {
+  position: absolute;
+  inset: 12%;
+  width: 76%;
+  height: 76%;
+  pointer-events: none;
+}
+.board-tile-zodiac-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.42);
+  stroke-width: 0.7;
+}
+.board-tile-zodiac-star {
+  fill: #fff;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tile) 80%, #fff)) drop-shadow(0 0 2px #fff);
+  animation: zodiac-twinkle 3.2s ease-in-out infinite;
+}
+@keyframes zodiac-twinkle {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-tile-zodiac-star { animation: none; opacity: 0.8; }
+}
+
 /* heraldic rule: a thin inset platinum frame, like the chased border of a
    knight's shield */
 .board-tile-face::before {
@@ -1807,27 +1739,6 @@ select.card-input {
   box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16);
   pointer-events: none;
   z-index: 1;
-}
-
-/* moonlight: a soft cool highlight that tracks the cursor (--mx/--my set in JS),
-   clipped to the rounded face so it reads as light gliding across the steel */
-.board-tile-face::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    220px 220px at var(--mx, 50%) var(--my, 0%),
-    rgba(244, 248, 255, 0.40),
-    transparent 60%
-  );
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  pointer-events: none;
-  z-index: 2;
-}
-.board-tile:hover .board-tile-face::after,
-.board-tile:focus-visible .board-tile-face::after {
-  opacity: 1;
 }
 
 .board-tile:hover,
@@ -1852,50 +1763,6 @@ select.card-input {
 .board-tile:focus-visible {
   outline: 2px solid var(--text-h);
   outline-offset: 2px;
-}
-
-/* three translucent column bars echoing a kanban board */
-.board-tile-columns {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 0 16px 0;
-  opacity: 0.9;
-  pointer-events: none;
-}
-.board-tile-columns span {
-  flex: 1;
-  min-width: 0;
-  border-radius: 6px 6px 0 0;
-  background: rgba(255, 255, 255, 0.16);
-  /* height is set inline, scaled to each column's card count */
-}
-
-.board-tile-monogram {
-  position: absolute;
-  top: -16px;
-  right: -4px;
-  /* illuminated drop-cap: an engraved initial leafed in gold, the way a
-     manuscript opens a chapter */
-  font-family: var(--fantasy);
-  font-weight: 800;
-  font-size: 104px;
-  line-height: 1;
-  background: linear-gradient(
-    158deg,
-    color-mix(in srgb, var(--metal) 92%, #fff) 0%,
-    var(--metal) 46%,
-    var(--metal-deep) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  opacity: 0.5;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.28));
-  pointer-events: none;
-  user-select: none;
 }
 
 .board-tile-top {
@@ -3762,6 +3629,16 @@ select.card-input {
   flex: 1;
 }
 
+.sidebar-item-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-h);
+}
+
 .sidebar-guild-icon {
   flex-shrink: 0;
 }
@@ -3867,27 +3744,6 @@ select.card-input {
 
 .guild-context-actions {
   margin-left: auto;
-}
-
-.guild-manage-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 15px;
-  transition: color 0.12s, background 0.12s, border-color 0.12s;
-}
-
-.guild-manage-btn:hover {
-  color: var(--guild-color, var(--accent));
-  background: color-mix(in srgb, var(--guild-color, var(--accent)) 9%, var(--bg));
-  border-color: color-mix(in srgb, var(--guild-color, var(--accent)) 45%, transparent);
 }
 
 /* ── Guild chip on board tiles ── */
@@ -4559,6 +4415,31 @@ select.card-input {
   color: var(--accent);
 }
 
+.sidebar-guild-manage-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.sidebar-guild-row:hover .sidebar-guild-manage-btn {
+  opacity: 1;
+}
+
+.sidebar-guild-manage-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-h);
+}
+
 /* ── Guild context header invite button ── */
 .guild-context-members {
   display: flex;
@@ -4715,106 +4596,7 @@ select.card-input {
   z-index: 1;
 }
 
-.dash-hero-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 24px;
-  flex-wrap: wrap;
-}
-
-.btn-hero-primary {
-  background: #e8a820;
-  color: #0a0809;
-  border: none;
-  border-radius: 100px;
-  padding: 10px 24px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: var(--sans);
-  transition: opacity 0.15s, transform 0.12s;
-
-  &:hover {
-    opacity: 0.88;
-    transform: translateY(-1px);
-  }
-}
-
-.btn-hero-ghost {
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--text-h);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 100px;
-  padding: 10px 24px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: var(--sans);
-  transition: background 0.15s, transform 0.12s;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.12);
-    transform: translateY(-1px);
-  }
-}
-
-/* ── Hero right-side mini preview ── */
-.dash-hero-preview {
-  flex-shrink: 0;
-  width: 280px;
-  height: 150px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  padding: 10px;
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 6px;
-  position: relative;
-  z-index: 1;
-}
-
-.dash-hero-mini-tile {
-  border-radius: 7px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--tile) 80%, #fff) 0%,
-    var(--tile) 100%
-  );
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: flex-end;
-  padding: 4px 6px;
-}
-
-.dash-hero-mini-tile:first-child {
-  grid-row: 1 / 3;
-}
-
-.dash-hero-mini-monogram {
-  font-family: var(--fantasy);
-  font-size: 22px;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.25);
-  line-height: 1;
-  margin-left: auto;
-}
-
-.dash-hero-mini-create {
-  border-radius: 7px;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 18px;
-  font-weight: 300;
-}
-
 @media (max-width: 820px) {
-  .dash-hero-preview { display: none; }
   .dash-hero-card { padding: 28px 28px; }
 }
 
@@ -4907,48 +4689,6 @@ select.card-input {
   }
 }
 
-/* ── Recent Search section ── */
-.dash-recent-search {
-  margin-top: 44px;
-}
-
-.dash-section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-h);
-  margin: 0 0 14px;
-}
-
-.dash-recent-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.dash-search-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 100px;
-  padding: 7px 18px;
-  font-size: 13px;
-  color: var(--text);
-  cursor: pointer;
-  font-family: var(--sans);
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-
-  &:hover {
-    background: var(--accent-bg);
-    color: var(--text-h);
-    border-color: var(--accent-border);
-  }
-}
-
 /* ── Sidebar brand ── */
 .sidebar-brand {
   display: flex;
@@ -5014,55 +4754,6 @@ select.card-input {
   color: var(--text-h);
 }
 
-.sidebar-profile-rank {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.sidebar-profile-stats {
-  display: flex;
-  align-items: stretch;
-  margin-top: 12px;
-  background: rgba(0, 0, 0, 0.22);
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.sidebar-stat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 6px;
-  gap: 2px;
-}
-
-.sidebar-stat-val {
-  font-family: var(--fantasy);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-h);
-  line-height: 1;
-}
-
-.sidebar-stat-label {
-  font-size: 8.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text);
-  opacity: 0.6;
-}
-
-.sidebar-stat-sep {
-  width: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 6px 0;
-}
 
 /* ── Sidebar footer (Settings + Log Out) ── */
 .sidebar-footer {

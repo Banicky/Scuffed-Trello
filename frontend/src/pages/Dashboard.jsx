@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { apiFetch, assetUrl } from '../api.js'
-import { COLUMN_PALETTE } from '../constants.js'
 import { relativeTime } from '../utils.js'
+import { COLUMN_PALETTE, ZODIAC_CONSTELLATIONS } from '../constants.js'
 import UserAvatar from '../components/UserAvatar.jsx'
 
 const GUILD_COLORS = [
@@ -421,15 +421,13 @@ function BoardSettingsPopover({ board, onRename, onDelete, onClose }) {
 function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner }) {
   const [showSettings, setShowSettings] = useState(false)
   const color = COLUMN_PALETTE[index % COLUMN_PALETTE.length]
-  const monogram = (board.title.trim()[0] || '?').toUpperCase()
   const lastOpened = relativeTime(board.last_accessed_at)
+  // stable per board (not grid position) so a board keeps its sign across reorders
+  const zodiac = ZODIAC_CONSTELLATIONS[board.id % ZODIAC_CONSTELLATIONS.length]
 
   const members = board.members || []
   const shownMembers = members.slice(0, 4)
   const extraMembers = members.length - shownMembers.length
-
-  const counts = board.column_counts?.length ? board.column_counts.slice(0, 6) : [0, 0, 0]
-  const maxCount = Math.max(...counts, 1)
 
   const [preview, setPreview] = useState(() => previewCache.get(board.id) || null)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -457,19 +455,9 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
     clearTimeout(hoverTimer.current)
     hoverTimer.current = setTimeout(() => { setPreviewOpen(true); loadPreview() }, 320)
   }
-  function closePreview(e) {
+  function closePreview() {
     clearTimeout(hoverTimer.current)
     setPreviewOpen(false)
-    e?.currentTarget?.style.setProperty('--mx', '50%')
-    e?.currentTarget?.style.setProperty('--my', '0%')
-  }
-
-  function trackTorch(e) {
-    const r = e.currentTarget.getBoundingClientRect()
-    const x = ((e.clientX - r.left) / r.width) * 100
-    const y = ((e.clientY - r.top) / r.height) * 100
-    e.currentTarget.style.setProperty('--mx', `${x}%`)
-    e.currentTarget.style.setProperty('--my', `${y}%`)
   }
 
   return (
@@ -479,7 +467,6 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
       onClick={() => !showSettings && onOpen(board.id, color)}
       onMouseEnter={openPreview}
       onMouseLeave={closePreview}
-      onMouseMove={trackTorch}
       role="button"
       tabIndex={0}
       onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !showSettings) { e.preventDefault(); onOpen(board.id, color) } }}
@@ -494,12 +481,22 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
             }}
           />
         )}
-        <div className="board-tile-columns">
-          {counts.map((c, i) => (
-            <span key={i} style={{ height: `${18 + (c / maxCount) * 62}%` }} />
+        <svg className="board-tile-zodiac" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <polyline
+            className="board-tile-zodiac-line"
+            points={zodiac.points.map(([x, y]) => `${x},${y}`).join(' ')}
+          />
+          {zodiac.points.map(([x, y], i) => (
+            <circle
+              key={i}
+              className="board-tile-zodiac-star"
+              cx={x}
+              cy={y}
+              r={i % 3 === 0 ? 1.8 : 1.2}
+              style={{ animationDelay: `${i * 0.5}s` }}
+            />
           ))}
-        </div>
-        <span className="board-tile-monogram">{monogram}</span>
+        </svg>
       </div>
 
       <div className="board-tile-top">
@@ -746,24 +743,11 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const [notifOpen, setNotifOpen] = useState(false)
   const [showGuildInvite, setShowGuildInvite] = useState(false)
   const [inviteTargetGuild, setInviteTargetGuild] = useState(null)
-  const [recentSearches, setRecentSearches] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`dash:${user.id}:recentSearches`) || '[]') } catch { return [] }
-  })
-
   function toggleBoardView() {
     if (viewFlipping) return
     setViewFlipping(true)
     setTimeout(() => setBoardView(v => v === 'owned' ? 'shared' : 'owned'), 150)
     setTimeout(() => setViewFlipping(false), 300)
-  }
-
-  function submitSearch(q) {
-    if (!q.trim()) return
-    setRecentSearches(prev => {
-      const next = [q.trim(), ...prev.filter(s => s !== q.trim())].slice(0, 6)
-      try { localStorage.setItem(`dash:${user.id}:recentSearches`, JSON.stringify(next)) } catch {}
-      return next
-    })
   }
 
   async function handleAcceptInvite(notif) {
@@ -978,89 +962,6 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
         <div className="sky-comet-streak" />
       </div>
 
-      <div className="dash-mountains" aria-hidden="true">
-        <svg viewBox="0 0 1440 300" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            {/* Clip snow to mountain silhouettes so nothing bleeds into sky */}
-            <clipPath id="nearMtnClip">
-              <path d="M240 300 L240 254 Q350 240 450 220 Q540 202 606 178 Q660 158 706 132 Q742 110 768 84 Q790 62 810 44 Q828 28 848 38 Q866 50 886 72 Q910 98 952 116 Q996 134 1054 120 Q1108 106 1160 118 Q1254 134 1380 146 L1440 150 L1440 300 Z" />
-            </clipPath>
-            {/* Snow gradient: white at apex fading to soft lavender */}
-            <linearGradient id="snowCapGrad" x1="50%" y1="0%" x2="50%" y2="100%">
-              <stop offset="0%"   stopColor="#ffffff" stopOpacity="1" />
-              <stop offset="55%"  stopColor="#ede5ff" stopOpacity="0.97" />
-              <stop offset="100%" stopColor="#c0aadf" stopOpacity="0.42" />
-            </linearGradient>
-            {/* Glint streak from peak trending right */}
-            <linearGradient id="snowGlint" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.92" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-
-          {/* Far range — distant rolling ridge */}
-          <path className="mtn-far" d="M0 300 L0 215 Q180 208 360 202 Q540 196 700 190 Q860 184 1020 178 Q1180 172 1320 168 L1440 165 L1440 300 Z" />
-          {/* Mid range — sharper peaks emerging center-right */}
-          <path className="mtn-mid" d="M0 300 L0 245 Q120 234 240 222 Q360 210 460 194 Q560 178 650 158 Q720 142 768 118 Q802 100 836 78 Q858 62 878 74 Q898 88 930 105 Q966 124 1030 116 Q1094 108 1158 120 Q1280 138 1440 148 L1440 300 Z" />
-          {/* Near range — hero silhouette, tallest peak center-right */}
-          <path className="mtn-near" d="M240 300 L240 254 Q350 240 450 220 Q540 202 606 178 Q660 158 706 132 Q742 110 768 84 Q790 62 810 44 Q828 28 848 38 Q866 50 886 72 Q910 98 952 116 Q996 134 1054 120 Q1108 106 1160 118 Q1254 134 1380 146 L1440 150 L1440 300 Z" />
-
-          {/* ── Near-peak snow (clipped to near mountain so the sides follow the slope) ── */}
-          <g clipPath="url(#nearMtnClip)">
-            {/* Main body: top runs above the ridge (clipped away) so the upper edge IS the
-                mountain crest; only the lower snowline is shaped — it drapes down each
-                slope and lifts into a soft, shallow notch over the centre ridge */}
-            <path fill="url(#snowCapGrad)" d="M 752 24 Q 786 -4 828 -6 Q 874 -4 916 26 L 900 96 Q 893 82 884 86 Q 875 91 866 83 Q 858 73 849 66 Q 841 63 834 65 Q 828 63 822 65 Q 814 71 803 82 Q 795 88 786 80 Q 776 82 766 98 Z" />
-            {/* Snow blankets draping along each slope — outer edge runs into the sky so the
-                clip trims it to the exact slope line; inner edge offsets into the face */}
-            <path fill="url(#snowCapGrad)" fillOpacity="0.72" d="M 805 38 Q 788 53 770 70 Q 752 87 734 104 Q 717 119 700 134 L 710 150 Q 726 135 742 120 Q 759 107 776 94 Q 791 81 806 68 Z" />
-            <path fill="url(#snowCapGrad)" fillOpacity="0.9" d="M 852 40 Q 861 46 870 52 Q 881 64 892 76 Q 904 88 916 100 Q 930 107 944 111 L 936 126 Q 922 117 908 108 Q 896 97 884 86 Q 873 75 862 64 Z" />
-            {/* Shadow face — left of the crest in cold blue-violet shade */}
-            <path fill="rgba(50,18,110,0.30)" d="M 828 -6 Q 786 -4 752 24 L 766 98 Q 776 82 786 80 Q 795 88 803 82 Q 814 71 822 65 Q 827 63 829 64 Z" />
-            {/* Glint — bright highlight running down the right of the crest */}
-            <path fill="url(#snowGlint)" d="M 828 -6 Q 845 20 854 44 Q 861 62 866 78 Q 858 66 850 50 Q 840 30 828 -6 Z" />
-            {/* Crevice lines — subtle surface texture flowing down the faces */}
-            <path d="M 818 24 Q 812 48 807 74" fill="none" stroke="rgba(155,130,205,0.40)" strokeWidth="1.2" strokeLinecap="round" />
-            <path d="M 829 18 Q 828 44 830 70" fill="none" stroke="rgba(190,175,230,0.24)" strokeWidth="0.9" strokeLinecap="round" />
-            <path d="M 838 24 Q 844 48 849 74" fill="none" stroke="rgba(255,255,255,0.20)" strokeWidth="0.9" strokeLinecap="round" />
-          </g>
-
-          {/* ── A small expedition of knights climbing toward the summit (outside the
-                clip so their bodies rise above the snowline; medium tone reads against
-                both snow and dark mountain) ── */}
-          <g className="dash-walkers" aria-hidden="true">
-            {/* Summit — a knight planting a pennant */}
-            <g className="dash-walker" transform="translate(849 41) scale(0.85)">
-              <path d="M -1.1 0 L 0 -3 L 1.1 0 M 0 -3 L 0 -6 M 0 -5.4 L -1.2 -4.5 M 0 -5.4 L 1.3 -5" />
-              <circle className="dash-walker-fill" cx="0" cy="-7" r="1.2" />
-              <path d="M 1.5 0.5 L 1.3 -9" />
-              <path className="dash-walker-pennant" d="M 1.3 -9 L 4.4 -8.1 L 1.3 -6.8 Z" />
-            </g>
-            {/* Looking around, spear planted */}
-            <g className="dash-walker" transform="translate(872 58) scale(0.85)">
-              <path d="M -1.2 0 L 0 -3 L 1.2 0 M 0 -3 L 0 -6 M 0 -5.4 L 1.3 -4.6 M 0 -5.4 L -1 -6.6" />
-              <circle className="dash-walker-fill" cx="0" cy="-7" r="1.2" />
-              <path d="M 1.5 0.4 L 1.1 -8.5" />
-            </g>
-            {/* Climbing, hunched over a staff */}
-            <g className="dash-walker" transform="translate(895 78) scale(0.85)">
-              <path d="M -1.4 0 L -0.2 -2.6 L 1.1 -0.2 M -0.2 -2.6 L -1 -5 M -1 -5 L -1.9 -4 M -1 -5 L 0.3 -4.3 M -2.1 0.6 L -1.5 -6.2" />
-              <circle className="dash-walker-fill" cx="-1.6" cy="-5.9" r="1.15" />
-            </g>
-            {/* Running up the slope */}
-            <g className="dash-walker" transform="translate(920 100) scale(0.85)">
-              <path d="M -2 0 L -0.4 -3 L 1.3 -0.4 M -0.4 -3 L -1.1 -5.8 M -1.8 -4.2 L -0.9 -5.2 L 0.6 -5.2" />
-              <circle className="dash-walker-fill" cx="-1.5" cy="-6.7" r="1.2" />
-            </g>
-            {/* Climber on the left ridge, mirrored to face the peak */}
-            <g className="dash-walker" transform="translate(802 66) scale(-0.85 0.85)">
-              <path d="M -1.4 0 L -0.2 -2.6 L 1.1 -0.2 M -0.2 -2.6 L -1 -5 M -1 -5 L -1.9 -4 M -1 -5 L 0.3 -4.3 M -2.1 0.6 L -1.5 -6.2" />
-              <circle className="dash-walker-fill" cx="-1.6" cy="-5.9" r="1.15" />
-            </g>
-          </g>
-        </svg>
-      </div>
-
       <header className="topbar">
         <div className="topbar-left">
           <p className="topbar-breadcrumb">DASHBOARD › {isPersonal ? 'MY BOARDS' : (guildDetails?.name?.toUpperCase() || 'GUILD')}</p>
@@ -1092,7 +993,6 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               onChange={e => setDashSearchQuery(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Escape') { setDashSearchQuery(''); setSearchOpen(false) }
-                if (e.key === 'Enter' && dashSearchQuery.trim()) submitSearch(dashSearchQuery)
               }}
               tabIndex={searchOpen ? 0 : -1}
               aria-hidden={!searchOpen}
@@ -1157,29 +1057,26 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             <UserAvatar user={user} className="sidebar-profile-avatar" />
             <div className="sidebar-profile-info">
               <span className="sidebar-profile-username">{user.username}</span>
-              <span className="sidebar-profile-rank">● LV.1 ADVENTURER</span>
-            </div>
-            <div className="sidebar-profile-stats">
-              <div className="sidebar-stat">
-                <span className="sidebar-stat-val">{loading ? '–' : ownedBoards.length}</span>
-                <span className="sidebar-stat-label">BOARDS</span>
-              </div>
-              <div className="sidebar-stat-sep" />
-              <div className="sidebar-stat">
-                <span className="sidebar-stat-val">{loading ? '–' : sharedBoards.length}</span>
-                <span className="sidebar-stat-label">SHARED</span>
-              </div>
             </div>
           </div>
 
           <p className="sidebar-section-label">MAIN REALM</p>
 
           <button
-            className={`sidebar-item${isPersonal ? ' active' : ''}`}
-            onClick={() => { setActiveContext('personal'); setAddingBoard(false) }}
+            className={`sidebar-item${isPersonal && boardView === 'owned' ? ' active' : ''}`}
+            onClick={() => { setActiveContext('personal'); setBoardView('owned'); setAddingBoard(false) }}
           >
             <span className="sidebar-item-icon" aria-hidden="true">⊞</span>
             <span className="sidebar-item-name">Boards</span>
+          </button>
+
+          <button
+            className={`sidebar-item${isPersonal && boardView === 'shared' ? ' active' : ''}`}
+            onClick={() => { setActiveContext('personal'); setBoardView('shared'); setAddingBoard(false) }}
+          >
+            <span className="sidebar-item-icon" aria-hidden="true">⇄</span>
+            <span className="sidebar-item-name">Shared with me</span>
+            {sharedBoards.length > 0 && <span className="sidebar-item-count">{sharedBoards.length}</span>}
           </button>
 
           {guilds.length > 0 && (
@@ -1207,6 +1104,19 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                     <circle cx="9" cy="7" r="4"/>
                     <line x1="19" y1="8" x2="19" y2="14"/>
                     <line x1="22" y1="11" x2="16" y2="11"/>
+                  </svg>
+                </button>
+              )}
+              {g.role === 'owner' && (
+                <button
+                  className="sidebar-guild-manage-btn"
+                  title="Manage / Disband"
+                  aria-label={`Manage ${g.name}`}
+                  onClick={e => { e.stopPropagation(); setActiveContext(g.id); setShowGuildSettings(true) }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                   </svg>
                 </button>
               )}
@@ -1240,20 +1150,6 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               <p className="dash-hero-eyebrow">{today.toUpperCase()}</p>
               <h1 className="dash-hero-greeting">{greeting}, <em className="dash-hero-username">{user.username}</em>.</h1>
               <p className="dash-hero-summary">{isPersonal ? personalSummary : guildSummary}</p>
-              <div className="dash-hero-actions">
-                <button className="btn-hero-primary" onClick={() => { setAddingBoard(true); if (activeContext !== 'personal') {} }}>
-                  Create New Board
-                </button>
-                <button className="btn-hero-ghost">Read Guides</button>
-              </div>
-            </div>
-            <div className="dash-hero-preview" aria-hidden="true">
-              {!loading && ownedBoards.slice(0, 4).map((b, i) => (
-                <div key={b.id} className="dash-hero-mini-tile" style={{ '--tile': COLUMN_PALETTE[i % COLUMN_PALETTE.length] }}>
-                  <span className="dash-hero-mini-monogram">{(b.title[0] || '?').toUpperCase()}</span>
-                </div>
-              ))}
-              <div className="dash-hero-mini-create">+</div>
             </div>
           </section>
 
@@ -1306,7 +1202,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                         {!loading && !addingBoard && (
                           <button className="board-tile board-tile--create" style={{ '--stagger': 0 }} onClick={() => setAddingBoard(true)}>
                             <span className="board-tile-plus" aria-hidden="true">+</span>
-                            <span className="board-tile-create-label">Embark on a Quest</span>
+                            <span className="board-tile-create-label">Create New Board</span>
                           </button>
                         )}
                         {loading
@@ -1394,13 +1290,6 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                         Summon Allies
                       </button>
                     )}
-                    <button
-                      className="board-tile-btn guild-manage-btn"
-                      onClick={() => setShowGuildSettings(true)}
-                      title="Manage guild"
-                    >
-                      ⚙
-                    </button>
                   </div>
                 </div>
               )}
@@ -1448,26 +1337,6 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                 </div>
               </section>
             </>
-          )}
-          {isPersonal && recentSearches.length > 0 && (
-            <section className="dash-recent-search">
-              <h2 className="dash-section-title">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                Recent Search
-              </h2>
-              <div className="dash-recent-chips">
-                {recentSearches.map(s => (
-                  <button
-                    key={s}
-                    className="dash-search-chip"
-                    onClick={() => setDashSearchQuery(s)}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </section>
           )}
         </main>
       </div>
