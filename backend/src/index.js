@@ -7,6 +7,8 @@ import cookieParser from "cookie-parser";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import multer from "multer";
+import multerS3 from "multer-s3";
+import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as GitHubStrategy } from "passport-github2";
@@ -25,15 +27,36 @@ const SERVER_URL = process.env.SERVER_URL || "http://localhost:4000";
 authenticator.options = { window: 1 };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Legacy local uploads dir — still served (see express.static below) so cards
+// stored before the Spaces migration keep loading. New uploads go to Spaces.
 const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
+// DigitalOcean Spaces (S3-compatible). Endpoint is the region origin WITHOUT the
+// bucket — the SDK prepends the bucket itself (virtual-hosted style). The CDN
+// endpoint is what we store in the DB and hand to the browser.
+const SPACES_REGION = process.env.SPACES_REGION;
+const SPACES_BUCKET = process.env.SPACES_BUCKET;
+const SPACES_CDN = (process.env.SPACES_CDN || "").replace(/\/$/, "");
+const s3 = new S3Client({
+  region: SPACES_REGION,
+  endpoint: `https://${SPACES_REGION}.digitaloceanspaces.com`,
+  forcePathStyle: false,
+  credentials: {
+    accessKeyId: process.env.SPACES_KEY,
+    secretAccessKey: process.env.SPACES_SECRET,
+  },
+});
+
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-    filename: (req, file, cb) => {
+  storage: multerS3({
+    s3,
+    bucket: SPACES_BUCKET,
+    acl: "public-read",
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: (req, file, cb) => {
       const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      cb(null, unique + path.extname(file.originalname).toLowerCase());
+      cb(null, "uploads/" + unique + path.extname(file.originalname).toLowerCase());
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
@@ -42,6 +65,20 @@ const upload = multer({
     else cb(new Error("Only image files are allowed"));
   },
 });
+
+// Best-effort delete of image objects from Spaces. Skips anything that isn't a
+// Spaces CDN URL (preset avatar keys, legacy /uploads/ disk paths, null/empty).
+// Fire-and-forget: a failed delete is logged but never blocks the response.
+function deleteSpacesImages(...urls) {
+  for (const url of urls.flat()) {
+    if (!url || typeof url !== "string") continue;
+    if (!SPACES_CDN || !url.startsWith(SPACES_CDN + "/")) continue;
+    const key = url.slice(SPACES_CDN.length + 1);
+    if (!key) continue;
+    s3.send(new DeleteObjectCommand({ Bucket: SPACES_BUCKET, Key: key }))
+      .catch(err => console.error("Spaces delete failed:", key, err.message));
+  }
+}
 
 const app = express();
 const PgSession = connectPgSimple(session);
@@ -519,10 +556,12 @@ app.get("/api/me/activity", requireAuth, async (req, res) => {
 // PATCH /api/users/me — update avatar (preset key or uploaded image path)
 app.patch("/api/users/me", requireAuth, async (req, res) => {
   const { avatar_url } = req.body;
+  const prev = await pool.query("SELECT avatar_url FROM users WHERE id = $1", [req.session.userId]);
   const result = await pool.query(
     "UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, username, email, avatar_url",
     [avatar_url ?? null, req.session.userId]
   );
+  if (prev.rows[0]?.avatar_url !== (avatar_url ?? null)) deleteSpacesImages(prev.rows[0]?.avatar_url);
   res.json(result.rows[0]);
 });
 
@@ -558,11 +597,16 @@ app.patch("/api/auth/profile", requireAuth, async (req, res) => {
   if (avatar_url !== undefined) { fields.push(`avatar_url = $${values.length + 1}`); values.push(avatar_url || null); }
   if (fields.length === 0) return res.status(400).json({ error: "Nothing to update" });
 
+  const prevAvatar = avatar_url !== undefined
+    ? (await pool.query("SELECT avatar_url FROM users WHERE id = $1", [req.session.userId])).rows[0]?.avatar_url
+    : null;
+
   values.push(req.session.userId);
   const result = await pool.query(
     `UPDATE users SET ${fields.join(", ")} WHERE id = $${values.length} RETURNING id, username, email, avatar_url`,
     values
   );
+  if (avatar_url !== undefined && prevAvatar !== (avatar_url || null)) deleteSpacesImages(prevAvatar);
   res.json(result.rows[0]);
 });
 
@@ -772,11 +816,16 @@ app.patch("/api/boards/:id", requireAuth, async (req, res) => {
     const current = await pool.query("SELECT * FROM boards WHERE id = $1", [req.params.id]);
     return res.json(current.rows[0]);
   }
+  const prevBg = background_image !== undefined
+    ? (await pool.query("SELECT background_image FROM boards WHERE id = $1", [req.params.id])).rows[0]?.background_image
+    : null;
+
   values.push(req.params.id);
   const result = await pool.query(
     `UPDATE boards SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`,
     values
   );
+  if (background_image !== undefined && prevBg !== background_image) deleteSpacesImages(prevBg);
   res.json(result.rows[0]);
 });
 
@@ -784,7 +833,21 @@ app.delete("/api/boards/:id", requireAuth, async (req, res) => {
   if (!await isOwner(req.session.userId, req.params.id)) {
     return res.status(403).json({ error: "Only the board owner can delete it" });
   }
+  // Collect every Spaces image under this board before the cascade wipes the
+  // rows: the board background, all card images, and all comment images.
+  const images = await pool.query(
+    `SELECT background_image AS url FROM boards WHERE id = $1
+     UNION ALL
+     SELECT c.image_url FROM cards c JOIN columns col ON col.id = c.column_id WHERE col.board_id = $1
+     UNION ALL
+     SELECT cc.image_url FROM card_comments cc
+       JOIN cards c ON c.id = cc.card_id
+       JOIN columns col ON col.id = c.column_id
+       WHERE col.board_id = $1`,
+    [req.params.id]
+  );
   await pool.query("DELETE FROM boards WHERE id = $1", [req.params.id]);
+  deleteSpacesImages(images.rows.map(r => r.url));
   res.json({ success: true });
 });
 
@@ -1184,8 +1247,15 @@ app.delete("/api/cards/:id", requireAuth, async (req, res) => {
   if (!card.rows[0] || !await canAccessBoard(req.session.userId, card.rows[0].board_id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
+  const images = await pool.query(
+    `SELECT image_url AS url FROM cards WHERE id = $1
+     UNION ALL
+     SELECT image_url FROM card_comments WHERE card_id = $1`,
+    [req.params.id]
+  );
   await logActivity({ boardId: card.rows[0].board_id, cardId: req.params.id, userId: req.session.userId, action: "deleted", cardTitle: card.rows[0].title });
   await pool.query("DELETE FROM cards WHERE id = $1", [req.params.id]);
+  deleteSpacesImages(images.rows.map(r => r.url));
   res.json({ success: true });
 });
 
@@ -1212,10 +1282,12 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
   if (title !== undefined) {
     if (tooLong(title, 255)) return res.status(400).json({ error: "Title must be 255 characters or fewer" });
     if (tooLong(description, 3000)) return res.status(400).json({ error: "Description must be 3000 characters or fewer" });
+    const prevImg = (await pool.query("SELECT image_url FROM cards WHERE id = $1", [req.params.id])).rows[0]?.image_url;
     const result = await pool.query(
       "UPDATE cards SET title = $1, description = $2, last_edited_by = $3, updated_at = NOW(), image_url = $4 WHERE id = $5 RETURNING *",
       [title, description || null, req.session.userId, image_url || null, req.params.id]
     );
+    if (prevImg !== (image_url || null)) deleteSpacesImages(prevImg);
     const editor = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
     await logActivity({ boardId: card.rows[0].board_id, cardId: req.params.id, userId: req.session.userId, action: "edited", cardTitle: result.rows[0].title });
     return res.json({ ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null });
@@ -1294,7 +1366,8 @@ app.post("/api/cards/:id/comments", requireAuth, async (req, res) => {
 // POST /api/upload — store an uploaded image and return its public URL
 app.post("/api/upload", requireAuth, upload.single("image"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No image uploaded" });
-  res.json({ url: `/uploads/${req.file.filename}` });
+  // multer-s3 sets req.file.key to the object key (e.g. "uploads/123.png").
+  res.json({ url: `${SPACES_CDN}/${req.file.key}` });
 });
 
 app.patch("/api/comments/:id", requireAuth, async (req, res) => {
@@ -1364,12 +1437,13 @@ app.post("/api/comments/:id/reactions", requireAuth, async (req, res) => {
 });
 
 app.delete("/api/comments/:id", requireAuth, async (req, res) => {
-  const comment = await pool.query("SELECT user_id FROM card_comments WHERE id = $1", [req.params.id]);
+  const comment = await pool.query("SELECT user_id, image_url FROM card_comments WHERE id = $1", [req.params.id]);
   if (!comment.rows[0]) return res.status(404).json({ error: "Not found" });
   if (comment.rows[0].user_id !== req.session.userId) {
     return res.status(403).json({ error: "You can only delete your own comments" });
   }
   await pool.query("DELETE FROM card_comments WHERE id = $1", [req.params.id]);
+  deleteSpacesImages(comment.rows[0].image_url);
   res.json({ success: true });
 });
 
