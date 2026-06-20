@@ -1385,13 +1385,12 @@ select.card-input {
   flex-direction: column;
   height: 100svh;
   overflow: hidden;
-  /* astral atlas: a sparse silvered starfield drifting over a faint pegboard grid,
-     so the colourful realm-tomes sit on a surface that reads as a night sky */
+  /* astral atlas: a single sparse silvered star-dust layer. The pegboard grid
+     was removed so the canvas starfield reads as the only texture — quieter sky */
   background-image:
-    radial-gradient(color-mix(in srgb, var(--metal) 30%, transparent) 1.2px, transparent 1.3px),
-    radial-gradient(var(--border) 1px, transparent 1px);
-  background-size: 96px 96px, 22px 22px;
-  background-position: 12px 28px, -1px -1px;
+    radial-gradient(color-mix(in srgb, var(--metal) 30%, transparent) 1.2px, transparent 1.3px);
+  background-size: 96px 96px;
+  background-position: 12px 28px;
 }
 
 /* Prototype #1: a soft single-hue brand glow behind the hero only. It's
@@ -1407,8 +1406,8 @@ select.card-input {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(58% 70% at 20% -8%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 68%),
-    radial-gradient(46% 64% at 82% -16%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%);
+    radial-gradient(58% 70% at 20% -8%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 68%),
+    radial-gradient(46% 64% at 82% -16%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 70%);
 }
 
 .dashboard-shell::after {
@@ -1423,7 +1422,7 @@ select.card-input {
   /* anchor the breathing to the glow's own corner so it never drifts off-edge */
   transform-origin: 100% 100%;
   background:
-    radial-gradient(54% 66% at 84% 112%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%);
+    radial-gradient(54% 66% at 84% 112%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1584,7 +1583,7 @@ select.card-input {
 
 .dashboard-main {
   flex: 1;
-  padding: 16px 40px 56px;
+  padding: 28px 40px 64px;
   max-width: 1120px;
   width: 100%;
   margin: 0 auto;
@@ -1933,7 +1932,7 @@ select.card-input {
   background: transparent;
   /* keep the label in the readable UI text colour; the metal lives in the edge */
   color: var(--text);
-  border: 1.5px dashed color-mix(in srgb, var(--metal) 60%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--metal) 28%, transparent);
   box-shadow: none;
   align-items: center;
   justify-content: center;
@@ -2337,12 +2336,11 @@ select.card-input {
   flex-direction: column;
   height: 100svh;
   overflow: hidden;
-  /* same astral atlas as the dashboard: silvered starfield over a faint grid */
+  /* same astral atlas as the dashboard: a single silvered star-dust layer */
   background-image:
-    radial-gradient(color-mix(in srgb, var(--metal) 30%, transparent) 1.2px, transparent 1.3px),
-    radial-gradient(var(--border) 1px, transparent 1px);
-  background-size: 96px 96px, 22px 22px;
-  background-position: 12px 28px, -1px -1px;
+    radial-gradient(color-mix(in srgb, var(--metal) 30%, transparent) 1.2px, transparent 1.3px);
+  background-size: 96px 96px;
+  background-position: 12px 28px;
 }
 
 /* accent aurora glow anchored top-left, mirroring the dashboard hero */
@@ -2356,8 +2354,8 @@ select.card-input {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(52% 68% at 18% -10%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 68%),
-    radial-gradient(44% 62% at 84% -16%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%);
+    radial-gradient(52% 68% at 18% -10%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 68%),
+    radial-gradient(44% 62% at 84% -16%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 70%);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -3736,7 +3734,7 @@ select.card-input {
   margin-top: 8px;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px dashed var(--border);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   background: none;
   cursor: pointer;
   color: var(--text);
@@ -4657,8 +4655,8 @@ select.card-input {
   );
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
-  padding: 36px 40px;
-  margin-bottom: 32px;
+  padding: 40px 44px;
+  margin-bottom: 44px;
   position: relative;
   overflow: hidden;
 }
@@ -5142,8 +5140,8 @@ select.card-input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
-  margin-top: 8px;
+  margin-bottom: 22px;
+  margin-top: 20px;
 }
 
 .board-section-title {
