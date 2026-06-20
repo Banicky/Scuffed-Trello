@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import Tag from './Tag.jsx'
 import { apiFetch, uploadImage, assetUrl } from '../api.js'
 import UserAvatar from './UserAvatar.jsx'
 
@@ -185,7 +184,6 @@ export default function CardDetailModal({ card, currentUserId, onClose, onCommen
     >
       <div className="card-modal">
         <div className="card-modal-header">
-          <Tag label={card.label_name} color={card.label_color} />
           <h2 className="card-modal-title">{card.title}</h2>
         </div>
 

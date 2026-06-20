@@ -563,7 +563,6 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
                   <div className="mini-col-cards">
                     {col.cards.map(c => (
                       <div className="mini-card" key={c.id}>
-                        {c.color && <span className="mini-card-tag" style={{ background: c.color }} />}
                         <span className="mini-card-title">{c.title}</span>
                       </div>
                     ))}

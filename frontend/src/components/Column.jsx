@@ -1,18 +1,17 @@
 import { useState } from 'react'
 import Card from './Card.jsx'
 import ImageUploadField from './ImageUploadField.jsx'
-import { TAG_COLORS, COLUMN_PALETTE } from '../constants.js'
+import { COLUMN_PALETTE } from '../constants.js'
 
 function AddCardForm({ onAdd, onCancel }) {
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
-  const [tag, setTag] = useState('Design')
   const [imageUrl, setImageUrl] = useState(null)
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!title.trim()) return
-    onAdd({ title: title.trim(), description: desc.trim(), label_name: tag, label_color: TAG_COLORS[tag]?.color, image_url: imageUrl })
+    onAdd({ title: title.trim(), description: desc.trim(), image_url: imageUrl })
     setTitle('')
     setDesc('')
     setImageUrl(null)
@@ -20,9 +19,6 @@ function AddCardForm({ onAdd, onCancel }) {
 
   return (
     <form className="add-card-form" onSubmit={handleSubmit}>
-      <select className="card-input" value={tag} onChange={e => setTag(e.target.value)}>
-        {Object.keys(TAG_COLORS).map(t => <option key={t}>{t}</option>)}
-      </select>
       <input
         className="card-input"
         placeholder="Card title"

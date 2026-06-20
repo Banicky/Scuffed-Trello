@@ -718,10 +718,10 @@ app.get("/api/boards/:id/preview", requireAuth, async (req, res) => {
     `SELECT col.id, col.title,
             (SELECT COUNT(*)::int FROM cards WHERE cards.column_id = col.id) AS card_count,
             COALESCE((
-              SELECT jsonb_agg(jsonb_build_object('id', c.id, 'title', c.title, 'color', c.color) ORDER BY c.position)
+              SELECT jsonb_agg(jsonb_build_object('id', c.id, 'title', c.title) ORDER BY c.position)
               FROM (
-                SELECT cards.id, cards.title, cards.position, labels.color
-                FROM cards LEFT JOIN labels ON labels.card_id = cards.id
+                SELECT cards.id, cards.title, cards.position
+                FROM cards
                 WHERE cards.column_id = col.id ORDER BY cards.position LIMIT 8
               ) c
             ), '[]'::jsonb) AS cards
@@ -1142,12 +1142,11 @@ app.get("/api/columns/:columnId/cards", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   const result = await pool.query(
-    `SELECT cards.*, labels.name AS label_name, labels.color AS label_color,
+    `SELECT cards.*,
             creator.username AS created_by_username,
             editor.username AS last_edited_by_username,
             (SELECT COUNT(*)::int FROM card_comments cc WHERE cc.card_id = cards.id) AS comment_count
      FROM cards
-     LEFT JOIN labels ON labels.card_id = cards.id
      LEFT JOIN users creator ON creator.id = cards.created_by
      LEFT JOIN users editor ON editor.id = cards.last_edited_by
      WHERE cards.column_id = $1
@@ -1158,7 +1157,7 @@ app.get("/api/columns/:columnId/cards", requireAuth, async (req, res) => {
 });
 
 app.post("/api/cards", requireAuth, async (req, res) => {
-  const { column_id, title, description, position, label_name, label_color, image_url } = req.body;
+  const { column_id, title, description, position, image_url } = req.body;
   const col = await pool.query("SELECT board_id FROM columns WHERE id = $1", [column_id]);
   if (!col.rows[0] || !await canAccessBoard(req.session.userId, col.rows[0].board_id)) {
     return res.status(403).json({ error: "Forbidden" });
@@ -1172,16 +1171,9 @@ app.post("/api/cards", requireAuth, async (req, res) => {
   );
   const card = cardResult.rows[0];
 
-  if (label_name) {
-    await pool.query(
-      "INSERT INTO labels (card_id, name, color) VALUES ($1, $2, $3)",
-      [card.id, label_name, label_color]
-    );
-  }
-
   const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
   await logActivity({ boardId: col.rows[0].board_id, cardId: card.id, userId: req.session.userId, action: "created", cardTitle: card.title });
-  res.json({ ...card, label_name: label_name || null, label_color: label_color || null, created_by_username: user.rows[0]?.username || null });
+  res.json({ ...card, created_by_username: user.rows[0]?.username || null });
 });
 
 app.delete("/api/cards/:id", requireAuth, async (req, res) => {
@@ -1207,7 +1199,7 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
 
-  const { column_id, position, starred, title, description, label_name, label_color, track_edit, image_url } = req.body;
+  const { column_id, position, starred, title, description, track_edit, image_url } = req.body;
 
   if (starred !== undefined) {
     const result = await pool.query(
@@ -1224,16 +1216,9 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
       "UPDATE cards SET title = $1, description = $2, last_edited_by = $3, updated_at = NOW(), image_url = $4 WHERE id = $5 RETURNING *",
       [title, description || null, req.session.userId, image_url || null, req.params.id]
     );
-    await pool.query("DELETE FROM labels WHERE card_id = $1", [req.params.id]);
-    if (label_name) {
-      await pool.query(
-        "INSERT INTO labels (card_id, name, color) VALUES ($1, $2, $3)",
-        [req.params.id, label_name, label_color]
-      );
-    }
     const editor = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
     await logActivity({ boardId: card.rows[0].board_id, cardId: req.params.id, userId: req.session.userId, action: "edited", cardTitle: result.rows[0].title });
-    return res.json({ ...result.rows[0], label_name: label_name || null, label_color: label_color || null, last_edited_by_username: editor.rows[0]?.username || null });
+    return res.json({ ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null });
   }
 
   if (track_edit) {
@@ -1625,16 +1610,8 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS card_activity_board_idx ON card_activity (board_id, created_at DESC)
   `);
 
-  // labels references cards(id), so it must be created inside migrate() *after*
-  // the cards table — not stranded at module scope where it ran first.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS labels (
-      id SERIAL PRIMARY KEY,
-      card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-      name VARCHAR(100),
-      color VARCHAR(50)
-    )
-  `);
+  // The label/tag feature was removed; drop the table so no stale data lingers.
+  await pool.query(`DROP TABLE IF EXISTS labels`);
 }
 
 // JSON error handler — multer upload errors (size/type) map to 400; anything
