@@ -4661,6 +4661,76 @@ select.card-input {
   overflow: hidden;
 }
 
+/* ── Celestial corner filigree (top-left of the hero card) ── */
+.dash-hero-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 150px;
+  height: 150px;
+  pointer-events: none;
+  color: var(--star, #d8dfe9);
+}
+/* keep the real content above the ornament */
+.dash-hero-left,
+.dash-hero-art { position: relative; }
+
+.dhc-line {
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.72;
+}
+.dhc-line--faint { opacity: 0.38; }
+
+.dhc-arc {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-dasharray: 1.5 5;
+  opacity: 0.45;
+}
+
+.dhc-star { fill: currentColor; opacity: 0.92; }
+.dhc-star--lg {
+  opacity: 1;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 80%, transparent));
+}
+
+.dhc-dot { fill: currentColor; opacity: 0.78; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .dhc-star--lg { animation: dhc-twinkle 7s ease-in-out infinite; }
+}
+/* bright at rest; the glow gradually spreads out, then eases back in.
+   Every stop keeps exactly two drop-shadow() functions so the filter list
+   interpolates continuously (mismatched counts would snap instead). */
+@keyframes dhc-twinkle {
+  0%, 50%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 80%, transparent))
+            drop-shadow(0 0 0 transparent);
+  }
+  62% {
+    filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 88%, transparent))
+            drop-shadow(0 0 9px color-mix(in srgb, currentColor 35%, transparent));
+  }
+  72% {
+    filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 95%, transparent))
+            drop-shadow(0 0 14px color-mix(in srgb, currentColor 55%, transparent));
+  }
+  80% {
+    filter: drop-shadow(0 0 9px color-mix(in srgb, currentColor 100%, transparent))
+            drop-shadow(0 0 18px color-mix(in srgb, currentColor 70%, transparent));
+  }
+  88% {
+    filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 95%, transparent))
+            drop-shadow(0 0 14px color-mix(in srgb, currentColor 55%, transparent));
+  }
+  94% {
+    filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 88%, transparent))
+            drop-shadow(0 0 9px color-mix(in srgb, currentColor 35%, transparent));
+  }
+}
+
 .dash-hero-card::before {
   content: '';
   position: absolute;

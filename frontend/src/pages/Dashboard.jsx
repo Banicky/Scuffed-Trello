@@ -1300,6 +1300,22 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
         {/* ── Main content ── */}
         <main className="dashboard-main" ref={mainRef}>
           <section className="dash-hero-card">
+            {/* celestial filigree anchored to the top-left corner */}
+            <svg className="dash-hero-corner" viewBox="0 0 150 150" fill="none" aria-hidden="true">
+              {/* double L-bracket framing the corner */}
+              <path className="dhc-line" d="M24 92 L24 32 Q24 24 32 24 L92 24" />
+              <path className="dhc-line dhc-line--faint" d="M36 100 L36 42 Q36 36 42 36 L100 36" />
+              {/* faint orbit arc */}
+              <path className="dhc-arc" d="M104 28 A76 76 0 0 0 28 104" />
+              {/* radiant compass star at the vertex */}
+              <path className="dhc-star dhc-star--lg" d="M24 4 L26.4 21.6 L44 24 L26.4 26.4 L24 44 L21.6 26.4 L4 24 L21.6 21.6 Z" />
+              {/* scattered stars */}
+              <path className="dhc-star" d="M68 14 L69 18 L73 19 L69 20 L68 24 L67 20 L63 19 L67 18 Z" />
+              <path className="dhc-star" d="M14 68 L15 72 L19 73 L15 74 L14 78 L13 74 L9 73 L13 72 Z" />
+              <circle className="dhc-dot" cx="58" cy="50" r="1.2" />
+              <circle className="dhc-dot" cx="100" cy="62" r="1.4" />
+              <circle className="dhc-dot" cx="50" cy="100" r="1.2" />
+            </svg>
             <div className="dash-hero-left">
               <p className="dash-hero-eyebrow">{today.toUpperCase()}</p>
               <h1 className="dash-hero-greeting">{greeting}, <em className="dash-hero-username">{user.username}</em>.</h1>
