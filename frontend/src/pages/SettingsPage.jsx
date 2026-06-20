@@ -3,6 +3,7 @@ import { apiFetch, uploadImage, assetUrl } from '../api.js'
 import { hexToRgb } from '../utils.js'
 import TwoFactorSection from '../components/TwoFactorSection.jsx'
 import TwoFactorSetup from './TwoFactorSetup.jsx'
+import Starfield from '../components/Starfield.jsx'
 
 const AVATAR_PRESETS = [
   { key: '⚔', label: 'Knight' },
@@ -418,9 +419,11 @@ export default function SettingsPage({ user, section, onSection, onBack, onUpdat
 
   return (
     <div className="settings-shell">
+      <Starfield />
+
       <header className="settings-topbar">
         <button className="back-btn" onClick={onBack} title="Back to dashboard">←</button>
-        <span className="settings-topbar-title">Adventurer's Codex</span>
+        <span className="settings-topbar-title">Settings</span>
         <button className="btn-ghost logout-btn" onClick={onLogout}>Log out</button>
       </header>
 

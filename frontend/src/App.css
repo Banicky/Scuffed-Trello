@@ -2332,12 +2332,42 @@ select.card-input {
 
 /* ── Settings page ── */
 .settings-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100svh;
   overflow: hidden;
-  background: var(--bg);
+  /* same astral atlas as the dashboard: silvered starfield over a faint grid */
+  background-image:
+    radial-gradient(color-mix(in srgb, var(--metal) 30%, transparent) 1.2px, transparent 1.3px),
+    radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 96px 96px, 22px 22px;
+  background-position: 12px 28px, -1px -1px;
 }
+
+/* accent aurora glow anchored top-left, mirroring the dashboard hero */
+.settings-shell::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 460px;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(52% 68% at 18% -10%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 68%),
+    radial-gradient(44% 62% at 84% -16%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .settings-shell::before { animation: aurora-drift-a 24s ease-in-out infinite alternate; }
+}
+
+/* the canvas starfield + UI both sit above the grid/glow background */
+.settings-shell > .starfield-canvas { z-index: 0; }
+.settings-shell > .settings-topbar,
+.settings-shell > .settings-layout { position: relative; z-index: 1; }
 
 .settings-topbar {
   display: flex;
@@ -2346,14 +2376,14 @@ select.card-input {
   padding: 0 24px;
   height: 56px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  background: transparent;
 }
 
 .settings-topbar-title {
-  font-family: var(--fantasy, 'Cinzel', Georgia, serif);
-  font-size: 13px;
-  font-weight: 600;
+  font-family: var(--fantasy);
+  font-size: 20px;
+  font-weight: 800;
   color: var(--text-h);
   letter-spacing: 0.08em;
   flex: 1;
@@ -2369,12 +2399,18 @@ select.card-input {
 .settings-nav {
   width: 216px;
   flex-shrink: 0;
-  border-right: 1px solid var(--border);
-  padding: 20px 10px;
+  margin: 16px 0 16px 16px;
+  padding: 14px 10px;
   display: flex;
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
+  /* glass panel matching the dashboard sidebar */
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .settings-nav-item {
@@ -2424,16 +2460,27 @@ select.card-input {
 .settings-pane {
   flex: 1;
   overflow-y: auto;
-  padding: 40px 48px;
+  padding: 32px 40px 48px;
   min-width: 0;
 }
 
 .settings-section {
-  max-width: 520px;
+  max-width: 560px;
+  padding: 28px 32px;
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: 18px;
+  background: linear-gradient(
+    135deg,
+    rgba(28, 32, 42, 0.5) 0%,
+    rgba(12, 14, 20, 0.36) 100%
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
 }
 
 .settings-section-title {
-  font-family: var(--fantasy, 'Cinzel', Georgia, serif);
+  font-family: var(--fantasy);
   font-size: 20px;
   font-weight: 700;
   color: var(--text-h);
@@ -2472,7 +2519,7 @@ select.card-input {
   line-height: 1;
 }
 .settings-avatar-hero-monogram {
-  font-family: var(--fantasy, 'Cinzel', Georgia, serif);
+  font-family: var(--fantasy);
   font-size: 36px;
   font-weight: 700;
   color: var(--text-h);
@@ -2662,14 +2709,6 @@ select.card-input {
 }
 
 /* ── Account settings ── */
-.settings-shell {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-  color: var(--text);
-}
-
 .settings-main {
   flex: 1;
   display: flex;
@@ -2901,9 +2940,9 @@ select.card-input {
   top: 50%;
   transform: translate(-50%, -50%);
   margin: 0;
-  /* Cinzel — engraved Roman capitals, for an epic "gateway" feel; set in caps
-     with wide tracking so it reads as an inscription, not a label */
-  font-family: 'Cinzel', Georgia, serif;
+  /* celestial-grimoire serif, set in caps with wide tracking so it reads as a
+     star-chart inscription, not a label */
+  font-family: var(--fantasy);
   font-weight: 700;
   font-size: clamp(1.3rem, 3.6vw, 2.3rem);
   text-transform: uppercase;
@@ -5001,30 +5040,6 @@ select.card-input {
     color: var(--text-h);
     background: var(--accent-bg);
   }
-}
-
-/* ── Sidebar brand ── */
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 10px 14px;
-  margin-bottom: 2px;
-}
-
-.sidebar-brand-icon {
-  width: 30px !important;
-  height: 30px !important;
-  font-size: 13px !important;
-  flex-shrink: 0;
-}
-
-.sidebar-brand-name {
-  font-family: var(--fantasy);
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--text-h);
-  letter-spacing: 0.02em;
 }
 
 /* ── Sidebar user profile (top of sidebar) ── */

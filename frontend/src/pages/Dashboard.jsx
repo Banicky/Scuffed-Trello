@@ -919,7 +919,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       gsap.from('.dash-hero-eyebrow, .dash-hero-greeting, .dash-hero-summary', {
         y: 20, opacity: 0, duration: 0.7, ease: 'power3.out', stagger: 0.09, delay: 0.08,
       })
-      gsap.from('.dash-sidebar .sidebar-brand, .dash-sidebar .sidebar-profile, .dash-sidebar .sidebar-section-label, .dash-sidebar .sidebar-item, .dash-sidebar .sidebar-create-btn', {
+      gsap.from('.dash-sidebar .sidebar-profile, .dash-sidebar .sidebar-section-label, .dash-sidebar .sidebar-item, .dash-sidebar .sidebar-create-btn', {
         x: -18, opacity: 0, duration: 0.5, ease: 'power2.out', stagger: 0.035, delay: 0.05,
       })
       // hero orrery drifts in, then breathes with a slow vertical float
@@ -1207,11 +1207,6 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       <div className="dash-layout">
         {/* ── Sidebar ── */}
         <nav className="dash-sidebar" ref={sidebarRef} aria-label="Navigation">
-          <div className="sidebar-brand">
-            <div className="board-icon sidebar-brand-icon">S</div>
-            <span className="sidebar-brand-name">Scuffed Trello</span>
-          </div>
-
           <div className="sidebar-profile" onClick={() => onOpenSettings('avatar')} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') onOpenSettings('avatar') }}>
             <UserAvatar user={user} className="sidebar-profile-avatar" />
             <div className="sidebar-profile-info">
