@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { gsap } from 'gsap'
 import { apiFetch, assetUrl } from '../api.js'
 import { relativeTime } from '../utils.js'
@@ -392,7 +392,7 @@ function BoardSettingsPopover({ board, onRename, onDelete, onClose }) {
 
   return (
     <div className="board-popover" ref={ref} onClick={e => e.stopPropagation()}>
-      <p className="board-popover-label">Rename board</p>
+      <p className="board-popover-label">Rename galaxy</p>
       <form className="board-popover-rename" onSubmit={handleRename}>
         <input
           className="card-input"
@@ -405,7 +405,7 @@ function BoardSettingsPopover({ board, onRename, onDelete, onClose }) {
       <div className="board-popover-divider" />
       {confirming ? (
         <div className="board-popover-confirm">
-          <span className="board-popover-confirm-msg">Delete this board?</span>
+          <span className="board-popover-confirm-msg">Delete this galaxy?</span>
           <div className="board-popover-confirm-actions">
             <button className="btn-danger-sm" onClick={() => { onDelete(board.id); onClose() }}>Delete</button>
             <button className="btn-ghost-sm" onClick={() => setConfirming(false)}>Cancel</button>
@@ -425,6 +425,22 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
   const color = COLUMN_PALETTE[index % COLUMN_PALETTE.length]
   // stable per board (not grid position) so a board keeps its sign across reorders
   const zodiac = ZODIAC_CONSTELLATIONS[board.id % ZODIAC_CONSTELLATIONS.length]
+
+  // Sparkle timing: hand each star an evenly-spaced slot across the 8s cycle,
+  // then shuffle the slots (seeded by board id) so the flares fire scattered in
+  // time — never all at once, at most ~2 overlapping — but not left-to-right.
+  const sparkleDelays = useMemo(() => {
+    const n = zodiac.points.length
+    const CYCLE = 8
+    const slots = Array.from({ length: n }, (_, i) => +((i / n) * CYCLE).toFixed(2))
+    let seed = (board.id * 1103515245 + 12345) & 0x7fffffff
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1))
+      ;[slots[i], slots[j]] = [slots[j], slots[i]]
+    }
+    return slots
+  }, [board.id, zodiac])
 
   const [preview, setPreview] = useState(() => previewCache.get(board.id) || null)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -490,7 +506,10 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
               cx={x}
               cy={y}
               r={i % 3 === 0 ? 1.8 : 1.2}
-              style={{ animationDelay: `${i * 0.5}s` }}
+              style={{
+                // twinkle phase derived from the same slot so stars don't pulse in unison
+                animationDelay: `${(sparkleDelays[i] % 3.2).toFixed(2)}s, ${sparkleDelays[i]}s`,
+              }}
             />
           ))}
         </svg>
@@ -502,7 +521,7 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
           <div className="board-tile-actions" onClick={e => e.stopPropagation()}>
             <button
               className={`board-tile-btn${showSettings ? ' active' : ''}`}
-              title="Board settings"
+              title="Galaxy settings"
               onClick={() => setShowSettings(v => !v)}
             >
               ⚙
@@ -679,6 +698,40 @@ function readSkeletonCount(key, fallback) {
   }
 }
 
+// ── Cosmic Activity: small line icon per event kind ──
+const ACTIVITY_ICONS = {
+  card: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 9h10M7 13h6" />
+    </svg>
+  ),
+  board: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" />
+    </svg>
+  ),
+  guild: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l7 3v5c0 4-3 7-7 9-4-2-7-5-7-9V6z" />
+    </svg>
+  ),
+}
+
+// Turns a feed row into a human "recent discovery" sentence.
+function activityText(a) {
+  const title = <strong>{a.title || 'an item'}</strong>
+  switch (`${a.kind}:${a.action}`) {
+    case 'card:created':  return <>Added {title}{a.context && <> to {a.context}</>}</>
+    case 'card:edited':   return <>Updated {title}{a.context && <> in {a.context}</>}</>
+    case 'card:moved':    return <>Moved {title}{a.context && <> within {a.context}</>}</>
+    case 'card:deleted':  return <>Removed {title}{a.context && <> from {a.context}</>}</>
+    case 'board:created': return <>Charted a new galaxy, {title}</>
+    case 'guild:founded': return <>Founded the guild {title}</>
+    case 'guild:joined':  return <>Joined the guild {title}</>
+    default:              return title
+  }
+}
+
 export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings }) {
   const rootRef = useRef(null)
   const sidebarRef = useRef(null)
@@ -686,6 +739,10 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const searchRef = useRef(null)
   const searchInputRef = useRef(null)
   const notifRef = useRef(null)
+  const streakRef = useRef(null)
+  const activityPageRef = useRef(null)
+  const feedListRef = useRef(null)
+  const scrollThumbRef = useRef(null)
 
   const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
@@ -711,6 +768,9 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
   const [dashSearchQuery, setDashSearchQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [activity, setActivity] = useState([])
+  const [activityLoading, setActivityLoading] = useState(true)
+  const [activityPageOpen, setActivityPageOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
   const [showGuildInvite, setShowGuildInvite] = useState(false)
@@ -813,6 +873,28 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       .then(data => setGuilds(Array.isArray(data) ? data : []))
   }, [])
 
+  // Cosmic Activity feed — the user's own recent deeds. Re-fetched on mount,
+  // whenever the tab regains focus (e.g. returning from a board), and after
+  // actions on the dashboard that produce new activity (see createBoard).
+  const loadActivity = useCallback(() => {
+    return apiFetch('/api/me/activity')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setActivity(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setActivityLoading(false))
+  }, [])
+
+  useEffect(() => {
+    loadActivity()
+    const refresh = () => { if (!document.hidden) loadActivity() }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [loadActivity])
+
   useEffect(() => {
     if (activeContext === 'personal') {
       setGuildBoards([])
@@ -840,6 +922,11 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       gsap.from('.dash-sidebar .sidebar-brand, .dash-sidebar .sidebar-profile, .dash-sidebar .sidebar-section-label, .dash-sidebar .sidebar-item, .dash-sidebar .sidebar-create-btn', {
         x: -18, opacity: 0, duration: 0.5, ease: 'power2.out', stagger: 0.035, delay: 0.05,
       })
+      // hero orrery drifts in, then breathes with a slow vertical float
+      gsap.from('.dash-hero-art', { scale: 0.8, opacity: 0, duration: 0.9, ease: 'power3.out', delay: 0.2 })
+      gsap.to('.dash-hero-art-svg', { y: -7, duration: 3.4, repeat: -1, yoyo: true, ease: 'sine.inOut' })
+      // the streak/activity chip in the hero
+      gsap.from('.hero-stats-trigger', { y: 14, opacity: 0, duration: 0.6, ease: 'power3.out', delay: 0.34 })
     }, rootRef)
     return () => ctx.revert()
   }, [])
@@ -864,6 +951,78 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     return () => ctx.revert()
   }, [loading, guildBoardsLoading, boardView, activeContext])
 
+  // ── GSAP: animate the Cosmic Activity page open (backdrop, panel, streak, rows) ──
+  useEffect(() => {
+    if (!activityPageOpen) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const ctx = gsap.context(() => {
+      if (activityPageRef.current) gsap.from(activityPageRef.current, { opacity: 0, duration: 0.25, ease: 'power1.out' })
+      gsap.from('.cosmic-page', { y: 34, scale: 0.96, opacity: 0, duration: 0.5, ease: 'power3.out' })
+      gsap.from('.cosmic-page .streak-flame', { scale: 0.5, opacity: 0, duration: 0.6, ease: 'back.out(1.7)', delay: 0.18 })
+      gsap.from('.cosmic-page .streak-dot', { scale: 0, opacity: 0, duration: 0.4, ease: 'back.out(2)', stagger: 0.05, delay: 0.34 })
+      gsap.from('.cosmic-page .cosmic-activity-item', { x: -16, opacity: 0, duration: 0.45, ease: 'power2.out', stagger: 0.06, delay: 0.2 })
+
+      // count the streak number up from zero
+      const target = user.streak_count ?? 0
+      if (streakRef.current) {
+        streakRef.current.textContent = '0'
+        const proxy = { n: 0 }
+        gsap.to(proxy, {
+          n: target, duration: 1, delay: 0.25, ease: 'power2.out',
+          onUpdate: () => { if (streakRef.current) streakRef.current.textContent = String(Math.round(proxy.n)) },
+        })
+      }
+    }, activityPageRef)
+    return () => ctx.revert()
+  }, [activityPageOpen])
+
+  // Close the Cosmic Activity page on Escape; refresh its data each time it opens.
+  useEffect(() => {
+    if (!activityPageOpen) return
+    loadActivity()
+    function onKey(e) { if (e.key === 'Escape') setActivityPageOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [activityPageOpen, loadActivity])
+
+  // Custom overlay scrollbar for the activity feed: hidden at rest, GSAP-fades
+  // in only while scrolling, then fades out once the user stops.
+  useEffect(() => {
+    if (!activityPageOpen) return
+    const list = feedListRef.current
+    const thumb = scrollThumbRef.current
+    if (!list || !thumb) return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let idle
+
+    const sizeThumb = () => {
+      const { scrollHeight, clientHeight, scrollTop } = list
+      if (scrollHeight <= clientHeight + 1) { thumb.style.height = '0'; return false }
+      const h = Math.max(28, (clientHeight / scrollHeight) * clientHeight)
+      const top = (scrollTop / (scrollHeight - clientHeight)) * (clientHeight - h)
+      thumb.style.height = `${h}px`
+      thumb.style.transform = `translateY(${top}px)`
+      return true
+    }
+
+    const onScroll = () => {
+      if (!sizeThumb()) return
+      if (reduced) {
+        thumb.style.opacity = '0.55'
+        clearTimeout(idle)
+        idle = setTimeout(() => { thumb.style.opacity = '0' }, 700)
+        return
+      }
+      gsap.to(thumb, { opacity: 1, duration: 0.18, ease: 'power1.out', overwrite: true })
+      clearTimeout(idle)
+      idle = setTimeout(() => gsap.to(thumb, { opacity: 0, duration: 0.5, ease: 'power1.out' }), 700)
+    }
+
+    sizeThumb() // position it correctly while still invisible
+    list.addEventListener('scroll', onScroll, { passive: true })
+    return () => { list.removeEventListener('scroll', onScroll); clearTimeout(idle) }
+  }, [activityPageOpen, activity.length])
+
   async function createBoard(e) {
     e.preventDefault()
     if (!newTitle.trim()) return
@@ -882,6 +1041,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     }
     setNewTitle('')
     setAddingBoard(false)
+    loadActivity() // surface the new board in Cosmic Activity immediately
   }
 
   async function deleteBoard(boardId) {
@@ -930,12 +1090,23 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const today = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
 
+  // one Cosmic Activity row — shared by the 3-row preview and the "View all" panel
+  const renderActivityRow = (a, i) => (
+    <li key={i} className="cosmic-activity-item">
+      <span className={`cosmic-activity-icon cosmic-activity-icon--${a.kind}`}>
+        {ACTIVITY_ICONS[a.kind] || ACTIVITY_ICONS.card}
+      </span>
+      <span className="cosmic-activity-text">{activityText(a)}</span>
+      <span className="cosmic-activity-time">{relativeTime(a.created_at)}</span>
+    </li>
+  )
+
   const personalSummary = loading
-    ? 'Loading your boards…'
+    ? 'Charting your galaxies…'
     : ownedBoards.length === 0 && sharedBoards.length === 0
-      ? 'No boards yet — make your first one to get rolling.'
+      ? 'No galaxies yet — chart your first to begin your voyage.'
       : <>
-          {`${ownedBoards.length} board${ownedBoards.length === 1 ? '' : 's'}`}
+          {`${ownedBoards.length} galax${ownedBoards.length === 1 ? 'y' : 'ies'}`}
           {sharedBoards.length ? ` · ${sharedBoards.length} shared with you` : ''}
           {' · '}<em className="dash-hero-cta">choose your journey.</em>
         </>
@@ -953,7 +1124,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       <header className="topbar">
         <div className="topbar-left">
           <p className="topbar-breadcrumb">DASHBOARD › {isPersonal ? 'MY BOARDS' : (guildDetails?.name?.toUpperCase() || 'GUILD')}</p>
-          <h1 className="topbar-page-title">{isPersonal ? 'My Boards' : (guildDetails?.name || 'Guild')}</h1>
+          <h1 className="topbar-page-title">{isPersonal ? 'My Universe' : (guildDetails?.name || 'Guild')}</h1>
         </div>
         <div className="topbar-right">
           <div
@@ -962,7 +1133,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
           >
             <button
               className="dash-search-icon-btn"
-              aria-label="Search boards"
+              aria-label="Search galaxies"
               aria-expanded={searchOpen}
               onClick={() => {
                 if (!searchOpen) setSearchOpen(true)
@@ -1048,14 +1219,14 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             </div>
           </div>
 
-          <p className="sidebar-section-label">MAIN REALM</p>
+          <p className="sidebar-section-label">HOME SYSTEM</p>
 
           <button
             className={`sidebar-item${isPersonal && boardView === 'owned' ? ' active' : ''}`}
             onClick={() => { setActiveContext('personal'); setBoardView('owned'); setAddingBoard(false) }}
           >
             <span className="sidebar-item-icon" aria-hidden="true">⊞</span>
-            <span className="sidebar-item-name">Boards</span>
+            <span className="sidebar-item-name">Galaxies</span>
           </button>
 
           <button
@@ -1063,7 +1234,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             onClick={() => { setActiveContext('personal'); setBoardView('shared'); setAddingBoard(false) }}
           >
             <span className="sidebar-item-icon" aria-hidden="true">⇄</span>
-            <span className="sidebar-item-name">Shared with me</span>
+            <span className="sidebar-item-name">Shared Skies</span>
             {sharedBoards.length > 0 && <span className="sidebar-item-count">{sharedBoards.length}</span>}
           </button>
 
@@ -1138,6 +1309,27 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               <p className="dash-hero-eyebrow">{today.toUpperCase()}</p>
               <h1 className="dash-hero-greeting">{greeting}, <em className="dash-hero-username">{user.username}</em>.</h1>
               <p className="dash-hero-summary">{isPersonal ? personalSummary : guildSummary}</p>
+
+              <button
+                type="button"
+                className="hero-stats-trigger"
+                onClick={() => setActivityPageOpen(true)}
+                aria-haspopup="dialog"
+              >
+                <span className="hero-stat-streak">
+                  <svg className="hero-stat-flame" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2c1 3-1 4-2 6-1.4 2.8.4 4.8 2 4.8 1.2 0 2.1-1 1.9-2.4 1.6 1 2.6 2.7 2.6 4.4A6.4 6.4 0 0 1 5.6 15c0-3 1.9-4.6 3-7 .8-1.9 2.4-3.9 3.4-6z" />
+                  </svg>
+                  <strong>{user.streak_count ?? 0}</strong> day{(user.streak_count ?? 0) === 1 ? '' : 's'} active
+                </span>
+                <span className="hero-stat-sep" aria-hidden="true">·</span>
+                <span className="hero-stat-link">
+                  Cosmic Activity
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </span>
+              </button>
             </div>
             <div className="dash-hero-art" aria-hidden="true">
               <svg className="dash-hero-art-svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
@@ -1197,19 +1389,19 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             <>
               <div className="board-section-header">
                 <h2 className="board-section-title">
-                  {boardView === 'owned' ? 'My Boards' : 'Shared with me'}
+                  {boardView === 'owned' ? 'My Universe' : 'Shared Skies'}
                   {!loading && sharedBoards.length > 0 && (
                     <button
                       className={`board-view-toggle${viewFlipping ? ' board-view-toggle--flipping' : ''}`}
                       onClick={toggleBoardView}
-                      aria-label={boardView === 'owned' ? 'Switch to shared boards' : 'Switch to my boards'}
+                      aria-label={boardView === 'owned' ? 'Switch to shared skies' : 'Switch to my universe'}
                     >
                       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M1 5h10M8 2l3 3-3 3" />
                         <path d="M15 11H5M8 8l-3 3 3 3" />
                       </svg>
                       <span className="bvt-tooltip" aria-hidden="true">
-                        {boardView === 'owned' ? 'Shared with me' : 'My Boards'}
+                        {boardView === 'owned' ? 'Shared Skies' : 'My Universe'}
                       </span>
                     </button>
                   )}
@@ -1226,12 +1418,12 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                   <form className="new-board-form" onSubmit={createBoard}>
                     <input
                       className="card-input"
-                      placeholder="Name your board"
+                      placeholder="Name your galaxy"
                       value={newTitle}
                       onChange={e => setNewTitle(e.target.value)}
                       autoFocus
                     />
-                    <button className="btn-primary" type="submit">Create board</button>
+                    <button className="btn-primary" type="submit">Chart Galaxy</button>
                     <button className="btn-ghost" type="button" onClick={() => { setAddingBoard(false); setNewTitle('') }}>Cancel</button>
                   </form>
                 )}
@@ -1242,7 +1434,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                         {!loading && !addingBoard && (
                           <button className="board-tile board-tile--create" style={{ '--stagger': 0 }} onClick={() => setAddingBoard(true)}>
                             <span className="board-tile-plus" aria-hidden="true">+</span>
-                            <span className="board-tile-create-label">Create New Board</span>
+                            <span className="board-tile-create-label">Chart New Galaxy</span>
                           </button>
                         )}
                         {loading
@@ -1265,7 +1457,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                         {loading
                           ? Array.from({ length: skeletonShared }).map((_, i) => <BoardTileSkeleton key={i} />)
                           : filteredShared.length === 0
-                            ? <p className="dashboard-empty" style={{ gridColumn: '1 / -1' }}>No shared boards match your search.</p>
+                            ? <p className="dashboard-empty" style={{ gridColumn: '1 / -1' }}>No shared skies match your search.</p>
                             : filteredShared.map((b, i) => (
                               <BoardCard
                                 key={b.id}
@@ -1380,6 +1572,61 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
           )}
         </main>
       </div>
+
+      {/* ── Cosmic Activity page (full overlay, opened from the hero) ── */}
+      {activityPageOpen && (
+        <div
+          className="cosmic-page-overlay"
+          ref={activityPageRef}
+          onClick={e => { if (e.target === e.currentTarget) setActivityPageOpen(false) }}
+        >
+          <div className="cosmic-page" role="dialog" aria-modal="true" aria-label="Cosmic Activity">
+            <button
+              type="button"
+              className="cosmic-page-close"
+              onClick={() => setActivityPageOpen(false)}
+              aria-label="Close"
+            >✕</button>
+
+            <div className="cosmic-page-grid">
+              {/* Streak panel */}
+              <aside className="cosmic-page-streak">
+                <p className="cosmic-page-eyebrow">Login Streak</p>
+                <div className="streak-flame" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2c1 3-1 4-2 6-1.4 2.8.4 4.8 2 4.8 1.2 0 2.1-1 1.9-2.4 1.6 1 2.6 2.7 2.6 4.4A6.4 6.4 0 0 1 5.6 15c0-3 1.9-4.6 3-7 .8-1.9 2.4-3.9 3.4-6z" />
+                  </svg>
+                </div>
+                <div className="streak-count" ref={streakRef}>{user.streak_count ?? 0}</div>
+                <div className="streak-label">{(user.streak_count ?? 0) === 1 ? 'day active' : 'days active'}</div>
+                <div className="streak-dots" aria-hidden="true">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <span key={i} className={`streak-dot${i < Math.min(user.streak_count ?? 0, 7) ? ' streak-dot--on' : ''}`} />
+                  ))}
+                </div>
+                {(user.longest_streak ?? 0) > 0 && (
+                  <p className="cosmic-page-best">Best: {user.longest_streak} day{user.longest_streak === 1 ? '' : 's'}</p>
+                )}
+              </aside>
+
+              {/* Activity feed */}
+              <div className="cosmic-page-feed">
+                <p className="cosmic-page-eyebrow">Recent Discoveries</p>
+                <div className="cosmic-page-scroll">
+                  <ul className="cosmic-activity-list cosmic-page-list" ref={feedListRef}>
+                    {activityLoading ? (
+                      <li className="cosmic-activity-empty">Charting recent discoveries…</li>
+                    ) : activity.length === 0 ? (
+                      <li className="cosmic-activity-empty">No discoveries yet — your journey awaits.</li>
+                    ) : activity.map(renderActivityRow)}
+                  </ul>
+                  <span className="cosmic-page-scrollthumb" ref={scrollThumbRef} aria-hidden="true" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showGuildInvite && inviteTargetGuild && (
         <GuildInviteModal

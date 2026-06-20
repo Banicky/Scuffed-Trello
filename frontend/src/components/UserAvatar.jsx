@@ -7,7 +7,7 @@ export default function UserAvatar({ user, className }) {
 
   return (
     <div
-      className={className}
+      className={`user-avatar ${className ?? ''}`}
       title={user.username}
       style={hasImage ? { overflow: 'hidden', background: 'none' } : undefined}
     >

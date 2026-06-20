@@ -259,9 +259,48 @@ async function logActivity({ boardId, cardId, userId, action, cardTitle }) {
       "INSERT INTO card_activity (board_id, card_id, user_id, action, card_title) VALUES ($1, $2, $3, $4, $5)",
       [boardId, cardId || null, userId, action, cardTitle || null]
     );
+    // Keep the log bounded: retain only the 30 most recent rows per board,
+    // pruning the oldest so the table can't grow without limit.
+    await pool.query(
+      `DELETE FROM card_activity
+       WHERE board_id = $1 AND id NOT IN (
+         SELECT id FROM card_activity WHERE board_id = $1 ORDER BY created_at DESC, id DESC LIMIT 30
+       )`,
+      [boardId]
+    );
   } catch (err) {
     // Activity logging is best-effort — never fail the underlying card action.
     console.error("logActivity failed:", err.message);
+  }
+}
+
+// Records a login for the daily streak. Idempotent per day: signing in again
+// today is a no-op; a sign-in the very next calendar day extends the streak;
+// any longer gap resets it to 1. Returns the current streak count.
+async function bumpStreak(userId) {
+  try {
+    const result = await pool.query(
+      `UPDATE users SET
+         streak_count = CASE
+           WHEN streak_last_date = CURRENT_DATE THEN streak_count
+           WHEN streak_last_date = CURRENT_DATE - 1 THEN streak_count + 1
+           ELSE 1
+         END,
+         streak_last_date = CURRENT_DATE
+       WHERE id = $1
+       RETURNING streak_count`,
+      [userId]
+    );
+    const count = result.rows[0]?.streak_count ?? 0;
+    await pool.query(
+      "UPDATE users SET longest_streak = GREATEST(longest_streak, $2) WHERE id = $1",
+      [userId, count]
+    );
+    return count;
+  } catch (err) {
+    // Best-effort — never block a login on streak bookkeeping.
+    console.error("bumpStreak failed:", err.message);
+    return 0;
   }
 }
 
@@ -327,7 +366,8 @@ app.post("/api/auth/login", async (req, res) => {
   }
 
   req.session.userId = user.id;
-  res.json({ id: user.id, username: user.username, email: user.email, avatar_url: user.avatar_url ?? null, totp_enabled: user.totp_enabled });
+  const streak_count = await bumpStreak(user.id);
+  res.json({ id: user.id, username: user.username, email: user.email, avatar_url: user.avatar_url ?? null, totp_enabled: user.totp_enabled, streak_count });
 });
 
 // POST /api/auth/2fa/login — second step of a 2FA-gated login. Verifies the TOTP
@@ -354,7 +394,8 @@ app.post("/api/auth/2fa/login", async (req, res) => {
 
   delete req.session.pending2faUserId;
   req.session.userId = user.id;
-  res.json({ id: user.id, username: user.username, email: user.email, avatar_url: user.avatar_url, totp_enabled: true });
+  const streak_count = await bumpStreak(user.id);
+  res.json({ id: user.id, username: user.username, email: user.email, avatar_url: user.avatar_url, totp_enabled: true, streak_count });
 });
 
 app.post("/api/auth/logout", (req, res) => {
@@ -377,6 +418,7 @@ function registerOAuthRoutes(provider) {
         return res.redirect(`${CLIENT_URL}/#/?oauth_error=${provider}`);
       }
       req.session.userId = user.id;
+      bumpStreak(user.id).catch(() => {});
       res.redirect(`${CLIENT_URL}/#/`);
     })(req, res, next);
   });
@@ -430,11 +472,48 @@ app.post("/api/auth/change-password", requireAuth, async (req, res) => {
 app.get("/api/auth/me", async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
   const result = await pool.query(
-    "SELECT id, username, email, avatar_url, totp_enabled FROM users WHERE id = $1",
+    "SELECT id, username, email, avatar_url, totp_enabled, streak_count, longest_streak FROM users WHERE id = $1",
     [req.session.userId]
   );
   if (!result.rows[0]) return res.status(401).json({ error: "Unauthorized" });
   res.json(result.rows[0]);
+});
+
+// GET /api/me/activity — "Cosmic Activity": the signed-in user's own recent
+// deeds across boards, guilds and cards, merged into one reverse-chronological
+// feed. Each row is { created_at, kind, action, title, context, board_id }.
+app.get("/api/me/activity", requireAuth, async (req, res) => {
+  const uid = req.session.userId;
+  const result = await pool.query(
+    `SELECT * FROM (
+       -- card actions this user performed (create/edit/move/delete)
+       SELECT a.created_at, 'card'::text AS kind, a.action::text AS action,
+              a.card_title AS title, b.title AS context, b.id AS board_id
+       FROM card_activity a JOIN boards b ON b.id = a.board_id
+       WHERE a.user_id = $1
+
+       UNION ALL
+       -- boards this user charted
+       SELECT b.created_at, 'board', 'created', b.title, NULL, b.id
+       FROM boards b WHERE b.owner_id = $1
+
+       UNION ALL
+       -- guilds this user founded
+       SELECT g.created_at, 'guild', 'founded', g.name, NULL, NULL
+       FROM guilds g WHERE g.owner_id = $1
+
+       UNION ALL
+       -- guilds this user joined (but does not own)
+       SELECT gm.joined_at, 'guild', 'joined', g.name, NULL, NULL
+       FROM guild_members gm JOIN guilds g ON g.id = gm.guild_id
+       WHERE gm.user_id = $1 AND g.owner_id <> $1
+     ) feed
+     WHERE created_at IS NOT NULL
+     ORDER BY created_at DESC
+     LIMIT 15`,
+    [uid]
+  );
+  res.json(result.rows);
 });
 
 // PATCH /api/users/me — update avatar (preset key or uploaded image path)
@@ -1337,6 +1416,12 @@ async function migrate() {
   // Per-user secret backing the "remember this device" cookie, so a trusted
   // browser can skip the 2FA prompt. Cleared when 2FA is disabled.
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS trusted_token VARCHAR(64)`);
+
+  // Login streak: consecutive calendar days the user has signed in. streak_last_date
+  // is the last day we counted; bumpStreak() compares it to today on each login.
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_count INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_last_date DATE`);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_oauth_idx ON users (oauth_provider, oauth_id)
     WHERE oauth_provider IS NOT NULL
@@ -1364,6 +1449,11 @@ async function migrate() {
   `);
   await pool.query(`
     ALTER TABLE boards ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id)
+  `);
+  // boards predate this column in the CREATE above, so older databases never got
+  // it; Cosmic Activity orders by it. DEFAULT NOW() backfills existing rows.
+  await pool.query(`
+    ALTER TABLE boards ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()
   `);
 
   // optional decorative background image for a board, shown as a translucent
@@ -1484,6 +1574,10 @@ async function migrate() {
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       PRIMARY KEY (guild_id, user_id)
     )
+  `);
+  // when a member joined — powers the "joined a guild" entry in Cosmic Activity
+  await pool.query(`
+    ALTER TABLE guild_members ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT NOW()
   `);
 
   await pool.query(`
