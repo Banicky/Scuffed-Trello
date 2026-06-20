@@ -1,7 +1,5 @@
 import { useState } from 'react'
-import Tag from './Tag.jsx'
 import ImageUploadField from './ImageUploadField.jsx'
-import { TAG_COLORS } from '../constants.js'
 import { assetUrl } from '../api.js'
 import { buildSearchRegex } from '../utils.js'
 
@@ -27,20 +25,16 @@ function highlightMatches(text, query, caseSensitive, wholeWord, isActive) {
 function EditCardForm({ card, onSave, onCancel }) {
   const [title, setTitle] = useState(card.title)
   const [desc, setDesc] = useState(card.description || '')
-  const [tag, setTag] = useState(card.label_name || 'Design')
   const [imageUrl, setImageUrl] = useState(card.image_url || null)
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!title.trim()) return
-    onSave({ title: title.trim(), description: desc.trim(), label_name: tag, label_color: TAG_COLORS[tag]?.color, image_url: imageUrl })
+    onSave({ title: title.trim(), description: desc.trim(), image_url: imageUrl })
   }
 
   return (
     <form className="add-card-form" onSubmit={handleSubmit}>
-      <select className="card-input" value={tag} onChange={e => setTag(e.target.value)}>
-        {Object.keys(TAG_COLORS).map(t => <option key={t}>{t}</option>)}
-      </select>
       <input
         className="card-input"
         value={title}
@@ -90,7 +84,9 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
       onDragOver={e => { e.preventDefault(); onDragOverCard(card.id) }}
     >
       <div className="card-header">
-        <Tag label={card.label_name} color={card.label_color} />
+        <p className="card-title card-title--clickable" onClick={onOpenDetail}>
+          {highlightMatches(card.title, searchQuery, caseSensitive, wholeWord, isActiveMatch)}
+        </p>
         <div className="card-actions">
           <button
             className={`card-star${card.starred ? ' active' : ''}`}
@@ -104,9 +100,6 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
           </button>
         </div>
       </div>
-      <p className="card-title card-title--clickable" onClick={onOpenDetail}>
-        {highlightMatches(card.title, searchQuery, caseSensitive, wholeWord, isActiveMatch)}
-      </p>
       {card.description && (
         <p className="card-desc card-desc--clickable" onClick={onOpenDetail}>
           {highlightMatches(card.description, searchQuery, caseSensitive, wholeWord, isActiveMatch)}

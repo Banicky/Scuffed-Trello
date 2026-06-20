@@ -545,24 +545,25 @@
 
 .card-header {
   display: flex;
-  align-items: right;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 6px;
   margin-bottom: 8px;
 }
 
-.card-tag {
-  font-size: 11px;
-  font-weight: 769;
-  padding: 2px 8px;
-  border-radius: 100px;
-  letter-spacing: 0.03em;
-  margin-left: -4px;
+.card-header .card-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .card-actions {
   display: flex;
   align-items: center;
   gap: 3px;
+  flex-shrink: 0;
 }
 
 .card-star {
@@ -2122,14 +2123,6 @@ select.card-input {
   border-radius: 3px;
   padding: 3px;
   overflow: hidden;
-}
-
-.mini-card-tag {
-  display: block;
-  width: 11px;
-  height: 2.5px;
-  border-radius: 2px;
-  margin-bottom: 2.5px;
 }
 
 .mini-card-title {
