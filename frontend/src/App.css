@@ -1869,7 +1869,7 @@ select.card-input {
 .board-tile-title {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 18px;
+  font-size: 14px;
   line-height: 1.2;
   letter-spacing: -0.01em;
   color: #fff;
@@ -4239,8 +4239,9 @@ select.card-input {
 .notif-dropdown {
   position: absolute;
   top: calc(100% + 10px);
+  left: auto;
   right: 0;
-  width: 320px;
+  width: min(320px, calc(100vw - 32px));
   background: var(--column-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -4962,4 +4963,245 @@ select.card-input {
   color: var(--text-h);
   font-style: italic;
   opacity: 0.9;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   NIGHT SKY · ASTROLOGY THEME
+   A fixed near-black palette scoped to the dashboard. Redefining the theme
+   tokens here recolors every descendant (buttons, tiles, sidebar, modals)
+   into a silver-on-void register without touching their rules.
+   ════════════════════════════════════════════════════════════════════ */
+.dashboard-shell {
+  --text: #868c9b;            /* cool grey body */
+  --text-h: #e6e9f2;          /* silver-white headings */
+  --bg: #06070b;              /* near-black void */
+  --border: rgba(168, 178, 200, 0.10);
+  --code-bg: rgba(255, 255, 255, 0.035);
+  --accent: #828da3;          /* muted steel — primary actions */
+  --accent-bg: rgba(130, 141, 163, 0.13);
+  --accent-border: rgba(130, 141, 163, 0.42);
+  --social-bg: rgba(255, 255, 255, 0.025);
+  --metal: #c7cedd;
+  --metal-deep: #8b94a3;
+  --star: #d8dde8;            /* silver starlight — zodiac + accents */
+  --shadow:
+    rgba(0, 0, 0, 0.6) 0 10px 24px -6px, rgba(0, 0, 0, 0.4) 0 4px 12px -4px;
+  color: var(--text);
+
+  /* near-black gradient; the canvas paints silver stars + faint haze on top */
+  background-color: #06070b;
+  background-image:
+    radial-gradient(120% 80% at 50% -12%, #11141d 0%, transparent 58%),
+    radial-gradient(100% 70% at 84% 6%, rgba(28, 34, 48, 0.6) 0%, transparent 62%),
+    linear-gradient(180deg, #0a0c12 0%, #070809 56%, #040406 100%);
+  background-size: auto;
+  background-position: center;
+}
+
+/* the old pegboard-grid + aurora pseudo glows are replaced by the canvas */
+.dashboard-shell::before,
+.dashboard-shell::after { display: none; }
+
+/* full-bleed star canvas behind all content */
+.starfield-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* lift the actual UI above the canvas */
+.dashboard-shell > .topbar,
+.dashboard-shell > .dash-layout { position: relative; z-index: 1; }
+
+/* ── Hero card: a pane of black glass under the stars ── */
+.dashboard-shell .dash-hero-card {
+  background: linear-gradient(
+    135deg,
+    rgba(28, 32, 42, 0.5) 0%,
+    rgba(12, 14, 20, 0.36) 100%
+  );
+  border: 1px solid rgba(184, 194, 214, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 50px -24px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px) saturate(108%);
+}
+.dashboard-shell .dash-hero-card::before {
+  display: block;
+  background: radial-gradient(
+    70% 120% at 6% 24%,
+    rgba(180, 190, 214, 0.10),
+    transparent 62%
+  );
+}
+.dashboard-shell .dash-hero-eyebrow {
+  color: var(--star);
+  opacity: 0.7;
+  letter-spacing: 0.3em;
+}
+.dashboard-shell .dash-hero-username { color: var(--star); }
+
+/* ── Section title gets a small silver star ── */
+.dashboard-shell .board-section-title::before {
+  content: '✦';
+  margin-right: 10px;
+  color: var(--star);
+  font-size: 0.78em;
+  vertical-align: 1px;
+  opacity: 0.7;
+  text-shadow: 0 0 12px rgba(216, 221, 232, 0.4);
+}
+
+/* ── Sidebar / topbar: smoked glass rail over the void ── */
+.dashboard-shell .dash-sidebar {
+  background: linear-gradient(180deg, rgba(12, 14, 20, 0.78) 0%, rgba(6, 7, 11, 0.66) 100%);
+  border-right: 1px solid rgba(168, 178, 200, 0.09);
+  backdrop-filter: blur(10px) saturate(110%);
+}
+.dashboard-shell .sidebar-item.active {
+  background: linear-gradient(135deg, rgba(150, 160, 184, 0.16), rgba(150, 160, 184, 0.05));
+  box-shadow: inset 0 0 0 1px rgba(168, 178, 200, 0.22);
+}
+.dashboard-shell .sidebar-item.active::before {
+  background: var(--star);
+  box-shadow: 0 0 10px rgba(216, 221, 232, 0.7);
+}
+.dashboard-shell .sidebar-section-label {
+  color: rgba(168, 178, 200, 0.45);
+  letter-spacing: 0.22em;
+}
+
+/* search field + notif button as starlit glass pills */
+.dashboard-shell .dash-searchbar-wrap,
+.dashboard-shell .topbar-notif-btn {
+  background: rgba(16, 18, 26, 0.55);
+  border: 1px solid rgba(168, 178, 200, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+/* ── Board tiles: dark constellation tomes, color is just a faint hint ── */
+/* GSAP drives the entrance now, so retire the CSS keyframe to avoid a clash */
+.dashboard-shell .board-tile { animation: none; }
+.dashboard-shell .board-tile {
+  background:
+    linear-gradient(160deg,
+      color-mix(in srgb, var(--tile) 14%, rgba(9, 10, 15, 0.94)) 0%,
+      rgba(6, 7, 11, 0.96) 80%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 1px rgba(0, 0, 0, 0.5),
+    0 18px 38px -16px rgba(0, 0, 0, 0.75);
+}
+.dashboard-shell .board-tile:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px color-mix(in srgb, var(--tile) 40%, transparent),
+    0 0 26px -6px color-mix(in srgb, var(--tile) 32%, transparent),
+    0 26px 48px -18px rgba(0, 0, 0, 0.85);
+}
+
+.dashboard-shell .board-tile--create {
+  background: rgba(12, 14, 20, 0.45);
+  border: 1px dashed rgba(168, 178, 200, 0.26);
+}
+.dashboard-shell .board-tile--create:hover {
+  border-color: rgba(216, 221, 232, 0.5);
+  box-shadow: 0 0 24px -8px rgba(216, 221, 232, 0.3);
+}
+
+/* primary buttons read as moonlit steel with a soft halo */
+.dashboard-shell .btn-primary {
+  box-shadow: 0 6px 18px -8px rgba(150, 162, 186, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-shell .dash-hero-card { backdrop-filter: none; }
+}
+
+/* ── Hero cosmic orrery: ringed planet, orbiting moons, zodiac wheel ── */
+.dash-hero-art {
+  position: relative;
+  flex: 0 0 auto;
+  width: 196px;
+  height: 196px;
+  align-self: center;
+  margin-right: -8px;
+  pointer-events: none;
+}
+.dash-hero-art-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  /* fade the outer wheel into the card so it doesn't read as a hard disc */
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 96%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 96%);
+}
+
+.hero-wheel {
+  fill: none;
+  stroke: rgba(216, 221, 232, 0.16);
+  stroke-width: 0.6;
+  stroke-dasharray: 1 4;
+}
+.hero-wheel-ticks line {
+  stroke: rgba(216, 221, 232, 0.3);
+  stroke-width: 1;
+}
+.hero-orbit-path {
+  fill: none;
+  stroke: rgba(216, 221, 232, 0.12);
+  stroke-width: 0.6;
+}
+.hero-moon {
+  fill: #e8edf5;
+  filter: drop-shadow(0 0 3px rgba(216, 221, 232, 0.9));
+}
+.hero-moon--sm { fill: #c6cedd; }
+.hero-ring {
+  fill: none;
+  stroke: rgba(220, 226, 238, 0.55);
+  stroke-width: 1.4;
+}
+.hero-ring--back { opacity: 0.45; }
+.hero-band {
+  fill: none;
+  stroke: rgba(54, 60, 74, 0.55);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+.hero-spark { fill: rgba(232, 237, 246, 0.85); }
+
+.hero-orbit,
+.hero-wheel-ticks {
+  transform-box: view-box;
+  transform-origin: 100px 100px;
+}
+.hero-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-orbit--a   { animation: hero-spin 54s linear infinite; }
+  .hero-orbit--b   { animation: hero-spin 34s linear infinite reverse; }
+  .hero-wheel-ticks { animation: hero-spin 170s linear infinite; }
+  .hero-spark      { animation: hero-twinkle 3.4s ease-in-out infinite; }
+  .hero-spark--2   { animation-delay: 1.1s; }
+  .hero-spark--3   { animation-delay: 2.2s; }
+}
+
+@keyframes hero-spin { to { transform: rotate(360deg); } }
+@keyframes hero-twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50%      { opacity: 0.9; transform: scale(1.12); }
+}
+
+@media (max-width: 760px) {
+  .dash-hero-art { display: none; }
 }

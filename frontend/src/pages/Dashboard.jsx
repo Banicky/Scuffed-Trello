@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
+import { gsap } from 'gsap'
 import { apiFetch, assetUrl } from '../api.js'
 import { relativeTime } from '../utils.js'
 import { COLUMN_PALETTE, ZODIAC_CONSTELLATIONS } from '../constants.js'
 import UserAvatar from '../components/UserAvatar.jsx'
+import Starfield from '../components/Starfield.jsx'
 
 const GUILD_COLORS = [
   { key: 'arcane',  hex: '#aa3bff' },
@@ -421,13 +423,8 @@ function BoardSettingsPopover({ board, onRename, onDelete, onClose }) {
 function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner }) {
   const [showSettings, setShowSettings] = useState(false)
   const color = COLUMN_PALETTE[index % COLUMN_PALETTE.length]
-  const lastOpened = relativeTime(board.last_accessed_at)
   // stable per board (not grid position) so a board keeps its sign across reorders
   const zodiac = ZODIAC_CONSTELLATIONS[board.id % ZODIAC_CONSTELLATIONS.length]
-
-  const members = board.members || []
-  const shownMembers = members.slice(0, 4)
-  const extraMembers = members.length - shownMembers.length
 
   const [preview, setPreview] = useState(() => previewCache.get(board.id) || null)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -526,25 +523,7 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
             </span>
           )}
           <span className="board-tile-title">{board.title}</span>
-          <span className="board-tile-meta">
-            {lastOpened ? `Opened ${lastOpened}` : 'Not opened yet'}
-          </span>
         </div>
-        {members.length > 0 && (
-          <div
-            className="board-tile-members"
-            aria-label={`Members: ${members.map(m => m.username).join(', ')}`}
-          >
-            {shownMembers.map(m => (
-              <UserAvatar key={m.id} user={m} className="board-tile-avatar" />
-            ))}
-            {extraMembers > 0 && (
-              <span className="board-tile-avatar board-tile-avatar--more" title={`${extraMembers} more`}>
-                +{extraMembers}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {previewOpen && !showSettings && (
@@ -700,15 +679,8 @@ function readSkeletonCount(key, fallback) {
   }
 }
 
-const DASH_STARS = [
-  { left: '21%', top: 72,  size: 4, dur: 6.4, delay: 0.0 },
-  { left: '33%', top: 92,  size: 3, dur: 5.8, delay: 2.6 },
-  { left: '44%', top: 62,  size: 5, dur: 7.2, delay: 1.1 },
-  { left: '54%', top: 100, size: 3, dur: 6.2, delay: 4.0 },
-  { left: '63%', top: 76,  size: 4, dur: 6.8, delay: 0.7 },
-]
-
 export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings }) {
+  const rootRef = useRef(null)
   const sidebarRef = useRef(null)
   const mainRef = useRef(null)
   const searchRef = useRef(null)
@@ -858,6 +830,40 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     })
   }, [activeContext])
 
+  // ── GSAP entrance: hero copy + sidebar drift in on mount ──
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const ctx = gsap.context(() => {
+      gsap.from('.dash-hero-eyebrow, .dash-hero-greeting, .dash-hero-summary', {
+        y: 20, opacity: 0, duration: 0.7, ease: 'power3.out', stagger: 0.09, delay: 0.08,
+      })
+      gsap.from('.dash-sidebar .sidebar-brand, .dash-sidebar .sidebar-profile, .dash-sidebar .sidebar-section-label, .dash-sidebar .sidebar-item, .dash-sidebar .sidebar-create-btn', {
+        x: -18, opacity: 0, duration: 0.5, ease: 'power2.out', stagger: 0.035, delay: 0.05,
+      })
+    }, rootRef)
+    return () => ctx.revert()
+  }, [])
+
+  // ── GSAP reveal: board tiles rise + constellation lines stroke-draw ──
+  useEffect(() => {
+    if (loading || guildBoardsLoading) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const ctx = gsap.context(() => {
+      gsap.from('.board-grid > *', {
+        y: 26, opacity: 0, scale: 0.97, duration: 0.55, ease: 'power3.out', stagger: 0.06,
+        clearProps: 'transform,opacity', // end in pure CSS state — no inline residue that distorts size or blocks :hover
+      })
+      rootRef.current?.querySelectorAll('.board-tile-zodiac-line').forEach(line => {
+        const len = line.getTotalLength?.()
+        if (!len) return
+        gsap.fromTo(line,
+          { strokeDasharray: len, strokeDashoffset: len },
+          { strokeDashoffset: 0, duration: 1.2, ease: 'power2.out', delay: 0.25, clearProps: 'strokeDasharray,strokeDashoffset' })
+      })
+    }, rootRef)
+    return () => ctx.revert()
+  }, [loading, guildBoardsLoading, boardView, activeContext])
+
   async function createBoard(e) {
     e.preventDefault()
     if (!newTitle.trim()) return
@@ -941,26 +947,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const isPersonal = activeContext === 'personal'
 
   return (
-    <div className="dashboard-shell">
-      <div className="dash-stars" aria-hidden="true">
-        {DASH_STARS.map((s, i) => (
-          <span
-            key={i}
-            className="dash-star"
-            style={{
-              left: s.left,
-              top: s.top,
-              width: s.size,
-              height: s.size,
-              animationDuration: `${s.dur}s`,
-              animationDelay: `${s.delay}s`,
-            }}
-          />
-        ))}
-      </div>
-      <div className="sky-comet" aria-hidden="true">
-        <div className="sky-comet-streak" />
-      </div>
+    <div className="dashboard-shell" ref={rootRef}>
+      <Starfield />
 
       <header className="topbar">
         <div className="topbar-left">
@@ -1150,6 +1138,58 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               <p className="dash-hero-eyebrow">{today.toUpperCase()}</p>
               <h1 className="dash-hero-greeting">{greeting}, <em className="dash-hero-username">{user.username}</em>.</h1>
               <p className="dash-hero-summary">{isPersonal ? personalSummary : guildSummary}</p>
+            </div>
+            <div className="dash-hero-art" aria-hidden="true">
+              <svg className="dash-hero-art-svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                  <radialGradient id="heroPlanet" cx="38%" cy="32%" r="78%">
+                    <stop offset="0%" stopColor="#f1f4fa" />
+                    <stop offset="52%" stopColor="#aab2c6" />
+                    <stop offset="100%" stopColor="#363c4a" />
+                  </radialGradient>
+                  <radialGradient id="heroGlow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="rgba(198,208,230,0.45)" />
+                    <stop offset="100%" stopColor="rgba(198,208,230,0)" />
+                  </radialGradient>
+                </defs>
+
+                {/* zodiac wheel */}
+                <circle className="hero-wheel" cx="100" cy="100" r="90" />
+                <g className="hero-wheel-ticks">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <line
+                      key={i}
+                      x1="100" y1="6" x2="100" y2="14"
+                      transform={`rotate(${i * 30} 100 100)`}
+                    />
+                  ))}
+                </g>
+
+                {/* central glow + tilted ringed planet */}
+                <circle cx="100" cy="100" r="50" fill="url(#heroGlow)" />
+                <g transform="rotate(-18 100 100)">
+                  <ellipse className="hero-ring hero-ring--back" cx="100" cy="100" rx="42" ry="13" />
+                  <circle cx="100" cy="100" r="21" fill="url(#heroPlanet)" />
+                  <path className="hero-band" d="M82,95 q18,7 38,-2" />
+                  <path className="hero-band" d="M81,104 q19,7 39,-1" />
+                  <path className="hero-ring hero-ring--front" d="M58,100 a42,13 0 0 0 84,0" />
+                </g>
+
+                {/* orbiting moons */}
+                <g className="hero-orbit hero-orbit--a">
+                  <circle className="hero-orbit-path" cx="100" cy="100" r="80" />
+                  <circle className="hero-moon" cx="100" cy="20" r="3.4" />
+                </g>
+                <g className="hero-orbit hero-orbit--b">
+                  <circle className="hero-orbit-path" cx="100" cy="100" r="62" />
+                  <circle className="hero-moon hero-moon--sm" cx="100" cy="38" r="2.4" />
+                </g>
+
+                {/* sparkles */}
+                <path className="hero-spark hero-spark--1" d="M34,52 l1.4,4 4,1.4 -4,1.4 -1.4,4 -1.4,-4 -4,-1.4 4,-1.4 z" />
+                <path className="hero-spark hero-spark--2" d="M168,140 l1.1,3.2 3.2,1.1 -3.2,1.1 -1.1,3.2 -1.1,-3.2 -3.2,-1.1 3.2,-1.1 z" />
+                <path className="hero-spark hero-spark--3" d="M150,40 l0.9,2.6 2.6,0.9 -2.6,0.9 -0.9,2.6 -0.9,-2.6 -2.6,-0.9 2.6,-0.9 z" />
+              </svg>
             </div>
           </section>
 
