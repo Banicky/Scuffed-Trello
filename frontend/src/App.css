@@ -3604,6 +3604,11 @@ select.card-input {
   gap: 2px;
 }
 
+/* keep rows at natural height; sidebar scrolls instead of squashing them */
+.dash-sidebar > * {
+  flex-shrink: 0;
+}
+
 .sidebar-section-label {
   font-family: var(--fantasy);
   font-size: 9.5px;
