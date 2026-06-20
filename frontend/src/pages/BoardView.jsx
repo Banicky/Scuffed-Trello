@@ -467,7 +467,7 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
           <button
             className="avatar avatar--btn"
             title="Account settings"
-            onClick={() => onOpenSettings?.()}
+            onClick={() => onOpenSettings?.('security')}
           >
             <UserAvatar user={user} className="avatar" />
           </button>

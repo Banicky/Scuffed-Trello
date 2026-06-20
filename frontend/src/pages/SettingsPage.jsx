@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback } from 'react'
 import { apiFetch, uploadImage, assetUrl } from '../api.js'
 import { hexToRgb } from '../utils.js'
+import TwoFactorSection from '../components/TwoFactorSection.jsx'
+import TwoFactorSetup from './TwoFactorSetup.jsx'
 
 const AVATAR_PRESETS = [
   { key: '⚔', label: 'Knight' },
@@ -174,7 +176,7 @@ function AvatarSection({ user, onUpdate }) {
   )
 }
 
-function SecuritySection() {
+function SecuritySection({ user, onUpdateUser, onStartSetup }) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -252,6 +254,12 @@ function SecuritySection() {
           {saving ? 'Changing…' : 'Change password'}
         </button>
       </form>
+
+      <TwoFactorSection
+        enabled={!!user.totp_enabled}
+        onStartSetup={onStartSetup}
+        onChange={next => onUpdateUser({ totp_enabled: next })}
+      />
     </div>
   )
 }
@@ -395,6 +403,19 @@ const NAV_ITEMS = [
 ]
 
 export default function SettingsPage({ user, section, onSection, onBack, onUpdateUser, onLogout }) {
+  const [settingUp2fa, setSettingUp2fa] = useState(false)
+
+  // 2FA enrolment is its own full-screen flow, so it replaces the whole
+  // settings shell rather than rendering inside a pane.
+  if (settingUp2fa) {
+    return (
+      <TwoFactorSetup
+        onDone={() => { onUpdateUser({ totp_enabled: true }); setSettingUp2fa(false) }}
+        onCancel={() => setSettingUp2fa(false)}
+      />
+    )
+  }
+
   return (
     <div className="settings-shell">
       <header className="settings-topbar">
@@ -420,7 +441,7 @@ export default function SettingsPage({ user, section, onSection, onBack, onUpdat
 
         <main className="settings-pane">
           {section === 'avatar'        && <AvatarSection       user={user} onUpdate={onUpdateUser} />}
-          {section === 'security'      && <SecuritySection />}
+          {section === 'security'      && <SecuritySection user={user} onUpdateUser={onUpdateUser} onStartSetup={() => setSettingUp2fa(true)} />}
           {section === 'customization' && <CustomizationSection userId={user.id} />}
         </main>
       </div>
