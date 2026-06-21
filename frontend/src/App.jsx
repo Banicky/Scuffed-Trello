@@ -30,7 +30,7 @@ export default function App() {
         setStatus('ready')
         // restore accent theme only when the user is confirmed logged in
         const theme = localStorage.getItem(`accent-theme-${u.id}`)
-        if (theme) applyAccentTheme(theme, u.id)
+        if (theme) applyAccentTheme(theme)
         if (localStorage.getItem('force-reduced-motion') === 'true') {
           document.documentElement.classList.add('force-reduced-motion')
         }
@@ -51,7 +51,7 @@ export default function App() {
     setStatus('ready')
     // apply the user's saved accent theme now that they're authenticated
     const theme = localStorage.getItem(`accent-theme-${u.id}`)
-    if (theme) applyAccentTheme(theme, u.id)
+    if (theme) applyAccentTheme(theme)
     if (localStorage.getItem('force-reduced-motion') === 'true') {
       document.documentElement.classList.add('force-reduced-motion')
     }
