@@ -10,22 +10,40 @@ const STAR_LAYERS = [
   { count: 26, depth: 0.85, size: [1.1, 2.4], alpha: [0.55, 1.0] },  // near, bright
 ]
 
-const NEBULAE = [
+const NEBULAE_NIGHT = [
   { x: 0.18, y: 0.10, r: 0.44, color: [70, 84, 110], a: 0.07 },   // cold slate, top-left
   { x: 0.86, y: 0.04, r: 0.36, color: [58, 70, 96],  a: 0.06 },   // steel, top-right
   { x: 0.7,  y: 0.94, r: 0.52, color: [60, 92, 110], a: 0.045 },  // faint teal, bottom
 ]
 
-const STAR_TINTS = [
+// Daytime haze: warm amber clouds, painted normally (not additively) so they
+// settle softly onto the light sky instead of blowing out to white.
+const NEBULAE_DAY = [
+  { x: 0.20, y: 0.08, r: 0.50, color: [232, 196, 130], a: 0.12 }, // warm gold, top-left
+  { x: 0.84, y: 0.04, r: 0.40, color: [240, 200, 138], a: 0.10 }, // sun haze, top-right
+  { x: 0.7,  y: 0.96, r: 0.55, color: [214, 178, 128], a: 0.10 }, // sand, bottom
+]
+
+const STAR_TINTS_NIGHT = [
   [255, 255, 255],
   [216, 221, 232], // silver
   [200, 212, 230], // cool white-blue
   [191, 205, 224], // pale steel-blue
 ]
 
+// Day stars are warm bronze, kept deliberately darker than the sky so they
+// stay legible even over the lightest, warmest part of the gradient (the
+// bottom) where a brighter gold would simply vanish. source-over blended.
+const STAR_TINTS_DAY = [
+  [150, 104, 36],  // bronze
+  [132, 92, 40],   // deep bronze
+  [176, 126, 54],  // amber
+  [118, 82, 34],   // umber
+]
+
 function rand(min, max) { return min + Math.random() * (max - min) }
 
-export default function Starfield() {
+export default function Starfield({ mode = 'night' }) {
   const canvasRef = useRef(null)
   const pointerRef = useRef({ x: 0, y: 0, tx: 0, ty: 0 })
 
@@ -33,6 +51,16 @@ export default function Starfield() {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    // Day vs night palette. Night stacks light additively over the void; day
+    // paints warm specks normally so they stay visible on the bright sky.
+    const day = mode === 'day'
+    const STAR_TINTS = day ? STAR_TINTS_DAY : STAR_TINTS_NIGHT
+    const NEBULAE = day ? NEBULAE_DAY : NEBULAE_NIGHT
+    const blend = day ? 'source-over' : 'lighter'
+    const aBoost = day ? 1.65 : 1   // lift day stars so they read on the bright sky
+    const trail = day ? [196, 150, 70] : [210, 220, 235]   // shooting-star tail tint
+    const head = day ? [120, 84, 30] : [255, 255, 255]     // shooting-star head tint
 
     let w = 0, h = 0, dpr = Math.min(window.devicePixelRatio || 1, 2)
     let stars = []
@@ -108,13 +136,13 @@ export default function Starfield() {
       p.y += (p.ty - p.y) * 0.06
 
       ctx.clearRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'lighter'
+      ctx.globalCompositeOperation = blend
       drawNebulae()
 
       // stars
       for (const s of stars) {
         const twinkle = 0.6 + 0.4 * Math.sin(time * s.speed + s.phase)
-        const a = s.baseA * twinkle
+        const a = Math.min(1, s.baseA * twinkle * aBoost)
         const px = s.x * w + p.x * s.depth * 26 + Math.sin(time * 0.05 + s.phase) * s.depth * 6
         const py = s.y * h + p.y * s.depth * 26
         const [r, g, b] = s.tint
@@ -145,9 +173,9 @@ export default function Starfield() {
         const ux = sh.vx / mag, uy = sh.vy / mag
         const tailX = sh.x - ux * sh.len, tailY = sh.y - uy * sh.len
         const grad = ctx.createLinearGradient(sh.x, sh.y, tailX, tailY)
-        grad.addColorStop(0, `rgba(255,255,255,${0.9 * k})`)
-        grad.addColorStop(0.4, `rgba(210,220,235,${0.35 * k})`)
-        grad.addColorStop(1, 'rgba(210,220,235,0)')
+        grad.addColorStop(0, `rgba(${head[0]},${head[1]},${head[2]},${0.9 * k})`)
+        grad.addColorStop(0.4, `rgba(${trail[0]},${trail[1]},${trail[2]},${0.35 * k})`)
+        grad.addColorStop(1, `rgba(${trail[0]},${trail[1]},${trail[2]},0)`)
         ctx.strokeStyle = grad
         ctx.lineWidth = 2
         ctx.lineCap = 'round'
@@ -156,7 +184,7 @@ export default function Starfield() {
         ctx.lineTo(tailX, tailY)
         ctx.stroke()
         ctx.beginPath()
-        ctx.fillStyle = `rgba(255,255,255,${k})`
+        ctx.fillStyle = `rgba(${head[0]},${head[1]},${head[2]},${k})`
         ctx.arc(sh.x, sh.y, 1.8, 0, Math.PI * 2)
         ctx.fill()
       }
@@ -167,12 +195,12 @@ export default function Starfield() {
 
     function staticFrame() {
       ctx.clearRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'lighter'
+      ctx.globalCompositeOperation = blend
       drawNebulae()
       for (const s of stars) {
         const [r, g, b] = s.tint
         ctx.beginPath()
-        ctx.fillStyle = `rgba(${r},${g},${b},${s.baseA})`
+        ctx.fillStyle = `rgba(${r},${g},${b},${Math.min(1, s.baseA * aBoost)})`
         ctx.arc(s.x * w, s.y * h, s.r, 0, Math.PI * 2)
         ctx.fill()
       }
@@ -203,7 +231,7 @@ export default function Starfield() {
       window.removeEventListener('resize', onResize)
       window.removeEventListener('pointermove', onPointer)
     }
-  }, [])
+  }, [mode])
 
   return <canvas ref={canvasRef} className="starfield-canvas" aria-hidden="true" />
 }

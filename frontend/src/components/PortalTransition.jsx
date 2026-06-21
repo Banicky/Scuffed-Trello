@@ -47,6 +47,8 @@ export default function PortalTransition({ color, ready, onDone }) {
   const finish = () => { if (!doneRef.current) { doneRef.current = true; onDone() } }
 
   const motes = useMemo(() => buildMotes(), [])
+  // match the dashboard's day/night choice so the veil isn't a black flash in day
+  const day = (localStorage.getItem('dash-color-mode') || 'night') === 'day'
 
   // Start the reveal once the board is ready (after a minimum hold so the
   // gather always reads), or force it after a hard cap as a safety net.
@@ -69,7 +71,7 @@ export default function PortalTransition({ color, ready, onDone }) {
 
   return (
     <div
-      className={`portal portal--settle${revealing ? ' portal--reveal' : ''}`}
+      className={`portal portal--settle${revealing ? ' portal--reveal' : ''}${day ? ' portal--day' : ''}`}
       style={{ '--portal-color': color }}
       onAnimationEnd={handleAnimationEnd}
       aria-hidden="true"

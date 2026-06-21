@@ -311,6 +311,31 @@ async function logActivity({ boardId, cardId, userId, action, cardTitle }) {
   }
 }
 
+// Record a board-level deed (rename / delete) for the owner's Cosmic Activity.
+// Unlike card_activity, board_activity is deliberately NOT foreign-keyed to
+// boards, so a "deleted" entry outlives the board it describes. board_title and
+// detail (e.g. the previous name on a rename) are denormalised so the row still
+// reads on its own once the board is gone.
+async function logBoardActivity({ userId, boardId, action, title, detail }) {
+  try {
+    await pool.query(
+      "INSERT INTO board_activity (user_id, board_id, action, board_title, detail) VALUES ($1, $2, $3, $4, $5)",
+      [userId, boardId || null, action, title || null, detail || null]
+    );
+    // Keep the log bounded: retain only this user's 50 most recent entries.
+    await pool.query(
+      `DELETE FROM board_activity
+       WHERE user_id = $1 AND id NOT IN (
+         SELECT id FROM board_activity WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50
+       )`,
+      [userId]
+    );
+  } catch (err) {
+    // Best-effort — never fail the underlying board action over logging.
+    console.error("logBoardActivity failed:", err.message);
+  }
+}
+
 // Records a login for the daily streak. Idempotent per day: signing in again
 // today is a no-op; a sign-in the very next calendar day extends the streak;
 // any longer gap resets it to 1. Returns the current streak count.
@@ -533,6 +558,11 @@ app.get("/api/me/activity", requireAuth, async (req, res) => {
        -- boards this user charted
        SELECT b.created_at, 'board', 'created', b.title, NULL, b.id
        FROM boards b WHERE b.owner_id = $1
+
+       UNION ALL
+       -- board renames / deletions this user performed (survive the board itself)
+       SELECT ba.created_at, 'board', ba.action::text, ba.board_title, ba.detail, ba.board_id
+       FROM board_activity ba WHERE ba.user_id = $1
 
        UNION ALL
        -- guilds this user founded
@@ -819,6 +849,10 @@ app.patch("/api/boards/:id", requireAuth, async (req, res) => {
   const prevBg = background_image !== undefined
     ? (await pool.query("SELECT background_image FROM boards WHERE id = $1", [req.params.id])).rows[0]?.background_image
     : null;
+  // capture the old name before the update so a rename can record both ends
+  const prevTitle = title !== undefined
+    ? (await pool.query("SELECT title FROM boards WHERE id = $1", [req.params.id])).rows[0]?.title
+    : null;
 
   values.push(req.params.id);
   const result = await pool.query(
@@ -826,6 +860,16 @@ app.patch("/api/boards/:id", requireAuth, async (req, res) => {
     values
   );
   if (background_image !== undefined && prevBg !== background_image) deleteSpacesImages(prevBg);
+  // only a genuine title change is a "rename" worth surfacing in Cosmic Activity
+  if (title !== undefined && result.rows[0] && prevTitle !== result.rows[0].title) {
+    await logBoardActivity({
+      userId: req.session.userId,
+      boardId: Number(req.params.id),
+      action: "renamed",
+      title: result.rows[0].title,
+      detail: prevTitle,
+    });
+  }
   res.json(result.rows[0]);
 });
 
@@ -846,8 +890,16 @@ app.delete("/api/boards/:id", requireAuth, async (req, res) => {
        WHERE col.board_id = $1`,
     [req.params.id]
   );
+  // grab the name before deletion so Cosmic Activity can still say what was removed
+  const removed = await pool.query("SELECT title FROM boards WHERE id = $1", [req.params.id]);
   await pool.query("DELETE FROM boards WHERE id = $1", [req.params.id]);
   deleteSpacesImages(images.rows.map(r => r.url));
+  await logBoardActivity({
+    userId: req.session.userId,
+    boardId: Number(req.params.id),
+    action: "deleted",
+    title: removed.rows[0]?.title,
+  });
   res.json({ success: true });
 });
 
@@ -1682,6 +1734,25 @@ async function migrate() {
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS card_activity_board_idx ON card_activity (board_id, created_at DESC)
+  `);
+
+  // Board-level activity (rename / delete) for the owner's Cosmic Activity feed.
+  // Intentionally NOT foreign-keyed to boards: a "deleted" entry must outlive
+  // the board it describes, so board_id is a bare reference and board_title /
+  // detail are denormalised so the row reads on its own.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS board_activity (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      board_id INTEGER,
+      action VARCHAR(20) NOT NULL,
+      board_title VARCHAR(255),
+      detail VARCHAR(255),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS board_activity_user_idx ON board_activity (user_id, created_at DESC)
   `);
 
   // The label/tag feature was removed; drop the table so no stale data lingers.

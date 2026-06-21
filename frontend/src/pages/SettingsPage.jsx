@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef } from 'react'
 import { apiFetch, uploadImage, assetUrl } from '../api.js'
-import { hexToRgb } from '../utils.js'
 import TwoFactorSection from '../components/TwoFactorSection.jsx'
 import TwoFactorSetup from './TwoFactorSetup.jsx'
 import Starfield from '../components/Starfield.jsx'
+import ThemeOrrery from '../components/ThemeOrrery.jsx'
 
 const AVATAR_PRESETS = [
   { key: '⚔', label: 'Knight' },
@@ -20,34 +20,20 @@ const AVATAR_PRESETS = [
   { key: '🌿', label: 'Verdant' },
 ]
 
-export const ACCENT_THEMES = [
-  { label: 'Arcane',  value: 'arcane',  accent: '#a855f7', accBg: 'rgba(168,85,247,0.12)',  accBorder: 'rgba(168,85,247,0.35)' },
-  { label: 'Ember',   value: 'ember',   accent: '#e05a2b', accBg: 'rgba(224,90,43,0.12)',   accBorder: 'rgba(224,90,43,0.35)'  },
-  { label: 'Verdant', value: 'verdant', accent: '#16a34a', accBg: 'rgba(22,163,74,0.12)',   accBorder: 'rgba(22,163,74,0.35)'  },
-  { label: 'Tidal',   value: 'tidal',   accent: '#0ea5e9', accBg: 'rgba(14,165,233,0.12)',  accBorder: 'rgba(14,165,233,0.35)' },
-  { label: 'Gilded',  value: 'gilded',  accent: '#ca8a04', accBg: 'rgba(202,138,4,0.12)',   accBorder: 'rgba(202,138,4,0.35)'  },
+// Three curated themes. Each renders the same GSAP cosmic-orrery format in the
+// picker; `variant` decides the central body (ringed planet vs. radiant sun).
+export const THEME_PRESETS = [
+  { label: 'Arcane', value: 'arcane', tagline: 'Amethyst nebula', variant: 'planet', accent: '#a855f7', accBg: 'rgba(168,85,247,0.12)', accBorder: 'rgba(168,85,247,0.35)' },
+  { label: 'Solar',  value: 'solar',  tagline: 'Golden corona',   variant: 'sun',    accent: '#f59e0b', accBg: 'rgba(245,158,11,0.12)', accBorder: 'rgba(245,158,11,0.38)' },
+  { label: 'Aurora', value: 'aurora', tagline: 'Boreal tide',     variant: 'planet', accent: '#2dd4bf', accBg: 'rgba(45,212,191,0.12)', accBorder: 'rgba(45,212,191,0.35)' },
 ]
 
-export function applyAccentTheme(value, userId) {
-  if (value === 'custom') {
-    const hex = userId ? localStorage.getItem(`accent-custom-${userId}`) : null
-    if (hex) applyCustomAccent(hex)
-    return
-  }
-  const theme = ACCENT_THEMES.find(t => t.value === value)
-  if (!theme) return
+export function applyAccentTheme(value) {
+  const theme = THEME_PRESETS.find(t => t.value === value) || THEME_PRESETS[0]
   const root = document.documentElement
   root.style.setProperty('--accent', theme.accent)
   root.style.setProperty('--accent-bg', theme.accBg)
   root.style.setProperty('--accent-border', theme.accBorder)
-}
-
-function applyCustomAccent(hex) {
-  const [r, g, b] = hexToRgb(hex)
-  const root = document.documentElement
-  root.style.setProperty('--accent', hex)
-  root.style.setProperty('--accent-bg', `rgba(${r},${g},${b},0.12)`)
-  root.style.setProperty('--accent-border', `rgba(${r},${g},${b},0.35)`)
 }
 
 function AvatarSection({ user, onUpdate }) {
@@ -266,31 +252,19 @@ function SecuritySection({ user, onUpdateUser, onStartSetup }) {
 }
 
 function CustomizationSection({ userId }) {
-  const [activeTheme, setActiveTheme] = useState(
-    () => localStorage.getItem(`accent-theme-${userId}`) || 'arcane'
-  )
-  const [customHex, setCustomHex] = useState(
-    () => localStorage.getItem(`accent-custom-${userId}`) || '#a855f7'
-  )
+  const [activeTheme, setActiveTheme] = useState(() => {
+    const stored = localStorage.getItem(`accent-theme-${userId}`)
+    return THEME_PRESETS.some(t => t.value === stored) ? stored : 'arcane'
+  })
   const [reducedMotion, setReducedMotion] = useState(
     () => localStorage.getItem('force-reduced-motion') === 'true'
   )
-  const colorInputRef = useRef(null)
 
   function selectTheme(value) {
     setActiveTheme(value)
     localStorage.setItem(`accent-theme-${userId}`, value)
-    applyAccentTheme(value, userId)
+    applyAccentTheme(value)
   }
-
-  const handleCustomColor = useCallback((e) => {
-    const hex = e.target.value
-    setCustomHex(hex)
-    setActiveTheme('custom')
-    localStorage.setItem(`accent-custom-${userId}`, hex)
-    localStorage.setItem(`accent-theme-${userId}`, 'custom')
-    applyCustomAccent(hex)
-  }, [userId])
 
   function toggleReducedMotion(e) {
     const val = e.target.checked
@@ -303,9 +277,7 @@ function CustomizationSection({ userId }) {
     }
   }
 
-  const activeLabel = activeTheme === 'custom'
-    ? `Custom · ${customHex}`
-    : (ACCENT_THEMES.find(t => t.value === activeTheme)?.label ?? 'Arcane')
+  const active = THEME_PRESETS.find(t => t.value === activeTheme) || THEME_PRESETS[0]
 
   return (
     <div className="settings-section">
@@ -313,38 +285,34 @@ function CustomizationSection({ userId }) {
       <p className="settings-section-desc">Shape how the realm looks to you. Preferences are saved to this device.</p>
 
       <div className="settings-avatar-block">
-        <h3 className="settings-block-label">Accent colour</h3>
-        <div className="settings-theme-row">
-          {ACCENT_THEMES.map(t => (
+        <h3 className="settings-block-label">Theme</h3>
+        <div className="settings-theme-grid">
+          {THEME_PRESETS.map(t => (
             <button
               key={t.value}
-              className={`settings-theme-swatch${activeTheme === t.value ? ' selected' : ''}`}
-              style={{ '--swatch': t.accent }}
+              type="button"
+              className={`theme-card${activeTheme === t.value ? ' selected' : ''}`}
+              style={{ '--card-accent': t.accent }}
               onClick={() => selectTheme(t.value)}
-              title={t.label}
+              aria-pressed={activeTheme === t.value}
               aria-label={`${t.label} theme${activeTheme === t.value ? ' (active)' : ''}`}
-            />
+            >
+              <span className="theme-card-art">
+                <ThemeOrrery variant={t.variant} accent={t.accent} idKey={t.value} />
+              </span>
+              <span className="theme-card-meta">
+                <span className="theme-card-name">{t.label}</span>
+                <span className="theme-card-tag">{t.tagline}</span>
+              </span>
+              <span className="theme-card-check" aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 8.5l3.5 3.5L13 4.5" />
+                </svg>
+              </span>
+            </button>
           ))}
-          <button
-            className={`settings-theme-swatch settings-theme-swatch--custom${activeTheme === 'custom' ? ' selected' : ''}`}
-            style={{ '--swatch': customHex }}
-            onClick={() => colorInputRef.current?.click()}
-            title="Custom colour"
-            aria-label={`Custom colour${activeTheme === 'custom' ? ' (active)' : ''}`}
-          >
-            {activeTheme !== 'custom' && <span className="settings-swatch-plus">+</span>}
-          </button>
-          <input
-            ref={colorInputRef}
-            type="color"
-            value={customHex}
-            onChange={handleCustomColor}
-            style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
-            tabIndex={-1}
-            aria-hidden="true"
-          />
         </div>
-        <p className="settings-avatar-hint">{activeLabel} · applies to buttons, links, and highlights</p>
+        <p className="settings-avatar-hint">{active.label} · applies to buttons, links, and highlights</p>
       </div>
 
       <div className="settings-avatar-block">
@@ -405,6 +373,8 @@ const NAV_ITEMS = [
 
 export default function SettingsPage({ user, section, onSection, onBack, onUpdateUser, onLogout }) {
   const [settingUp2fa, setSettingUp2fa] = useState(false)
+  // mirror the dashboard's day/night choice so Settings matches the realm
+  const colorMode = localStorage.getItem('dash-color-mode') || 'night'
 
   // 2FA enrolment is its own full-screen flow, so it replaces the whole
   // settings shell rather than rendering inside a pane.
@@ -418,8 +388,8 @@ export default function SettingsPage({ user, section, onSection, onBack, onUpdat
   }
 
   return (
-    <div className="settings-shell">
-      <Starfield />
+    <div className={`settings-shell${colorMode === 'day' ? ' settings-shell--day' : ''}`}>
+      <Starfield mode={colorMode} />
 
       <header className="settings-topbar">
         <button className="back-btn" onClick={onBack} title="Back to dashboard">←</button>

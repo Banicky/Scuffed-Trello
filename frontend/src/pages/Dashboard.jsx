@@ -65,9 +65,9 @@ function CreateGuildModal({ onClose, onCreate }) {
       ref={overlayRef}
       onClick={e => { if (e.target === overlayRef.current) onClose() }}
     >
-      <div className="card-modal guild-modal" role="dialog" aria-modal="true" aria-label="Form a Guild">
+      <div className="card-modal guild-modal" role="dialog" aria-modal="true" aria-label="Forge an Alliance">
         <div className="card-modal-header">
-          <h2 className="guild-modal-title">Form a Guild</h2>
+          <h2 className="guild-modal-title">Forge an Alliance</h2>
         </div>
         <div className="card-modal-body">
           <form onSubmit={handleSubmit} className="guild-modal-form">
@@ -105,7 +105,7 @@ function CreateGuildModal({ onClose, onCreate }) {
             {error && <p className="auth-error">{error}</p>}
             <div className="guild-modal-actions">
               <button className="btn-primary" type="submit" disabled={busy || !name.trim()}>
-                {busy ? 'Forming…' : 'Form Guild'}
+                {busy ? 'Forging…' : 'Forge Alliance'}
               </button>
               <button className="btn-ghost" type="button" onClick={onClose}>Cancel</button>
             </div>
@@ -714,6 +714,24 @@ const ACTIVITY_ICONS = {
       <path d="M12 3l7 3v5c0 4-3 7-7 9-4-2-7-5-7-9V6z" />
     </svg>
   ),
+  rename: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  ),
+  delete: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M10 11v6M14 11v6" />
+    </svg>
+  ),
+}
+
+// Pick the glyph for a feed row. Board renames/deletes get their own icon so the
+// action reads at a glance; everything else falls back to its kind's icon.
+function activityIcon(a) {
+  if (a.kind === 'board' && a.action === 'renamed') return ACTIVITY_ICONS.rename
+  if (a.kind === 'board' && a.action === 'deleted') return ACTIVITY_ICONS.delete
+  return ACTIVITY_ICONS[a.kind] || ACTIVITY_ICONS.card
 }
 
 // Turns a feed row into a human "recent discovery" sentence.
@@ -725,6 +743,8 @@ function activityText(a) {
     case 'card:moved':    return <>Moved {title}{a.context && <> within {a.context}</>}</>
     case 'card:deleted':  return <>Removed {title}{a.context && <> from {a.context}</>}</>
     case 'board:created': return <>Charted a new galaxy, {title}</>
+    case 'board:renamed': return <>Renamed the galaxy <strong>{a.context}</strong> to {title}</>
+    case 'board:deleted': return <>Collapsed the galaxy {title}</>
     case 'guild:founded': return <>Founded the guild {title}</>
     case 'guild:joined':  return <>Joined the guild {title}</>
     default:              return title
@@ -742,6 +762,14 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const activityPageRef = useRef(null)
   const feedListRef = useRef(null)
   const scrollThumbRef = useRef(null)
+  // hero day/night swap (saturn ⇄ sun)
+  const heroPlanetRef = useRef(null)
+  const heroSunRef = useRef(null)
+  const heroRaysRef = useRef(null)
+  const modeIconRef = useRef(null)
+  const modeFxRef = useRef(null)    // full-screen ink-wipe overlay for mode switches
+  const sunSpinRef = useRef(null)   // the looping GSAP ray-rotation tween
+  const heroBodyInit = useRef(false) // skip the swap animation on first paint
 
   const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
@@ -774,6 +802,37 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const [notifOpen, setNotifOpen] = useState(false)
   const [showGuildInvite, setShowGuildInvite] = useState(false)
   const [inviteTargetGuild, setInviteTargetGuild] = useState(null)
+
+  // Day/Night dashboard mode — defaults to night (the original design).
+  const [colorMode, setColorMode] = useState(() => localStorage.getItem('dash-color-mode') || 'night')
+  function applyColorMode(next) {
+    localStorage.setItem('dash-color-mode', next)
+    setColorMode(next)
+  }
+  function toggleColorMode() {
+    const next = colorMode === 'night' ? 'day' : 'night'
+
+    // little GSAP pop on the toggle glyph
+    if (modeIconRef.current) {
+      gsap.fromTo(modeIconRef.current,
+        { rotate: -90, scale: 0.4, opacity: 0 },
+        { rotate: 0, scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(2)' })
+    }
+
+    const fx = modeFxRef.current
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!fx || reduced) { applyColorMode(next); return }
+
+    // gentle cross-fade: a veil in the incoming sky's tone fades in, we swap the
+    // theme underneath while it's opaque, then it fades back out to reveal it
+    fx.style.background = next === 'day' ? '#dcc8a0' : '#06070b'
+    gsap.timeline()
+      .set(fx, { autoAlpha: 0 })
+      .to(fx, { autoAlpha: 1, duration: 0.26, ease: 'power1.inOut' })
+      .add(() => applyColorMode(next))
+      .to(fx, { autoAlpha: 0, duration: 0.34, ease: 'power1.inOut' })
+  }
+
   function toggleBoardView() {
     if (viewFlipping) return
     setViewFlipping(true)
@@ -930,6 +989,37 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     return () => ctx.revert()
   }, [])
 
+  // ── GSAP: morph the hero between Saturn (night) and the Sun (day) ──
+  useEffect(() => {
+    const planet = heroPlanetRef.current
+    const sun = heroSunRef.current
+    if (!planet || !sun) return
+    const day = colorMode === 'day'
+
+    if (!heroBodyInit.current) {
+      // first paint — set the correct body instantly, no transition
+      gsap.set(planet, { autoAlpha: day ? 0 : 1, scale: day ? 0.4 : 1, svgOrigin: '100 100' })
+      gsap.set(sun,    { autoAlpha: day ? 1 : 0, scale: day ? 1 : 0.4, svgOrigin: '100 100' })
+      heroBodyInit.current = true
+    } else {
+      // cross-fade + scale the outgoing body out and the incoming body in
+      gsap.to(planet, { autoAlpha: day ? 0 : 1, scale: day ? 0.4 : 1, svgOrigin: '100 100',
+        duration: 0.6, ease: day ? 'power2.in' : 'back.out(1.7)', overwrite: 'auto' })
+      gsap.to(sun, { autoAlpha: day ? 1 : 0, scale: day ? 1 : 0.4, svgOrigin: '100 100',
+        duration: 0.6, ease: day ? 'back.out(1.7)' : 'power2.in', overwrite: 'auto' })
+    }
+
+    // the sun's rays turn slowly — only while the sun is showing
+    sunSpinRef.current?.kill()
+    sunSpinRef.current = null
+    if (day && heroRaysRef.current && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      sunSpinRef.current = gsap.to(heroRaysRef.current, {
+        rotation: 360, svgOrigin: '100 100', duration: 44, ease: 'none', repeat: -1,
+      })
+    }
+    return () => { sunSpinRef.current?.kill() }
+  }, [colorMode])
+
   // ── GSAP reveal: board tiles rise + constellation lines stroke-draw ──
   useEffect(() => {
     if (loading || guildBoardsLoading) return
@@ -959,7 +1049,9 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       gsap.from('.cosmic-page', { y: 34, scale: 0.96, opacity: 0, duration: 0.5, ease: 'power3.out' })
       gsap.from('.cosmic-page .streak-flame', { scale: 0.5, opacity: 0, duration: 0.6, ease: 'back.out(1.7)', delay: 0.18 })
       gsap.from('.cosmic-page .streak-dot', { scale: 0, opacity: 0, duration: 0.4, ease: 'back.out(2)', stagger: 0.05, delay: 0.34 })
-      gsap.from('.cosmic-page .cosmic-activity-item', { x: -16, opacity: 0, duration: 0.45, ease: 'power2.out', stagger: 0.06, delay: 0.2 })
+      // Voyager's Log slides in, and the milestone bar grows from empty
+      gsap.from('.cosmic-page .streak-extras > *', { y: 14, opacity: 0, duration: 0.5, ease: 'power2.out', stagger: 0.08, delay: 0.46 })
+      gsap.from('.cosmic-page .streak-milestone-fill', { scaleX: 0, transformOrigin: 'left center', duration: 0.9, ease: 'power2.out', delay: 0.62 })
 
       // count the streak number up from zero
       const target = user.streak_count ?? 0
@@ -974,6 +1066,22 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     }, activityPageRef)
     return () => ctx.revert()
   }, [activityPageOpen])
+
+  // Stagger the feed rows in. Keyed on the row count as well as open-state so
+  // entries that arrive from the async refresh *after* the page opens (e.g. a
+  // just-performed board rename/delete) still animate in rather than popping
+  // into place — the row animation lives here rather than in the panel effect
+  // above so it can re-fire without re-triggering the panel/streak entrance.
+  useEffect(() => {
+    if (!activityPageOpen || activity.length === 0) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const ctx = gsap.context(() => {
+      gsap.from('.cosmic-page .cosmic-activity-item', {
+        x: -16, opacity: 0, duration: 0.45, ease: 'power2.out', stagger: 0.06, delay: 0.2,
+      })
+    }, activityPageRef)
+    return () => ctx.revert()
+  }, [activityPageOpen, activity.length])
 
   // Close the Cosmic Activity page on Escape; refresh its data each time it opens.
   useEffect(() => {
@@ -1075,6 +1183,21 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const ownedBoards = boards.filter(b => b.role === 'owner')
   const sharedBoards = boards.filter(b => b.role === 'member')
 
+  // ── Voyager's Log: streak milestone + cosmic rank for the activity panel ──
+  const streakNow = user.streak_count ?? 0
+  const bestStreak = Math.max(streakNow, user.longest_streak ?? 0)
+  const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 365]
+  const nextMilestone = STREAK_MILESTONES.find(m => m > streakNow) ?? null
+  const milestonePct = nextMilestone ? Math.min(100, Math.round((streakNow / nextMilestone) * 100)) : 100
+  const milestoneToGo = nextMilestone ? nextMilestone - streakNow : 0
+  const cosmicRank =
+    bestStreak >= 30 ? 'Galactic Voyager' :
+    bestStreak >= 14 ? 'Constellation Keeper' :
+    bestStreak >= 7  ? 'Starfarer' :
+    bestStreak >= 4  ? 'Nebula Navigator' :
+    bestStreak >= 2  ? 'Comet Rider' :
+                       'Stardust Drifter'
+
   const unreadCount = notifications.filter(n => !n.read).length
 
   const filteredOwned = dashSearchQuery.trim()
@@ -1092,8 +1215,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   // one Cosmic Activity row — shared by the 3-row preview and the "View all" panel
   const renderActivityRow = (a, i) => (
     <li key={i} className="cosmic-activity-item">
-      <span className={`cosmic-activity-icon cosmic-activity-icon--${a.kind}`}>
-        {ACTIVITY_ICONS[a.kind] || ACTIVITY_ICONS.card}
+      <span className={`cosmic-activity-icon cosmic-activity-icon--${a.kind}${a.kind === 'board' && a.action === 'deleted' ? ' cosmic-activity-icon--deleted' : ''}`}>
+        {activityIcon(a)}
       </span>
       <span className="cosmic-activity-text">{activityText(a)}</span>
       <span className="cosmic-activity-time">{relativeTime(a.created_at)}</span>
@@ -1117,8 +1240,9 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const isPersonal = activeContext === 'personal'
 
   return (
-    <div className="dashboard-shell" ref={rootRef}>
-      <Starfield />
+    <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}`} ref={rootRef}>
+      <Starfield mode={colorMode} />
+      <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
 
       <header className="topbar">
         <div className="topbar-left">
@@ -1126,6 +1250,27 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
           <h1 className="topbar-page-title">{isPersonal ? 'My Universe' : (guildDetails?.name || 'Guild')}</h1>
         </div>
         <div className="topbar-right">
+          <button
+            className="dash-mode-toggle"
+            onClick={toggleColorMode}
+            aria-label={colorMode === 'day' ? 'Switch to night mode' : 'Switch to day mode'}
+            title={colorMode === 'day' ? 'Night mode' : 'Day mode'}
+          >
+            <span className="dash-mode-toggle-icon" ref={modeIconRef}>
+              {colorMode === 'day' ? (
+                // currently day → offer the moon
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              ) : (
+                // currently night → offer the sun
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                </svg>
+              )}
+            </span>
+          </button>
           <div
             className={`dash-searchbar-wrap${searchOpen ? ' open' : ''}`}
             ref={searchRef}
@@ -1228,7 +1373,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             onClick={() => { setActiveContext('personal'); setBoardView('shared'); setAddingBoard(false) }}
           >
             <span className="sidebar-item-icon" aria-hidden="true">⇄</span>
-            <span className="sidebar-item-name">Shared Skies</span>
+            <span className="sidebar-item-name">Shared Universe</span>
             {sharedBoards.length > 0 && <span className="sidebar-item-count">{sharedBoards.length}</span>}
           </button>
 
@@ -1281,7 +1426,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             onClick={() => setShowCreateGuild(true)}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Form a Guild
+            Forge an Alliance
           </button>
 
           <div className="sidebar-footer">
@@ -1353,6 +1498,15 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                     <stop offset="0%" stopColor="rgba(198,208,230,0.45)" />
                     <stop offset="100%" stopColor="rgba(198,208,230,0)" />
                   </radialGradient>
+                  <radialGradient id="heroSun" cx="42%" cy="38%" r="72%">
+                    <stop offset="0%" stopColor="#fff3d0" />
+                    <stop offset="52%" stopColor="#ffb43c" />
+                    <stop offset="100%" stopColor="#e07a1a" />
+                  </radialGradient>
+                  <radialGradient id="heroSunGlow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="rgba(255,190,90,0.55)" />
+                    <stop offset="100%" stopColor="rgba(255,190,90,0)" />
+                  </radialGradient>
                 </defs>
 
                 {/* zodiac wheel */}
@@ -1367,14 +1521,29 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                   ))}
                 </g>
 
-                {/* central glow + tilted ringed planet */}
+                {/* central glow */}
                 <circle cx="100" cy="100" r="50" fill="url(#heroGlow)" />
-                <g transform="rotate(-18 100 100)">
-                  <ellipse className="hero-ring hero-ring--back" cx="100" cy="100" rx="42" ry="13" />
-                  <circle cx="100" cy="100" r="21" fill="url(#heroPlanet)" />
-                  <path className="hero-band" d="M82,95 q18,7 38,-2" />
-                  <path className="hero-band" d="M81,104 q19,7 39,-1" />
-                  <path className="hero-ring hero-ring--front" d="M58,100 a42,13 0 0 0 84,0" />
+
+                {/* night body — tilted ringed planet (saturn) */}
+                <g className="hero-planet-group" ref={heroPlanetRef} style={{ visibility: colorMode === 'day' ? 'hidden' : 'visible' }}>
+                  <g transform="rotate(-18 100 100)">
+                    <ellipse className="hero-ring hero-ring--back" cx="100" cy="100" rx="42" ry="13" />
+                    <circle cx="100" cy="100" r="21" fill="url(#heroPlanet)" />
+                    <path className="hero-band" d="M82,95 q18,7 38,-2" />
+                    <path className="hero-band" d="M81,104 q19,7 39,-1" />
+                    <path className="hero-ring hero-ring--front" d="M58,100 a42,13 0 0 0 84,0" />
+                  </g>
+                </g>
+
+                {/* day body — radiant sun */}
+                <g className="hero-sun-group" ref={heroSunRef} style={{ visibility: colorMode === 'day' ? 'visible' : 'hidden' }}>
+                  <circle className="hero-sun-glow" cx="100" cy="100" r="50" fill="url(#heroSunGlow)" />
+                  <g className="hero-rays" ref={heroRaysRef}>
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <line key={i} className="hero-ray" x1="100" y1="68" x2="100" y2="56" transform={`rotate(${i * 30} 100 100)`} />
+                    ))}
+                  </g>
+                  <circle className="hero-sun" cx="100" cy="100" r="22" fill="url(#heroSun)" />
                 </g>
 
                 {/* orbiting moons */}
@@ -1399,19 +1568,19 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             <>
               <div className="board-section-header">
                 <h2 className="board-section-title">
-                  {boardView === 'owned' ? 'My Universe' : 'Shared Skies'}
+                  {boardView === 'owned' ? 'My Universe' : 'Shared Universe'}
                   {!loading && sharedBoards.length > 0 && (
                     <button
                       className={`board-view-toggle${viewFlipping ? ' board-view-toggle--flipping' : ''}`}
                       onClick={toggleBoardView}
-                      aria-label={boardView === 'owned' ? 'Switch to shared skies' : 'Switch to my universe'}
+                      aria-label={boardView === 'owned' ? 'Switch to shared universe' : 'Switch to my universe'}
                     >
                       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M1 5h10M8 2l3 3-3 3" />
                         <path d="M15 11H5M8 8l-3 3 3 3" />
                       </svg>
                       <span className="bvt-tooltip" aria-hidden="true">
-                        {boardView === 'owned' ? 'Shared Skies' : 'My Universe'}
+                        {boardView === 'owned' ? 'Shared Universe' : 'My Universe'}
                       </span>
                     </button>
                   )}
@@ -1467,7 +1636,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                         {loading
                           ? Array.from({ length: skeletonShared }).map((_, i) => <BoardTileSkeleton key={i} />)
                           : filteredShared.length === 0
-                            ? <p className="dashboard-empty" style={{ gridColumn: '1 / -1' }}>No shared skies match your search.</p>
+                            ? <p className="dashboard-empty" style={{ gridColumn: '1 / -1' }}>No shared universe matches your search.</p>
                             : filteredShared.map((b, i) => (
                               <BoardCard
                                 key={b.id}
@@ -1617,6 +1786,48 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                 {(user.longest_streak ?? 0) > 0 && (
                   <p className="cosmic-page-best">Best: {user.longest_streak} day{user.longest_streak === 1 ? '' : 's'}</p>
                 )}
+
+                {/* Voyager's Log — fills the panel with a milestone tracker,
+                    quick stats, and a cosmic rank earned from the best streak */}
+                <div className="streak-extras">
+                  <div className="streak-milestone">
+                    <div className="streak-milestone-head">
+                      <span className="streak-milestone-eyebrow">{nextMilestone ? 'Next Milestone' : 'Legend'}</span>
+                      <span className="streak-milestone-target">{nextMilestone ? `${nextMilestone}d` : '★'}</span>
+                    </div>
+                    <div className="streak-milestone-bar">
+                      <span className="streak-milestone-fill" style={{ width: `${milestonePct}%` }} />
+                    </div>
+                    <p className="streak-milestone-note">
+                      {nextMilestone
+                        ? `${milestoneToGo} day${milestoneToGo === 1 ? '' : 's'} to go`
+                        : 'Every milestone conquered'}
+                    </p>
+                  </div>
+
+                  <div className="voyager-log">
+                    <span className="voyager-log-eyebrow">Voyager's Log</span>
+                    <div className="voyager-stats">
+                      <div className="voyager-stat">
+                        <span className="voyager-stat-num">{ownedBoards.length}</span>
+                        <span className="voyager-stat-label">Galaxies</span>
+                      </div>
+                      <div className="voyager-stat">
+                        <span className="voyager-stat-num">{sharedBoards.length}</span>
+                        <span className="voyager-stat-label">Shared</span>
+                      </div>
+                      <div className="voyager-stat">
+                        <span className="voyager-stat-num">{guilds.length}</span>
+                        <span className="voyager-stat-label">Allies</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="cosmic-rank" title="Rank earned from your best streak">
+                    <span className="cosmic-rank-glyph" aria-hidden="true">✦</span>
+                    <span className="cosmic-rank-name">{cosmicRank}</span>
+                  </div>
+                </div>
               </aside>
 
               {/* Activity feed */}
