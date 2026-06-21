@@ -1,8 +1,7 @@
 {
   "permissions": {
-    "allow": [
-      "PowerShell(git -C \"c:\\\\Users\\\\sfhuh\\\\OneDrive\\\\Documents\\\\GitHub\\\\Scuffed-Trello\" diff --name-only --diff-filter=U)",
-      "PowerShell(git -C \"c:\\\\Users\\\\sfhuh\\\\OneDrive\\\\Documents\\\\GitHub\\\\Scuffed-Trello\" status --short)"
+    "deny": [
+      "Read(backend/.env)"
     ]
   }
 }
