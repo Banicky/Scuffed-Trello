@@ -8,7 +8,9 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import multer from "multer";
 import multerS3 from "multer-s3";
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { S3Client, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as GitHubStrategy } from "passport-github2";
@@ -40,6 +42,15 @@ const SPACES_REGION = process.env.SPACES_REGION;
 const SPACES_BUCKET = process.env.SPACES_BUCKET;
 const SPACES_ORIGIN = `https://${SPACES_REGION}.digitaloceanspaces.com`;
 const SPACES_CDN = `https://${SPACES_BUCKET}.${SPACES_REGION}.cdn.digitaloceanspaces.com`;
+
+// Per-user storage cap (total bytes of all live uploads). Reject uploads that
+// would push a user over this. Caps both storage growth and the egress an
+// account can ever trigger by re-serving its own files.
+const USER_STORAGE_CAP = 50 * 1024 * 1024; // 50 MB / user
+
+// Signed-URL lifetime for the image proxy. Short so a leaked URL stops working
+// quickly; long enough that a page's <img> tags don't re-mint mid-view.
+const SIGNED_URL_TTL = 300; // seconds
 const s3 = new S3Client({
   region: SPACES_REGION,
   endpoint: SPACES_ORIGIN,
@@ -61,7 +72,7 @@ const upload = multer({
   storage: multerS3({
     s3,
     bucket: SPACES_BUCKET,
-    acl: "public-read",
+    acl: "private", // objects are NOT publicly readable; served via signed-URL proxy only
     contentType: multerS3.AUTO_CONTENT_TYPE,
     key: (req, file, cb) => {
       const type = UPLOAD_TYPES.has(req.body?.type) ? req.body.type : "misc";
@@ -87,6 +98,10 @@ function deleteSpacesImages(...urls) {
     if (!key) continue;
     s3.send(new DeleteObjectCommand({ Bucket: SPACES_BUCKET, Key: key }))
       .catch(err => console.error("Spaces delete failed:", key, err.message));
+    // Free the bytes against the uploader's quota. Fire-and-forget like the
+    // object delete — a stale ledger row only over-counts, never loses data.
+    pool.query("DELETE FROM uploads WHERE key = $1", [key])
+      .catch(err => console.error("Upload ledger delete failed:", key, err.message));
   }
 }
 
@@ -109,6 +124,30 @@ function requireAuth(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
   next();
 }
+
+// Rate limiters keyed per-user (falls back to IP pre-auth). Both protect the
+// Spaces bill: uploadLimiter caps how fast an account can add storage; the
+// imgLimiter caps how many distinct signed URLs an account can mint, which is
+// the ceiling on the egress a single account can trigger.
+// requireAuth runs before these limiters, so userId is always set in practice;
+// the IP branch is a guard only and uses ipKeyGenerator to stay IPv6-safe.
+const rateKey = (req) => (req.session?.userId ? `u:${req.session.userId}` : `ip:${ipKeyGenerator(req.ip)}`);
+const uploadLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 20, // 20 uploads / 5 min / user
+  keyGenerator: rateKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many uploads, slow down" },
+});
+const imgLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300, // 300 image fetches / min / user — generous for real page loads
+  keyGenerator: rateKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many image requests" },
+});
 
 // ── "Remember this device" for 2FA ──────────────────────────────────────────────
 const TRUST_COOKIE = "trust2fa";
@@ -1425,11 +1464,72 @@ app.post("/api/cards/:id/comments", requireAuth, async (req, res) => {
   res.json({ ...result.rows[0], username: user.rows[0].username, reactions: [] });
 });
 
-// POST /api/upload — store an uploaded image and return its public URL
-app.post("/api/upload", requireAuth, upload.single("image"), (req, res) => {
+// Reject the upload before we stream a file to Spaces if the user is already
+// at/over their storage cap. Cheap guard; the post-upload check below catches
+// the single upload that tips them over.
+async function checkQuota(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      "SELECT COALESCE(SUM(bytes),0)::bigint AS used FROM uploads WHERE user_id = $1",
+      [req.session.userId]
+    );
+    if (Number(rows[0].used) >= USER_STORAGE_CAP) {
+      return res.status(413).json({ error: "Storage limit reached. Delete some images first." });
+    }
+    next();
+  } catch (e) { next(e); }
+}
+
+// POST /api/upload — store a PRIVATE image, record it against the user's quota,
+// and return a key-bearing URL the client renders through the signed-URL proxy.
+app.post("/api/upload", requireAuth, uploadLimiter, checkQuota, upload.single("image"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No image uploaded" });
-  // multer-s3 sets req.file.key to the object key (e.g. "uploads/123.png").
-  res.json({ url: `${SPACES_CDN}/${req.file.key}` });
+  const key = req.file.key; // e.g. "uploads/cards/123.png"
+  const size = req.file.size || 0;
+
+  // Record the bytes, then re-check the running total. If this upload pushed
+  // the user over the cap, roll back both the ledger row and the object so a
+  // single request can't exceed the cap by more than one file (≤5 MB).
+  await pool.query(
+    "INSERT INTO uploads (user_id, key, bytes) VALUES ($1, $2, $3)",
+    [req.session.userId, key, size]
+  );
+  const { rows } = await pool.query(
+    "SELECT COALESCE(SUM(bytes),0)::bigint AS used FROM uploads WHERE user_id = $1",
+    [req.session.userId]
+  );
+  if (Number(rows[0].used) > USER_STORAGE_CAP) {
+    await pool.query("DELETE FROM uploads WHERE key = $1", [key]);
+    s3.send(new DeleteObjectCommand({ Bucket: SPACES_BUCKET, Key: key }))
+      .catch(err => console.error("Spaces rollback delete failed:", key, err.message));
+    return res.status(413).json({ error: "Storage limit reached. Delete some images first." });
+  }
+
+  // Stored value keeps the CDN-URL shape (no data migration); assetUrl() on the
+  // client rewrites it to /api/img/<key>, which signs and redirects.
+  res.json({ url: `${SPACES_CDN}/${key}` });
+});
+
+// GET /api/img/<key> — auth-gated signed-URL proxy for PRIVATE Spaces objects.
+// A valid session is required, so anonymous/scripted fetching of public CDN
+// URLs no longer works — egress only happens for URLs we sign here. The redirect
+// target is short-lived; the browser may cache the redirect just under the TTL.
+app.get(/^\/api\/img\/(.+)$/, requireAuth, imgLimiter, async (req, res) => {
+  const key = decodeURIComponent(req.params[0] || "");
+  // Only sign objects under our own uploads/ prefix — never arbitrary keys.
+  if (!key.startsWith("uploads/")) return res.status(400).json({ error: "Bad image path" });
+  try {
+    const signed = await getSignedUrl(
+      s3,
+      new GetObjectCommand({ Bucket: SPACES_BUCKET, Key: key }),
+      { expiresIn: SIGNED_URL_TTL }
+    );
+    res.set("Cache-Control", `private, max-age=${SIGNED_URL_TTL - 60}`);
+    res.redirect(302, signed);
+  } catch (err) {
+    console.error("Sign image failed:", key, err.message);
+    res.status(404).json({ error: "Image not found" });
+  }
 });
 
 app.patch("/api/comments/:id", requireAuth, async (req, res) => {
@@ -1678,6 +1778,20 @@ async function migrate() {
   await pool.query(`
     ALTER TABLE card_comments ADD COLUMN IF NOT EXISTS image_url TEXT
   `);
+
+  // Upload ledger — one row per stored Spaces object, used to enforce the
+  // per-user storage cap (SUM(bytes) WHERE user_id). Rows are removed by
+  // deleteSpacesImages() whenever the underlying object is deleted.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS uploads (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      key TEXT NOT NULL UNIQUE,
+      bytes BIGINT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS uploads_user_idx ON uploads(user_id)`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS guilds (

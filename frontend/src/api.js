@@ -2,9 +2,23 @@ const API = 'http://localhost:4000'
 
 export const API_BASE = API
 
-// Turn a stored "/uploads/..." path into a full URL the browser can load
+// Turn a stored image reference into a URL the browser can load.
+// Spaces objects are now PRIVATE, so a stored Spaces CDN URL can't be loaded
+// directly — route it through the backend's auth-gated signed-URL proxy
+// (/api/img/<key>), which checks the session and 302-redirects to a short-lived
+// signed URL. Legacy local "/uploads/..." disk paths still load straight off the
+// API. The proxy request carries the session cookie because it targets the API
+// origin (ensure the session cookie is SameSite=None;Secure in cross-site prod).
 export function assetUrl(path) {
   if (!path) return ''
+  if (path.includes('digitaloceanspaces.com')) {
+    try {
+      const key = new URL(path).pathname.replace(/^\/+/, '')
+      return `${API}/api/img/${key}`
+    } catch {
+      return ''
+    }
+  }
   return path.startsWith('http') ? path : `${API}${path}`
 }
 
