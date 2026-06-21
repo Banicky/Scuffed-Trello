@@ -6,3 +6,5 @@ dist/
 .DS_Store
 Thumbs.db
 db_schema.sql
+.claude/
+.vscode/

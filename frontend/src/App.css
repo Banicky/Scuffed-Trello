@@ -4023,7 +4023,7 @@ select.card-input {
   flex-shrink: 0;
 }
 
-/* ── Create Guild modal ── */
+/* ── Create Alliance modal ── */
 .guild-modal {
   max-width: 420px;
 }
@@ -4070,11 +4070,16 @@ select.card-input {
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: var(--swatch);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--swatch) 68%, #fff),
+    var(--swatch)
+  );
   border: 2px solid transparent;
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.12s;
   outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .guild-color-swatch:hover {
@@ -4082,7 +4087,10 @@ select.card-input {
 }
 
 .guild-color-swatch.active {
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--swatch);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px color-mix(in srgb, var(--swatch) 70%, var(--accent)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 /* ── Guild preview chip inside create modal ── */
