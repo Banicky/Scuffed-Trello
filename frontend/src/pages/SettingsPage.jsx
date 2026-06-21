@@ -70,7 +70,7 @@ function AvatarSection({ user, onUpdate }) {
     setUploading(true)
     setError('')
     try {
-      const { url } = await uploadImage(file)
+      const { url } = await uploadImage(file, 'avatars')
       const res = await apiFetch('/api/users/me', {
         method: 'PATCH',
         body: JSON.stringify({ avatar_url: url }),

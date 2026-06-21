@@ -33,7 +33,7 @@ function AddCardForm({ onAdd, onCancel }) {
         onChange={e => setDesc(e.target.value)}
         rows={3}
       />
-      <ImageUploadField value={imageUrl} onChange={setImageUrl} />
+      <ImageUploadField value={imageUrl} onChange={setImageUrl} type="cards" />
       <div className="add-card-actions">
         <button className="btn-primary" type="submit">Add card</button>
         <button className="btn-ghost" type="button" onClick={onCancel}>Cancel</button>

@@ -489,6 +489,7 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
               <ImageUploadField
                 value={board.background_image}
                 onChange={url => setDesign({ background_image: url })}
+                type="boards"
               />
               {board.background_image && (
                 <label className="board-design-opacity">

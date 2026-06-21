@@ -72,10 +72,10 @@ function CreateGuildModal({ onClose, onCreate }) {
         <div className="card-modal-body">
           <form onSubmit={handleSubmit} className="guild-modal-form">
             <div>
-              <label className="guild-field-label">Guild Name</label>
+              <label className="guild-field-label">Alliance Name</label>
               <input
                 className="card-input"
-                placeholder="e.g. Dragon Slayers"
+                placeholder="e.g. Star Watchers"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 autoFocus
@@ -100,7 +100,7 @@ function CreateGuildModal({ onClose, onCreate }) {
             </div>
             <div className="guild-preview">
               <GuildIcon guild={{ name: name || '?', icon_color: color }} className="guild-icon--lg" />
-              <span className="guild-preview-name">{name || 'Unnamed Guild'}</span>
+              <span className="guild-preview-name">{name || 'Unnamed Alliance'}</span>
             </div>
             {error && <p className="auth-error">{error}</p>}
             <div className="guild-modal-actions">

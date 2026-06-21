@@ -2,8 +2,10 @@ import { useRef, useState } from 'react'
 import { uploadImage, assetUrl } from '../api.js'
 
 // Reusable image picker: uploads on select, shows a preview, reports the stored
-// URL (or null) back through onChange. Used by the add/edit card forms.
-export default function ImageUploadField({ value, onChange }) {
+// URL (or null) back through onChange. Used by the add/edit card forms and the
+// board design panel — type tells the backend which uploads/<type>/ folder to
+// file the object under (e.g. "cards", "boards").
+export default function ImageUploadField({ value, onChange, type }) {
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -15,7 +17,7 @@ export default function ImageUploadField({ value, onChange }) {
     setError('')
     setUploading(true)
     try {
-      const { url } = await uploadImage(file)
+      const { url } = await uploadImage(file, type)
       onChange(url)
     } catch (err) {
       setError(err.message)

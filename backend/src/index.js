@@ -32,15 +32,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, "..", "uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// DigitalOcean Spaces (S3-compatible). Endpoint is the region origin WITHOUT the
-// bucket — the SDK prepends the bucket itself (virtual-hosted style). The CDN
-// endpoint is what we store in the DB and hand to the browser.
+// DigitalOcean Spaces (S3-compatible). Origin endpoint is the region origin
+// WITHOUT the bucket — the SDK prepends the bucket itself (virtual-hosted
+// style). Both origin and CDN endpoints follow DO's fixed URL pattern, so
+// they're derived from region/bucket rather than configured separately.
 const SPACES_REGION = process.env.SPACES_REGION;
 const SPACES_BUCKET = process.env.SPACES_BUCKET;
-const SPACES_CDN = (process.env.SPACES_CDN || "").replace(/\/$/, "");
+const SPACES_ORIGIN = `https://${SPACES_REGION}.digitaloceanspaces.com`;
+const SPACES_CDN = `https://${SPACES_BUCKET}.${SPACES_REGION}.cdn.digitaloceanspaces.com`;
 const s3 = new S3Client({
   region: SPACES_REGION,
-  endpoint: `https://${SPACES_REGION}.digitaloceanspaces.com`,
+  endpoint: SPACES_ORIGIN,
   forcePathStyle: false,
   credentials: {
     accessKeyId: process.env.SPACES_KEY,
@@ -48,6 +50,13 @@ const s3 = new S3Client({
   },
 });
 
+// Uploads are filed under uploads/<type>/ so avatars, card images, board
+// backgrounds and comment images don't all land in one flat prefix. The type
+// comes from the "type" form field — it must be sent before "image" in the
+// multipart body since multer-s3's key fn reads req.body mid-stream.
+const UPLOAD_TYPES = new Set(["avatars", "cards", "boards", "comments"]);
+
+// Pushes uploaded files straight to bucket
 const upload = multer({
   storage: multerS3({
     s3,
@@ -55,8 +64,9 @@ const upload = multer({
     acl: "public-read",
     contentType: multerS3.AUTO_CONTENT_TYPE,
     key: (req, file, cb) => {
+      const type = UPLOAD_TYPES.has(req.body?.type) ? req.body.type : "misc";
       const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      cb(null, "uploads/" + unique + path.extname(file.originalname).toLowerCase());
+      cb(null, `uploads/${type}/${unique}${path.extname(file.originalname).toLowerCase()}`);
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
@@ -66,7 +76,7 @@ const upload = multer({
   },
 });
 
-// Best-effort delete of image objects from Spaces. Skips anything that isn't a
+// TLDR: Deletes image in DO space to clear unused images
 // Spaces CDN URL (preset avatar keys, legacy /uploads/ disk paths, null/empty).
 // Fire-and-forget: a failed delete is logged but never blocks the response.
 function deleteSpacesImages(...urls) {

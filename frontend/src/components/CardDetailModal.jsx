@@ -129,7 +129,7 @@ export default function CardDetailModal({ card, currentUserId, onClose, onCommen
     setUploadError('')
     setUploading(true)
     try {
-      const { url } = await uploadImage(file)
+      const { url } = await uploadImage(file, 'comments')
       setPendingImage({ url })
     } catch (err) {
       setUploadError(err.message)
