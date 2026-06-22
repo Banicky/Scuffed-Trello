@@ -5,6 +5,7 @@ import { relativeTime } from '../utils.js'
 import { COLUMN_PALETTE, ZODIAC_CONSTELLATIONS } from '../constants.js'
 import UserAvatar from '../components/UserAvatar.jsx'
 import Starfield from '../components/Starfield.jsx'
+import NebulaVeil from '../components/NebulaVeil.jsx'
 
 const GUILD_COLORS = [
   { key: 'arcane',  hex: '#aa3bff' },
@@ -1010,12 +1011,12 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     gsap.set(sun, { autoAlpha: 0 })
 
     if (!heroBodyInit.current) {
-      gsap.set(planet, { autoAlpha: 1, scale: 1, svgOrigin: '100 100' })
+      gsap.set(planet, { autoAlpha: 1, scale: 1.1, svgOrigin: '100 100' })
       heroBodyInit.current = true
     } else if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       gsap.fromTo(planet,
-        { scale: 0.86, svgOrigin: '100 100' },
-        { scale: 1, autoAlpha: 1, duration: 0.6, ease: 'back.out(1.7)', overwrite: 'auto' })
+        { scale: 0.95, svgOrigin: '100 100' },
+        { scale: 1.1, autoAlpha: 1, duration: 0.6, ease: 'back.out(1.7)', overwrite: 'auto' })
     }
   }, [colorMode])
 
@@ -1244,6 +1245,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
   return (
     <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}`} ref={rootRef}>
+      {colorMode === 'day' && <NebulaVeil />}
       <Starfield mode={colorMode} />
       <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
 
@@ -1602,13 +1604,10 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                 <path className="hero-spark hero-spark--1" d="M34,52 l1.4,4 4,1.4 -4,1.4 -1.4,4 -1.4,-4 -4,-1.4 4,-1.4 z" />
                 <path className="hero-spark hero-spark--2" d="M168,140 l1.1,3.2 3.2,1.1 -3.2,1.1 -1.1,3.2 -1.1,-3.2 -3.2,-1.1 3.2,-1.1 z" />
                 <path className="hero-spark hero-spark--3" d="M150,38 l0.9,2.6 2.6,0.9 -2.6,0.9 -0.9,2.6 -0.9,-2.6 -2.6,-0.9 2.6,-0.9 z" />
-                {/* two prominent compass stars on the inner ring, positions rotated 180°
-                    about the orrery centre (upper-right→lower-left and vice-versa) */}
-                <path className="hero-star hero-star--a" transform="rotate(180 100 100)" d="M146,49 L147.6,60.4 L159,62 L147.6,63.6 L146,75 L144.4,63.6 L133,62 L144.4,60.4 Z" />
-                <path className="hero-star hero-star--b" transform="rotate(180 100 100)" d="M58,131 L59.5,141.5 L70,143 L59.5,144.5 L58,155 L56.5,144.5 L46,143 L56.5,141.5 Z" />
-                {/* smaller echoes further out on the rings — top-right + bottom-left */}
-                <path className="hero-star hero-star--c" d="M160,44 L161,51 L168,52 L161,53 L160,60 L159,53 L152,52 L159,51 Z" />
-                <path className="hero-star hero-star--d" d="M44,142 L45,149 L52,150 L45,151 L44,158 L43,151 L36,150 L43,149 Z" />
+                {/* two echo stars nudged outward so their centres rest on the outer orbit
+                    ring (r=80) — top-right + bottom-left */}
+                <path className="hero-star hero-star--c" transform="translate(2.5,-2)" d="M160,44 L161,51 L168,52 L161,53 L160,60 L159,53 L152,52 L159,51 Z" />
+                <path className="hero-star hero-star--d" transform="translate(-3.7,3.3)" d="M44,142 L45,149 L52,150 L45,151 L44,158 L43,151 L36,150 L43,149 Z" />
                 {/* scattered star dust — small & medium echoes of the compass star spread
                     across the card to add depth and texture */}
                 <use href="#heroStarShape" className="hero-star hero-star--md" transform="translate(34,80) scale(0.46)" />

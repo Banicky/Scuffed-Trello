@@ -16,27 +16,11 @@ const NEBULAE_NIGHT = [
   { x: 0.7,  y: 0.94, r: 0.52, color: [60, 92, 110], a: 0.045 },  // faint teal, bottom
 ]
 
-// Daytime nebula: a layered cloud of three materials painted normally (not
-// additively) — bright white cores clustered through the centre and bottom
-// (the lit heart), soft blue reflection clouds around them, and desaturated
-// gray/charcoal dust lanes that give the cloud depth and keep it from reading
-// as a flat blue. Overlap does the mixing.
-const NEBULAE_DAY = [
-  // white cores — the lit heart, centre + bottom
-  { x: 0.44, y: 0.58, r: 0.40, color: [255, 255, 255], a: 0.30 },
-  { x: 0.58, y: 0.78, r: 0.34, color: [255, 255, 255], a: 0.26 },
-  { x: 0.30, y: 0.86, r: 0.30, color: [248, 251, 255], a: 0.22 },
-  { x: 0.86, y: 0.84, r: 0.28, color: [255, 255, 255], a: 0.18 },
-  // blue reflection clouds
-  { x: 0.20, y: 0.40, r: 0.42, color: [150, 184, 224], a: 0.18 },
-  { x: 0.72, y: 0.50, r: 0.40, color: [160, 192, 230], a: 0.16 },
-  { x: 0.50, y: 0.18, r: 0.36, color: [168, 196, 232], a: 0.14 },
-  // light gray dust lanes — soft depth, kept pale + airy (not heavy charcoal)
-  { x: 0.12, y: 0.64, r: 0.34, color: [150, 160, 176], a: 0.08 },
-  { x: 0.66, y: 0.32, r: 0.30, color: [146, 158, 176], a: 0.07 },
-  { x: 0.40, y: 0.98, r: 0.42, color: [140, 152, 172], a: 0.08 },
-  { x: 0.93, y: 0.28, r: 0.26, color: [152, 162, 178], a: 0.06 },
-]
+// Daytime nebula now lives in the SVG NebulaVeil (fractal-turbulence "paint"
+// clouds) painted beneath this canvas — smooth radial blooms here only read as
+// the flat blue→white wash we were trying to escape. The canvas keeps the day
+// constellations, stars, motes, and shooting stars; the veil owns the gas.
+const NEBULAE_DAY = []
 
 const STAR_TINTS_NIGHT = [
   [255, 255, 255],
