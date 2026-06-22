@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import ImageUploadField from './ImageUploadField.jsx'
+import UserAvatar from './UserAvatar.jsx'
 import { assetUrl } from '../api.js'
 import { buildSearchRegex } from '../utils.js'
 
@@ -113,6 +114,13 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
           draggable={false}
           onClick={onOpenDetail}
         />
+      )}
+      {card.assignees?.length > 0 && (
+        <div className="card-assignees" onClick={onOpenDetail} title="Assigned members">
+          {card.assignees.map(a => (
+            <UserAvatar key={a.id} user={a} className="card-assignee-avatar" />
+          ))}
+        </div>
       )}
       <div className="card-footer">
         <div className="card-footer-left">

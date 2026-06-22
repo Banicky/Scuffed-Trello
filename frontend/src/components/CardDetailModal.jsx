@@ -35,6 +35,32 @@ function PlusIcon() {
   )
 }
 
+function AssignIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="19" y1="8" x2="19" y2="14" />
+      <line x1="22" y1="11" x2="16" y2="11" />
+    </svg>
+  )
+}
+
+// Build the human-readable sentence for one history row, e.g.
+// "ming moved Theme to Review from In Progress".
+function describeHistory(h) {
+  const who = h.username || 'Someone'
+  const title = h.card_title || 'this card'
+  switch (h.action) {
+    case 'created':    return `${who} created ${title}`
+    case 'moved':      return `${who} moved ${title} ${h.detail || ''}`.trim()
+    case 'edited':     return `${who} edited ${title}${h.detail ? ` ${h.detail}` : ''}`
+    case 'assigned':   return `${who} assigned ${h.detail || 'a member'} to ${title}`
+    case 'unassigned': return `${who} unassigned ${h.detail || 'a member'} from ${title}`
+    default:           return `${who} ${h.action} ${title}`
+  }
+}
+
 // Group a comment's raw reaction rows into { emoji: { count, userIds } }
 function groupReactions(reactions) {
   return (reactions || []).reduce((acc, r) => {
@@ -45,7 +71,7 @@ function groupReactions(reactions) {
   }, {})
 }
 
-export default function CardDetailModal({ card, currentUserId, onClose, onCommentCountChange }) {
+export default function CardDetailModal({ card, boardId, currentUserId, onClose, onCommentCountChange, onAssigneesChange }) {
   const [comments, setComments] = useState([])
   const [commentBody, setCommentBody] = useState('')
   const [editingCommentId, setEditingCommentId] = useState(null)
@@ -56,17 +82,67 @@ export default function CardDetailModal({ card, currentUserId, onClose, onCommen
   const [pendingImage, setPendingImage] = useState(null) // { url } once uploaded
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [assignees, setAssignees] = useState(card.assignees || [])
+  const [history, setHistory] = useState([])
+  const [members, setMembers] = useState([])
+  const [showAssignPicker, setShowAssignPicker] = useState(false)
   const overlayRef = useRef(null)
   const commentInputRef = useRef(null)
   const emojiPickerRef = useRef(null)
   const reactionPickerRef = useRef(null)
   const fileInputRef = useRef(null)
+  const assignPickerRef = useRef(null)
 
   useEffect(() => {
     apiFetch(`/api/cards/${card.id}/comments`)
       .then(r => r.json())
       .then(data => Array.isArray(data) ? setComments(data) : setComments([]))
   }, [card.id])
+
+  function loadHistory() {
+    apiFetch(`/api/cards/${card.id}/history`)
+      .then(r => r.json())
+      .then(data => setHistory(Array.isArray(data) ? data : []))
+  }
+
+  useEffect(() => { loadHistory() }, [card.id])
+
+  useEffect(() => {
+    if (!boardId) return
+    apiFetch(`/api/boards/${boardId}/members`)
+      .then(r => r.json())
+      .then(data => Array.isArray(data) ? setMembers(data) : setMembers([]))
+  }, [boardId])
+
+  useEffect(() => {
+    if (!showAssignPicker) return
+    function handleClick(e) {
+      if (assignPickerRef.current && !assignPickerRef.current.contains(e.target)) setShowAssignPicker(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showAssignPicker])
+
+  async function toggleAssignee(member) {
+    const isAssigned = assignees.some(a => a.id === member.id)
+    let next
+    if (isAssigned) {
+      const res = await apiFetch(`/api/cards/${card.id}/assignees/${member.id}`, { method: 'DELETE' })
+      if (!res.ok) return
+      next = assignees.filter(a => a.id !== member.id)
+    } else {
+      const res = await apiFetch(`/api/cards/${card.id}/assignees`, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: member.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) return
+      next = [...assignees, data].sort((a, b) => a.username.localeCompare(b.username))
+    }
+    setAssignees(next)
+    onAssigneesChange?.(next)
+    loadHistory()
+  }
 
   useEffect(() => {
     function handleKey(e) {
@@ -185,7 +261,63 @@ export default function CardDetailModal({ card, currentUserId, onClose, onCommen
       <div className="card-modal">
         <div className="card-modal-header">
           <h2 className="card-modal-title">{card.title}</h2>
+          <div className="card-assign-wrap" ref={assignPickerRef}>
+            <button
+              type="button"
+              className="card-assign-btn"
+              title="Assign members"
+              onClick={() => setShowAssignPicker(p => !p)}
+            >
+              <AssignIcon />
+              <span>Assign</span>
+            </button>
+            {showAssignPicker && (
+              <div className="card-assign-picker">
+                <span className="card-assign-picker-label">Board members</span>
+                {members.length === 0 && (
+                  <p className="card-assign-empty">No board members yet.</p>
+                )}
+                {members.map(m => {
+                  const checked = assignees.some(a => a.id === m.id)
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`card-assign-option${checked ? ' active' : ''}`}
+                      onClick={() => toggleAssignee(m)}
+                    >
+                      <UserAvatar user={m} className="card-assign-option-avatar" />
+                      <span className="card-assign-option-name">{m.username}</span>
+                      {checked && <span className="card-assign-check">✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
+
+        {assignees.length > 0 && (
+          <div className="card-modal-assignees">
+            <span className="card-modal-section-label">Assigned</span>
+            <div className="card-assignee-chips">
+              {assignees.map(a => (
+                <span key={a.id} className="card-assignee-chip">
+                  <UserAvatar user={a} className="card-assignee-chip-avatar" />
+                  <span className="card-assignee-chip-name">{a.username}</span>
+                  <button
+                    type="button"
+                    className="card-assignee-chip-remove"
+                    title="Unassign"
+                    onClick={() => toggleAssignee(a)}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="card-modal-body">
           <div className="card-modal-main">
@@ -373,6 +505,24 @@ export default function CardDetailModal({ card, currentUserId, onClose, onCommen
               </form>
             </div>
           </div>
+
+          <aside className="card-modal-history">
+            <span className="card-modal-section-label">History</span>
+            <ul className="card-history-list">
+              {history.length === 0 && (
+                <li className="card-history-empty">No history yet.</li>
+              )}
+              {history.map(h => (
+                <li key={h.id} className={`card-history-item card-history-item--${h.action}`}>
+                  <span className="card-history-dot" aria-hidden="true" />
+                  <div className="card-history-content">
+                    <p className="card-history-text">{describeHistory(h)}</p>
+                    <span className="card-history-date">{formatDate(h.created_at)}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </aside>
         </div>
       </div>
     </div>

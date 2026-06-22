@@ -360,6 +360,30 @@ async function logActivity({ boardId, cardId, userId, action, cardTitle }) {
   }
 }
 
+// Append a row to a card's own history trail (shown in the card detail panel).
+// Resolves and denormalises the actor's username so the row reads on its own.
+// Best-effort: never fails the underlying card action. Keeps the newest 15
+// rows per card, pruning the oldest so the trail can't grow without bound.
+async function logCardHistory({ cardId, userId, action, cardTitle, detail }) {
+  if (!cardId) return;
+  try {
+    const u = await pool.query("SELECT username FROM users WHERE id = $1", [userId]);
+    await pool.query(
+      "INSERT INTO card_history (card_id, user_id, username, action, card_title, detail) VALUES ($1, $2, $3, $4, $5, $6)",
+      [cardId, userId, u.rows[0]?.username || null, action, cardTitle || null, detail || null]
+    );
+    await pool.query(
+      `DELETE FROM card_history
+       WHERE card_id = $1 AND id NOT IN (
+         SELECT id FROM card_history WHERE card_id = $1 ORDER BY created_at DESC, id DESC LIMIT 15
+       )`,
+      [cardId]
+    );
+  } catch (err) {
+    console.error("logCardHistory failed:", err.message);
+  }
+}
+
 // Record a board-level deed (rename / delete) for the owner's Cosmic Activity.
 // Unlike card_activity, board_activity is deliberately NOT foreign-keyed to
 // boards, so a "deleted" entry outlives the board it describes. board_title and
@@ -1309,7 +1333,12 @@ app.get("/api/columns/:columnId/cards", requireAuth, async (req, res) => {
     `SELECT cards.*,
             creator.username AS created_by_username,
             editor.username AS last_edited_by_username,
-            (SELECT COUNT(*)::int FROM card_comments cc WHERE cc.card_id = cards.id) AS comment_count
+            (SELECT COUNT(*)::int FROM card_comments cc WHERE cc.card_id = cards.id) AS comment_count,
+            COALESCE(
+              (SELECT json_agg(jsonb_build_object('id', au.id, 'username', au.username, 'avatar_url', au.avatar_url) ORDER BY au.username)
+               FROM card_assignees ca JOIN users au ON au.id = ca.user_id WHERE ca.card_id = cards.id),
+              '[]'::json
+            ) AS assignees
      FROM cards
      LEFT JOIN users creator ON creator.id = cards.created_by
      LEFT JOIN users editor ON editor.id = cards.last_edited_by
@@ -1337,6 +1366,7 @@ app.post("/api/cards", requireAuth, async (req, res) => {
 
   const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
   await logActivity({ boardId: col.rows[0].board_id, cardId: card.id, userId: req.session.userId, action: "created", cardTitle: card.title });
+  await logCardHistory({ cardId: card.id, userId: req.session.userId, action: "created", cardTitle: card.title });
   res.json({ ...card, created_by_username: user.rows[0]?.username || null });
 });
 
@@ -1383,7 +1413,8 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
   if (title !== undefined) {
     if (tooLong(title, 255)) return res.status(400).json({ error: "Title must be 255 characters or fewer" });
     if (tooLong(description, 3000)) return res.status(400).json({ error: "Description must be 3000 characters or fewer" });
-    const prevImg = (await pool.query("SELECT image_url FROM cards WHERE id = $1", [req.params.id])).rows[0]?.image_url;
+    const before = (await pool.query("SELECT title, description, image_url FROM cards WHERE id = $1", [req.params.id])).rows[0] || {};
+    const prevImg = before.image_url;
     const result = await pool.query(
       "UPDATE cards SET title = $1, description = $2, last_edited_by = $3, updated_at = NOW(), image_url = $4 WHERE id = $5 RETURNING *",
       [title, description || null, req.session.userId, image_url || null, req.params.id]
@@ -1391,6 +1422,14 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
     if (prevImg !== (image_url || null)) deleteSpacesImages(prevImg);
     const editor = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
     await logActivity({ boardId: card.rows[0].board_id, cardId: req.params.id, userId: req.session.userId, action: "edited", cardTitle: result.rows[0].title });
+    // Summarise which fields changed for the per-card history trail.
+    const changed = [];
+    if (before.title !== title) changed.push("[Title]");
+    if ((before.description || null) !== (description || null)) changed.push("[Description]");
+    if ((prevImg || null) !== (image_url || null)) changed.push("[Image]");
+    if (changed.length) {
+      await logCardHistory({ cardId: req.params.id, userId: req.session.userId, action: "edited", cardTitle: result.rows[0].title, detail: changed.join(", ") });
+    }
     return res.json({ ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null });
   }
 
@@ -1406,6 +1445,13 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
     const editor = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
     if (movedColumns) {
       await logActivity({ boardId: card.rows[0].board_id, cardId: req.params.id, userId: req.session.userId, action: "moved", cardTitle: result.rows[0].title });
+      // Resolve from/to column names so the history reads "to [Review] from [In Progress]".
+      const cols = await pool.query("SELECT id, title FROM columns WHERE id = ANY($1)", [[before.rows[0].column_id, column_id]]);
+      const nameOf = id => `[${cols.rows.find(c => String(c.id) === String(id))?.title || "a column"}]`;
+      await logCardHistory({
+        cardId: req.params.id, userId: req.session.userId, action: "moved", cardTitle: result.rows[0].title,
+        detail: `to ${nameOf(column_id)} from ${nameOf(before.rows[0].column_id)}`,
+      });
     }
     return res.json({ ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null });
   }
@@ -1415,6 +1461,98 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
     [column_id, position, req.params.id]
   );
   res.json(result.rows[0]);
+});
+
+// ── Card assignees ──────────────────────────────────────────────────────────────
+
+// Resolve the board a card belongs to, or null if the card doesn't exist.
+async function cardBoardId(cardId) {
+  const r = await pool.query(
+    "SELECT columns.board_id FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1",
+    [cardId]
+  );
+  return r.rows[0]?.board_id ?? null;
+}
+
+app.get("/api/cards/:id/assignees", requireAuth, async (req, res) => {
+  const boardId = await cardBoardId(req.params.id);
+  if (!boardId || !await canAccessBoard(req.session.userId, boardId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const result = await pool.query(
+    `SELECT u.id, u.username, u.avatar_url FROM users u
+     JOIN card_assignees ca ON ca.user_id = u.id
+     WHERE ca.card_id = $1
+     ORDER BY u.username`,
+    [req.params.id]
+  );
+  res.json(result.rows);
+});
+
+app.post("/api/cards/:id/assignees", requireAuth, async (req, res) => {
+  const boardId = await cardBoardId(req.params.id);
+  if (!boardId || !await canAccessBoard(req.session.userId, boardId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { user_id } = req.body;
+  if (!user_id) return res.status(400).json({ error: "user_id is required" });
+
+  // Only board members (or the owner) may be assigned to a card on that board.
+  if (!await canAccessBoard(user_id, boardId)) {
+    return res.status(400).json({ error: "User is not a member of this board" });
+  }
+
+  const inserted = await pool.query(
+    "INSERT INTO card_assignees (card_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING card_id",
+    [req.params.id, user_id]
+  );
+  const user = await pool.query(
+    "SELECT id, username, avatar_url FROM users WHERE id = $1",
+    [user_id]
+  );
+  if (inserted.rows[0]) {
+    const cardTitle = (await pool.query("SELECT title FROM cards WHERE id = $1", [req.params.id])).rows[0]?.title;
+    await logCardHistory({ cardId: req.params.id, userId: req.session.userId, action: "assigned", cardTitle, detail: user.rows[0]?.username || "a member" });
+  }
+  res.json(user.rows[0]);
+});
+
+app.delete("/api/cards/:id/assignees/:userId", requireAuth, async (req, res) => {
+  const boardId = await cardBoardId(req.params.id);
+  if (!boardId || !await canAccessBoard(req.session.userId, boardId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const removed = await pool.query(
+    "DELETE FROM card_assignees WHERE card_id = $1 AND user_id = $2 RETURNING user_id",
+    [req.params.id, req.params.userId]
+  );
+  if (removed.rows[0]) {
+    const cardTitle = (await pool.query("SELECT title FROM cards WHERE id = $1", [req.params.id])).rows[0]?.title;
+    const removedUser = (await pool.query("SELECT username FROM users WHERE id = $1", [req.params.userId])).rows[0];
+    await logCardHistory({ cardId: req.params.id, userId: req.session.userId, action: "unassigned", cardTitle, detail: removedUser?.username || "a member" });
+  }
+  res.json({ success: true });
+});
+
+// ── Card history ────────────────────────────────────────────────────────────────
+
+// Full per-card activity trail (newest first) for the card detail panel.
+app.get("/api/cards/:id/history", requireAuth, async (req, res) => {
+  const boardId = await cardBoardId(req.params.id);
+  if (!boardId || !await canAccessBoard(req.session.userId, boardId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const result = await pool.query(
+    `SELECT h.id, h.action, h.card_title, h.detail, h.created_at,
+            COALESCE(u.username, h.username) AS username
+     FROM card_history h
+     LEFT JOIN users u ON u.id = h.user_id
+     WHERE h.card_id = $1
+     ORDER BY h.created_at DESC, h.id DESC
+     LIMIT 15`,
+    [req.params.id]
+  );
+  res.json(result.rows);
 });
 
 // ── Comments ──────────────────────────────────────────────────────────────────
@@ -1755,6 +1893,17 @@ async function migrate() {
     ALTER TABLE cards ADD COLUMN IF NOT EXISTS image_url TEXT
   `);
 
+  // Members assigned to a card. A card can have many assignees; each must be a
+  // member of (or own) the board, enforced at the route level.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS card_assignees (
+      card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      assigned_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (card_id, user_id)
+    )
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS card_comments (
       id SERIAL PRIMARY KEY,
@@ -1858,6 +2007,27 @@ async function migrate() {
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS card_activity_board_idx ON card_activity (board_id, created_at DESC)
+  `);
+
+  // Per-card history log shown in the card detail panel. Unlike card_activity
+  // (board-scoped, deduped, capped at 30) this keeps a fuller per-card trail:
+  // each row carries a free-text `detail` (e.g. "from In Progress to Review" or
+  // a member's name). username / card_title are denormalised so a row still
+  // reads on its own after the user or card is gone.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS card_history (
+      id SERIAL PRIMARY KEY,
+      card_id INTEGER REFERENCES cards(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      username VARCHAR(255),
+      action VARCHAR(20) NOT NULL,
+      card_title VARCHAR(255),
+      detail TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS card_history_card_idx ON card_history (card_id, created_at DESC)
   `);
 
   // Board-level activity (rename / delete) for the owner's Cosmic Activity feed.

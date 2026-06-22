@@ -520,12 +520,20 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
       {detailCard && (
         <CardDetailModal
           card={detailCard}
+          boardId={boardId}
           currentUserId={user.id}
           onClose={() => setDetailCard(null)}
           onCommentCountChange={count => setColumns(cols => cols.map(col => ({
             ...col,
             cards: col.cards.map(c => c.id === detailCard.id ? { ...c, comment_count: count } : c),
           })))}
+          onAssigneesChange={assignees => {
+            setDetailCard(c => c ? { ...c, assignees } : c)
+            setColumns(cols => cols.map(col => ({
+              ...col,
+              cards: col.cards.map(c => c.id === detailCard.id ? { ...c, assignees } : c),
+            })))
+          }}
         />
       )}
 
