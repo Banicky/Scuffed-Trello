@@ -1464,6 +1464,22 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               <circle className="dhc-dot" cx="100" cy="62" r="1.4" />
               <circle className="dhc-dot" cx="50" cy="100" r="1.2" />
             </svg>
+            {/* diamond stars scattered across the banner for depth & texture */}
+            {[
+              { cls: 'hero-card-star--md', pos: { top: '62%', left: '3%' } },     // bottom-left of the summary line
+              { cls: 'hero-card-star--sm', pos: { top: '8%', left: '13%' } },     // near the top border, left side
+              { cls: 'hero-card-star--sm', pos: { top: '47%', left: '6.5%' } },   // directly below the greeting name
+              { cls: 'hero-card-star--sm', pos: { top: '85%', left: '20%' } },    // below "Cosmic Activity"
+              { cls: 'hero-card-star--md', pos: { top: '9%', right: '3%' } },     // upper-right corner
+              // cluster plastered in the open band right of the name / summary
+              { cls: 'hero-card-star--md', pos: { top: '36%', left: '57%' } },    // top (nudged right)
+              { cls: 'hero-card-star--lg', pos: { top: '86%', left: '70%' } },    // bottom-right, kept clear of the Saturn orrery
+              { cls: 'hero-card-star--md', pos: { top: '70%', left: '31%' } },    // below — next to Cosmic Activity
+            ].map((s, i) => (
+              <svg key={i} className={`hero-card-star ${s.cls}`} style={s.pos} viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 0 L13.6 10.4 L24 12 L13.6 13.6 L12 24 L10.4 13.6 L0 12 L10.4 10.4 Z" />
+              </svg>
+            ))}
             <div className="dash-hero-left">
               <p className="dash-hero-eyebrow">{today.toUpperCase()}</p>
               <h1 className="dash-hero-greeting">{greeting}, <em className="dash-hero-username">{user.username}</em>.</h1>
@@ -1523,6 +1539,15 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                     <stop offset="0%" stopColor="rgba(255,190,90,0.55)" />
                     <stop offset="100%" stopColor="rgba(255,190,90,0)" />
                   </radialGradient>
+                  {/* surface latitude lines: light gray fading to dark gray */}
+                  <linearGradient id="heroBandLight" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#eef1f6" />
+                    <stop offset="50%" stopColor="#9aa0ad" />
+                    <stop offset="100%" stopColor="#3c414c" />
+                  </linearGradient>
+                  {/* the four-pointed compass star, normalized to the origin so it can be
+                      scattered at any size/position via <use transform> */}
+                  <path id="heroStarShape" d="M0,-13 L1.6,-1.6 L13,0 L1.6,1.6 L0,13 L-1.6,1.6 L-13,0 L-1.6,-1.6 Z" />
                 </defs>
 
                 {/* zodiac wheel */}
@@ -1545,8 +1570,9 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                   <g transform="rotate(-18 100 100)">
                     <ellipse className="hero-ring hero-ring--back" cx="100" cy="100" rx="42" ry="13" />
                     <circle className="hero-planet-body" cx="100" cy="100" r="21" fill="url(#heroPlanet)" />
-                    <path className="hero-band" d="M82,95 q18,7 38,-2" />
-                    <path className="hero-band" d="M81,104 q19,7 39,-1" />
+                    {/* two latitude lines meeting the planet's edge so they read as curving over the sphere, sitting just above the front ring */}
+                    <path className="hero-band-light" d="M79,98 q21,7 42,-3" />
+                    <path className="hero-band-light" d="M80,104 q20,7 40,-3" />
                     <path className="hero-ring hero-ring--front" d="M58,100 a42,13 0 0 0 84,0" />
                   </g>
                 </g>
@@ -1576,13 +1602,25 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                 <path className="hero-spark hero-spark--1" d="M34,52 l1.4,4 4,1.4 -4,1.4 -1.4,4 -1.4,-4 -4,-1.4 4,-1.4 z" />
                 <path className="hero-spark hero-spark--2" d="M168,140 l1.1,3.2 3.2,1.1 -3.2,1.1 -1.1,3.2 -1.1,-3.2 -3.2,-1.1 3.2,-1.1 z" />
                 <path className="hero-spark hero-spark--3" d="M150,38 l0.9,2.6 2.6,0.9 -2.6,0.9 -0.9,2.6 -0.9,-2.6 -2.6,-0.9 2.6,-0.9 z" />
-                {/* two prominent compass stars flanking Saturn (upper-right + lower-left),
-                    like the corner filigree scaled up */}
-                <path className="hero-star hero-star--a" d="M146,49 L147.6,60.4 L159,62 L147.6,63.6 L146,75 L144.4,63.6 L133,62 L144.4,60.4 Z" />
-                <path className="hero-star hero-star--b" d="M58,131 L59.5,141.5 L70,143 L59.5,144.5 L58,155 L56.5,144.5 L46,143 L56.5,141.5 Z" />
+                {/* two prominent compass stars on the inner ring, positions rotated 180°
+                    about the orrery centre (upper-right→lower-left and vice-versa) */}
+                <path className="hero-star hero-star--a" transform="rotate(180 100 100)" d="M146,49 L147.6,60.4 L159,62 L147.6,63.6 L146,75 L144.4,63.6 L133,62 L144.4,60.4 Z" />
+                <path className="hero-star hero-star--b" transform="rotate(180 100 100)" d="M58,131 L59.5,141.5 L70,143 L59.5,144.5 L58,155 L56.5,144.5 L46,143 L56.5,141.5 Z" />
                 {/* smaller echoes further out on the rings — top-right + bottom-left */}
                 <path className="hero-star hero-star--c" d="M160,44 L161,51 L168,52 L161,53 L160,60 L159,53 L152,52 L159,51 Z" />
                 <path className="hero-star hero-star--d" d="M44,142 L45,149 L52,150 L45,151 L44,158 L43,151 L36,150 L43,149 Z" />
+                {/* scattered star dust — small & medium echoes of the compass star spread
+                    across the card to add depth and texture */}
+                <use href="#heroStarShape" className="hero-star hero-star--md" transform="translate(34,80) scale(0.46)" />
+                <use href="#heroStarShape" className="hero-star hero-star--md" transform="translate(168,116) scale(0.42)" />
+                <use href="#heroStarShape" className="hero-star hero-star--md" transform="translate(98,176) scale(0.4)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(22,34) scale(0.22)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(181,30) scale(0.2)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(16,126) scale(0.24)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(186,152) scale(0.2)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(118,18) scale(0.22)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(78,160) scale(0.18)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(150,168) scale(0.22)" />
               </svg>
             </div>
           </section>
