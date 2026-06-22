@@ -95,7 +95,20 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   const isOwner = board?.owner_id === user.id
 
   const matches = useMemo(() => {
-    const regex = buildSearchRegex(searchQuery.trim(), { caseSensitive, wholeWord })
+    const query = searchQuery.trim()
+    // Card id search: a leading '#' followed by digits matches that card id exactly.
+    const idMatch = query.match(/^#(\d+)$/)
+    if (idMatch) {
+      const targetId = Number(idMatch[1])
+      const found = []
+      columns.forEach(col => {
+        col.cards.forEach(card => {
+          if (card.id === targetId) found.push(card.id)
+        })
+      })
+      return found
+    }
+    const regex = buildSearchRegex(query, { caseSensitive, wholeWord })
     if (!regex) return []
     const found = []
     columns.forEach(col => {

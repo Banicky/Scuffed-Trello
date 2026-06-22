@@ -743,6 +743,12 @@
   line-height: 1.4;
 }
 
+.card-id {
+  color: var(--accent);
+  font-weight: 600;
+  opacity: 0.85;
+}
+
 .card-desc {
   font-size: 12px;
   color: var(--text);
