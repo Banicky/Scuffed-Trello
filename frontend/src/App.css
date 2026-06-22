@@ -5233,6 +5233,34 @@ select.card-input {
 
 .dhc-dot { fill: currentColor; opacity: 0.78; }
 
+/* diamond stars scattered across the hero banner (small & medium) for depth */
+.hero-card-star {
+  position: absolute;
+  color: var(--star, #d8dfe9);
+  fill: currentColor;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+.hero-card-star--md {
+  width: 20px;
+  height: 20px;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 65%, transparent));
+}
+.hero-card-star--lg {
+  width: 26px;
+  height: 26px;
+  opacity: 0.88;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, currentColor 65%, transparent));
+}
+.hero-card-star--sm {
+  width: 12px;
+  height: 12px;
+  opacity: 0.6;
+}
+.dashboard-shell--day .hero-card-star { color: #363b43; }
+
 @media (prefers-reduced-motion: no-preference) {
   .dhc-star--lg { animation: dhc-twinkle 7s ease-in-out infinite; }
 }
@@ -6243,10 +6271,10 @@ select.card-input {
   stroke-width: 1.4;
 }
 .hero-ring--back { opacity: 0.45; }
-.hero-band {
+.hero-band-light {
   fill: none;
-  stroke: rgba(54, 60, 74, 0.55);
-  stroke-width: 1;
+  stroke: url(#heroBandLight);
+  stroke-width: 1.1;
   stroke-linecap: round;
 }
 .hero-spark { fill: rgba(232, 237, 246, 0.85); }
@@ -6316,6 +6344,9 @@ select.card-input {
   opacity: 0.92;
 }
 .dashboard-shell--day .hero-star { fill: #363b43; }
+/* scattered star dust — dimmer at smaller sizes so they recede for depth */
+.hero-star--md { opacity: 0.62; }
+.hero-star--sm { opacity: 0.42; }
 @keyframes hero-star-twinkle {
   0%, 100% { opacity: 0.7; transform: scale(0.9); }
   50%      { opacity: 1;   transform: scale(1.08); }
@@ -6542,7 +6573,9 @@ select.card-input {
   fill: url(#heroPlanetDay);
   filter:
     drop-shadow(0 0 14px rgba(18, 30, 64, 0.6))
-    drop-shadow(0 0 32px rgba(30, 48, 96, 0.42));
+    drop-shadow(0 0 32px rgba(30, 48, 96, 0.42))
+    /* faint white glow off the right edge, blending into the dark halo */
+    drop-shadow(7px 0 11px rgba(255, 255, 255, 0.6));
 }
 /* the breathing aura behind the planet — a dark-blue glow (pulse driven by CSS) */
 .dashboard-shell--day .hero-glow-core { fill: url(#heroGlowDay); }
@@ -6551,7 +6584,6 @@ select.card-input {
   stroke: rgba(74, 92, 140, 0.82);
   filter: drop-shadow(0 0 5px rgba(40, 60, 112, 0.6));
 }
-.dashboard-shell--day .hero-band { stroke: rgba(40, 54, 80, 0.55); }
 .dashboard-shell--day .hero-moon {
   fill: #3a5790;
   filter: drop-shadow(0 0 3px rgba(60, 92, 150, 0.7));
