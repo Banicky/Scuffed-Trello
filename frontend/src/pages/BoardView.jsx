@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Column from '../components/Column.jsx'
 import CardDetailModal from '../components/CardDetailModal.jsx'
-import { apiFetch } from '../api.js'
-import { COLUMN_PALETTE } from '../constants.js'
+import ImageUploadField from '../components/ImageUploadField.jsx'
+import UserAvatar from '../components/UserAvatar.jsx'
+import { apiFetch, assetUrl, exportBoard, importBoard } from '../api.js'
+import { buildSearchRegex } from '../utils.js'
 
 function MembersPanel({ boardId, isOwner, onClose }) {
   const [members, setMembers] = useState([])
@@ -42,7 +44,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
       <ul className="members-list">
         {members.map(u => (
           <li key={u.id} className="member-row">
-            <div className="avatar member-avatar" title={u.username}>{u.username.charAt(0).toUpperCase()}</div>
+            <UserAvatar user={u} className="avatar member-avatar" />
             <span className="member-name">{u.username}</span>
             {isOwner && (
               <button className="member-remove" onClick={() => handleRemove(u.id)} title="Remove">✕</button>
@@ -58,6 +60,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
             placeholder="Username or email"
             value={invite}
             onChange={e => setInvite(e.target.value)}
+            maxLength={255}
           />
           <button className="btn-primary" type="submit">Invite</button>
         </form>
@@ -67,7 +70,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
   )
 }
 
-export default function BoardView({ boardId, user, onBack }) {
+export default function BoardView({ boardId, user, onBack, onReady, onOpenSettings }) {
   const [columns, setColumns] = useState([])
   const [loading, setLoading] = useState(true)
   const [board, setBoard] = useState(null)
@@ -75,35 +78,133 @@ export default function BoardView({ boardId, user, onBack }) {
   const [dragOverColId, setDragOverColId] = useState(null)
   const [dragOverCardId, setDragOverCardId] = useState(null)
   const [showMembers, setShowMembers] = useState(false)
+  const [showDesign, setShowDesign] = useState(false)
   const [columnLimitError, setColumnLimitError] = useState(false)
   const [draggingColId, setDraggingColId] = useState(null)
   const [colDragOverId, setColDragOverId] = useState(null)
   const [detailCard, setDetailCard] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [caseSensitive, setCaseSensitive] = useState(false)
+  const [wholeWord, setWholeWord] = useState(false)
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0)
+  const [ioBusy, setIoBusy] = useState(false)
+  const [ioMessage, setIoMessage] = useState('')
+  const cardRefs = useRef(new Map())
+  const importInputRef = useRef(null)
 
   const isOwner = board?.owner_id === user.id
 
+  const matches = useMemo(() => {
+    const regex = buildSearchRegex(searchQuery.trim(), { caseSensitive, wholeWord })
+    if (!regex) return []
+    const found = []
+    columns.forEach(col => {
+      col.cards.forEach(card => {
+        if (regex.test(card.title) || regex.test(card.description || '')) found.push(card.id)
+      })
+    })
+    return found
+  }, [searchQuery, caseSensitive, wholeWord, columns])
+
   useEffect(() => {
-    async function load() {
-      const [colRes, boardRes] = await Promise.all([
-        apiFetch(`/api/boards/${boardId}/columns`),
-        apiFetch(`/api/boards/${boardId}`),
-      ])
-      const cols = await colRes.json()
-      const boardData = await boardRes.json()
-      setBoard(boardData)
+    setActiveMatchIndex(0)
+  }, [searchQuery, caseSensitive, wholeWord])
 
-      const withCards = await Promise.all(cols.map(async col => {
-        const cardRes = await apiFetch(`/api/columns/${col.id}/cards`)
-        const cards = await cardRes.json()
-        const sorted = [...cards].sort((a, b) => b.starred - a.starred)
-        return { ...col, cards: sorted }
-      }))
+  useEffect(() => {
+    if (!matches.length) return
+    const idx = Math.min(activeMatchIndex, matches.length - 1)
+    const el = cardRefs.current.get(matches[idx])
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [matches, activeMatchIndex])
 
-      setColumns(withCards)
-      setLoading(false)
+  function registerCardRef(cardId, node) {
+    if (node) cardRefs.current.set(cardId, node)
+    else cardRefs.current.delete(cardId)
+  }
+
+  const activeMatchCardId = matches.length ? matches[Math.min(activeMatchIndex, matches.length - 1)] : null
+
+  function goToMatch(delta) {
+    if (!matches.length) return
+    setActiveMatchIndex(i => (i + delta + matches.length) % matches.length)
+  }
+
+  // Fetch the board, its columns, and each column's cards into state. Returns
+  // true on success; on access failure it escalates back to the dashboard.
+  async function loadBoard() {
+    const [colRes, boardRes] = await Promise.all([
+      apiFetch(`/api/boards/${boardId}/columns`),
+      apiFetch(`/api/boards/${boardId}`),
+    ])
+
+    // escalates to main dashboard if the id is invalid or user doesn't have access, instead of showing an error message on this page
+    if (!boardRes.ok || !colRes.ok) {
+      onBack()
+      return false
     }
-    load()
+    const cols = await colRes.json()
+    const boardData = await boardRes.json()
+    setBoard(boardData)
+
+    const withCards = await Promise.all(cols.map(async col => {
+      const cardRes = await apiFetch(`/api/columns/${col.id}/cards`)
+      const cards = await cardRes.json()
+      const sorted = [...cards].sort((a, b) => b.starred - a.starred)
+      return { ...col, cards: sorted }
+    }))
+
+    setColumns(withCards)
+    setLoading(false)
+    return true
+  }
+
+  useEffect(() => {
+    loadBoard()
   }, [boardId])
+
+  async function handleExport() {
+    setIoMessage('')
+    setIoBusy(true)
+    try {
+      await exportBoard(board.id, board.title)
+    } catch (err) {
+      setIoMessage(err.message)
+    } finally {
+      setIoBusy(false)
+    }
+  }
+
+  async function handleImportFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-importing the same file later
+    if (!file) return
+    if (!window.confirm('Importing will replace this board\'s columns and cards. Continue?')) return
+    setIoMessage('')
+    setIoBusy(true)
+    try {
+      const text = await file.text()
+      let doc
+      try { doc = JSON.parse(text) } catch { throw new Error('That file is not valid JSON') }
+      await importBoard(board.id, doc)
+      await loadBoard()
+      setIoMessage('Board imported')
+      setTimeout(() => setIoMessage(''), 3000)
+    } catch (err) {
+      setIoMessage(err.message)
+    } finally {
+      setIoBusy(false)
+    }
+  }
+
+  // Tell the portal the board has painted (one rAF after loading clears) so it
+  // holds the veil over the heavy first render, then fades to reveal it.
+  const readyFired = useRef(false)
+  useEffect(() => {
+    if (loading || readyFired.current) return
+    readyFired.current = true
+    const id = requestAnimationFrame(() => onReady?.())
+    return () => cancelAnimationFrame(id)
+  }, [loading, onReady])
 
   async function renameBoard(newTitle) {
     if (!newTitle.trim() || newTitle === board.title) return
@@ -113,6 +214,21 @@ export default function BoardView({ boardId, user, onBack }) {
     })
     const updated = await res.json()
     setBoard(updated)
+  }
+
+  // Apply a board-design change (background image or opacity). Updates locally
+  // at once for a live preview, then saves — debounced for the opacity slider so
+  // dragging it doesn't fire a request per step.
+  const designSaveTimer = useRef(null)
+  function setDesign(patch, { debounce = false } = {}) {
+    setBoard(b => ({ ...b, ...patch }))
+    clearTimeout(designSaveTimer.current)
+    const save = () => apiFetch(`/api/boards/${board.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    })
+    if (debounce) designSaveTimer.current = setTimeout(save, 350)
+    else save()
   }
 
   async function addCard(columnId, cardData, position) {
@@ -162,19 +278,6 @@ export default function BoardView({ boardId, user, onBack }) {
         method: 'PATCH',
         body: JSON.stringify({ column_id: columnId, position: i }),
       })
-    ))
-  }
-
-  async function reactCard(columnId, cardId, emoji) {
-    const res = await apiFetch(`/api/cards/${cardId}/reactions`, {
-      method: 'POST',
-      body: JSON.stringify({ emoji }),
-    })
-    const { reactions } = await res.json()
-    setColumns(cols => cols.map(col =>
-      col.id === columnId
-        ? { ...col, cards: col.cards.map(c => c.id === cardId ? { ...c, reactions } : c) }
-        : col
     ))
   }
 
@@ -311,12 +414,22 @@ export default function BoardView({ boardId, user, onBack }) {
 
   if (loading) return (
     <div className="app-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
-      Loading…
+      Journeying…
     </div>
   )
 
   return (
     <div className="app-shell">
+      {board?.background_image && (
+        <div
+          className="board-bg-overlay"
+          aria-hidden="true"
+          style={{
+            backgroundImage: `url(${assetUrl(board.background_image)})`,
+            opacity: (board.background_opacity ?? 10) / 100,
+          }}
+        />
+      )}
       <header className="topbar">
         <div className="topbar-left">
           <button className="back-btn" onClick={onBack} title="Back to dashboard">←</button>
@@ -326,6 +439,7 @@ export default function BoardView({ boardId, user, onBack }) {
               <input
                 className="board-name-input"
                 defaultValue={board.title}
+                maxLength={255}
                 autoFocus
                 onBlur={e => { renameBoard(e.target.value); setEditingTitle(false) }}
                 onKeyDown={e => {
@@ -340,17 +454,127 @@ export default function BoardView({ boardId, user, onBack }) {
             )}
             <div className="board-meta">{totalCards} cards · {doneCount} done</div>
           </div>
+          <div className="board-io">
+            <button
+              className="btn-ghost board-io-btn"
+              onClick={handleExport}
+              disabled={ioBusy}
+              title="Download this board as a JSON file"
+            >
+              ⬇ Export
+            </button>
+            <button
+              className="btn-ghost board-io-btn"
+              onClick={() => importInputRef.current?.click()}
+              disabled={ioBusy}
+              title="Replace this board from a JSON file"
+            >
+              ⬆ Import
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              style={{ display: 'none' }}
+              onChange={handleImportFile}
+            />
+            {ioMessage && <span className="board-io-msg">{ioMessage}</span>}
+          </div>
         </div>
+        <div className="topbar-search">
+          <div className="search-input-wrap">
+            <input
+              className="search-input"
+              placeholder="Search cards…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="search-clear" onClick={() => setSearchQuery('')} title="Clear search">✕</button>
+            )}
+          </div>
+          <button
+            className={`search-toggle${caseSensitive ? ' active' : ''}`}
+            onClick={() => setCaseSensitive(v => !v)}
+            title="Case sensitive"
+          >
+            Aa
+          </button>
+          <button
+            className={`search-toggle${wholeWord ? ' active' : ''}`}
+            onClick={() => setWholeWord(v => !v)}
+            title="Match whole word"
+          >
+            “ab”
+          </button>
+          {searchQuery.trim() && (
+            <div className="search-nav">
+              <span className="search-count">{matches.length ? `${activeMatchIndex + 1}/${matches.length}` : '0/0'}</span>
+              <button className="search-nav-btn" onClick={() => goToMatch(-1)} disabled={!matches.length} title="Previous match">↑</button>
+              <button className="search-nav-btn" onClick={() => goToMatch(1)} disabled={!matches.length} title="Next match">↓</button>
+            </div>
+          )}
+        </div>
+
         <div className="topbar-right">
+          {isOwner && (
+            <button
+              className={`btn-ghost members-toggle${showDesign ? ' active' : ''}`}
+              onClick={() => setShowDesign(v => !v)}
+            >
+              🎨 Design
+            </button>
+          )}
           <button
             className={`btn-ghost members-toggle${showMembers ? ' active' : ''}`}
             onClick={() => setShowMembers(v => !v)}
           >
             👥 Members
           </button>
-          <div className="avatar" title={user.username}>{user.username.charAt(0).toUpperCase()}</div>
+          <button
+            className="avatar avatar--btn"
+            title="Account settings"
+            onClick={() => onOpenSettings?.('security')}
+          >
+            <UserAvatar user={user} className="avatar" />
+          </button>
         </div>
       </header>
+
+      {showDesign && (
+        <div className="board-members-overlay" onClick={() => setShowDesign(false)}>
+          <div onClick={e => e.stopPropagation()}>
+            <div className="members-panel board-members-panel board-design-panel">
+              <div className="members-panel-header">
+                <span className="members-panel-title">Board design</span>
+                <button className="members-panel-close" onClick={() => setShowDesign(false)}>✕</button>
+              </div>
+              <p className="board-design-hint">
+                Add an image to drape over your board. It sits behind the lists,
+                so your cards stay readable.
+              </p>
+              <ImageUploadField
+                value={board.background_image}
+                onChange={url => setDesign({ background_image: url })}
+                type="boards"
+              />
+              {board.background_image && (
+                <label className="board-design-opacity">
+                  <span>Overlay strength</span>
+                  <input
+                    type="range"
+                    min="5"
+                    max="100"
+                    value={board.background_opacity ?? 10}
+                    onChange={e => setDesign({ background_opacity: Number(e.target.value) }, { debounce: true })}
+                  />
+                  <span className="board-design-opacity-val">{board.background_opacity ?? 10}%</span>
+                </label>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showMembers && (
         <div className="board-members-overlay" onClick={() => setShowMembers(false)}>
@@ -363,8 +587,20 @@ export default function BoardView({ boardId, user, onBack }) {
       {detailCard && (
         <CardDetailModal
           card={detailCard}
+          boardId={boardId}
           currentUserId={user.id}
           onClose={() => setDetailCard(null)}
+          onCommentCountChange={count => setColumns(cols => cols.map(col => ({
+            ...col,
+            cards: col.cards.map(c => c.id === detailCard.id ? { ...c, comment_count: count } : c),
+          })))}
+          onAssigneesChange={assignees => {
+            setDetailCard(c => c ? { ...c, assignees } : c)
+            setColumns(cols => cols.map(col => ({
+              ...col,
+              cards: col.cards.map(c => c.id === detailCard.id ? { ...c, assignees } : c),
+            })))
+          }}
         />
       )}
 
@@ -384,8 +620,6 @@ export default function BoardView({ boardId, user, onBack }) {
             onDeleteCard={deleteCard}
             onToggleStar={(cardId, starred) => toggleStar(col.id, cardId, starred)}
             onEdit={editCard}
-            onReact={(cardId, emoji) => reactCard(col.id, cardId, emoji)}
-            currentUserId={user.id}
             onRenameColumn={renameColumn}
             onDeleteColumn={deleteColumn}
             onDragOver={colId => {
@@ -409,6 +643,11 @@ export default function BoardView({ boardId, user, onBack }) {
             }}
             onColumnDragEnd={() => { setDraggingColId(null); setColDragOverId(null) }}
             onOpenDetail={card => setDetailCard(card)}
+            searchQuery={searchQuery.trim()}
+            caseSensitive={caseSensitive}
+            wholeWord={wholeWord}
+            onCardRef={registerCardRef}
+            activeMatchCardId={activeMatchCardId}
           />
           )
         })}

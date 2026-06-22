@@ -1,25 +1,41 @@
-import { useState, useEffect, useRef } from 'react'
-import Tag from './Tag.jsx'
-import { TAG_COLORS } from '../constants.js'
+import { useState } from 'react'
+import ImageUploadField from './ImageUploadField.jsx'
+import UserAvatar from './UserAvatar.jsx'
+import { assetUrl } from '../api.js'
+import { buildSearchRegex } from '../utils.js'
 
-const QUICK_EMOJIS = ['👍', '👎', '❤️', '😄', '🎉', '🚀', '😮', '😢']
+function highlightMatches(text, query, caseSensitive, wholeWord, isActive) {
+  if (!text || !query) return text
+  const regex = buildSearchRegex(query, { caseSensitive, wholeWord, flags: 'g' })
+  if (!regex) return text
+  const parts = []
+  let lastIndex = 0
+  let match
+  while ((match = regex.exec(text))) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
+    parts.push(
+      <mark key={match.index} className={`search-highlight${isActive ? ' active' : ''}`}>{match[0]}</mark>
+    )
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex === 0) return text
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex))
+  return parts
+}
 
 function EditCardForm({ card, onSave, onCancel }) {
   const [title, setTitle] = useState(card.title)
   const [desc, setDesc] = useState(card.description || '')
-  const [tag, setTag] = useState(card.label_name || 'Design')
+  const [imageUrl, setImageUrl] = useState(card.image_url || null)
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!title.trim()) return
-    onSave({ title: title.trim(), description: desc.trim(), label_name: tag, label_color: TAG_COLORS[tag]?.color })
+    onSave({ title: title.trim(), description: desc.trim(), image_url: imageUrl })
   }
 
   return (
     <form className="add-card-form" onSubmit={handleSubmit}>
-      <select className="card-input" value={tag} onChange={e => setTag(e.target.value)}>
-        {Object.keys(TAG_COLORS).map(t => <option key={t}>{t}</option>)}
-      </select>
       <input
         className="card-input"
         value={title}
@@ -33,6 +49,7 @@ function EditCardForm({ card, onSave, onCancel }) {
         onChange={e => setDesc(e.target.value)}
         rows={3}
       />
+      <ImageUploadField value={imageUrl} onChange={setImageUrl} type="cards" />
       <div className="add-card-actions">
         <button className="btn-primary" type="submit">Save</button>
         <button className="btn-ghost" type="button" onClick={onCancel}>Cancel</button>
@@ -44,26 +61,8 @@ function EditCardForm({ card, onSave, onCancel }) {
 // onDragStart: stores this card's id in the drag event so the drop target knows which card was picked up
 // onDragOverCard: tells App which card is currently being hovered over, used to determine insertion point
 // isDropTarget: when true, renders a purple top border showing where the dragged card will be inserted
-export default function Card({ card, onDelete, onToggleStar, onEdit, onReact, currentUserId, onDragStart, onDragOverCard, isDropTarget, onOpenDetail }) {
+export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart, onDragOverCard, isDropTarget, onOpenDetail, searchQuery, caseSensitive, wholeWord, cardRef, isActiveMatch }) {
   const [editing, setEditing] = useState(false)
-  const [showPicker, setShowPicker] = useState(false)
-  const pickerRef = useRef(null)
-
-  useEffect(() => {
-    if (!showPicker) return
-    function handleClick(e) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target)) setShowPicker(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [showPicker])
-
-  const grouped = (card.reactions || []).reduce((acc, r) => {
-    if (!acc[r.emoji]) acc[r.emoji] = { count: 0, userIds: [] }
-    acc[r.emoji].count++
-    acc[r.emoji].userIds.push(r.userId)
-    return acc
-  }, {})
 
   if (editing) {
     return (
@@ -79,13 +78,16 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onReact, cu
 
   return (
     <div
+      ref={node => cardRef?.(card.id, node)}
       className={`kanban-card${isDropTarget ? ' drop-target' : ''}${card.starred ? ' starred' : ''}`}
       draggable
       onDragStart={onDragStart}
       onDragOver={e => { e.preventDefault(); onDragOverCard(card.id) }}
     >
       <div className="card-header">
-        <Tag label={card.label_name} color={card.label_color} />
+        <p className="card-title card-title--clickable" onClick={onOpenDetail}>
+          {highlightMatches(card.title, searchQuery, caseSensitive, wholeWord, isActiveMatch)}
+        </p>
         <div className="card-actions">
           <button
             className={`card-star${card.starred ? ' active' : ''}`}
@@ -99,40 +101,43 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onReact, cu
           </button>
         </div>
       </div>
-      <p className="card-title card-title--clickable" onClick={onOpenDetail}>{card.title}</p>
-      {card.description && <p className="card-desc card-desc--clickable" onClick={onOpenDetail}>{card.description}</p>}
-      <div className="card-reactions" ref={pickerRef}>
-        {Object.entries(grouped).map(([emoji, { count, userIds }]) => (
-          <button
-            key={emoji}
-            draggable={false}
-            className={`reaction-pill${userIds.includes(currentUserId) ? ' active' : ''}`}
-            onClick={() => onReact(card.id, emoji)}
-          >
-            {emoji} <span>{count}</span>
-          </button>
-        ))}
-        <button
+      {card.description && (
+        <p className="card-desc card-desc--clickable" onClick={onOpenDetail}>
+          {highlightMatches(card.description, searchQuery, caseSensitive, wholeWord, isActiveMatch)}
+        </p>
+      )}
+      {card.image_url && (
+        <img
+          className="card-image-thumb"
+          src={assetUrl(card.image_url)}
+          alt="card attachment"
           draggable={false}
-          className="reaction-add-btn"
-          onClick={() => setShowPicker(p => !p)}
-          title="Add reaction"
-        >+</button>
-        {showPicker && (
-          <div className="reaction-picker">
-            {QUICK_EMOJIS.map(e => (
-              <button
-                key={e}
-                draggable={false}
-                className={`reaction-option${grouped[e]?.userIds.includes(currentUserId) ? ' active' : ''}`}
-                onClick={() => { onReact(card.id, e); setShowPicker(false) }}
-              >{e}</button>
-            ))}
-          </div>
-        )}
-      </div>
+          onClick={onOpenDetail}
+        />
+      )}
+      {card.assignees?.length > 0 && (
+        <div className="card-assignees" onClick={onOpenDetail} title="Assigned members">
+          {card.assignees.map(a => (
+            <UserAvatar key={a.id} user={a} className="card-assignee-avatar" />
+          ))}
+        </div>
+      )}
       <div className="card-footer">
-        <button className="card-edit" onClick={() => setEditing(true)} title="Edit card">✎</button>
+        <div className="card-footer-left">
+          {card.comment_count > 0 && (
+            <button
+              className="card-comment-count"
+              onClick={onOpenDetail}
+              title={`${card.comment_count} comment${card.comment_count === 1 ? '' : 's'}`}
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+              </svg>
+              <span>{card.comment_count}</span>
+            </button>
+          )}
+          <button className="card-edit" onClick={() => setEditing(true)} title="Edit card">✎</button>
+        </div>
         <div className="card-by-info">
           {card.last_edited_by_username && (
             <>

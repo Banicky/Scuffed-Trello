@@ -4,6 +4,20 @@
   flex-direction: column;
   height: 100svh;
   overflow: hidden;
+  position: relative;
+}
+
+/* Board background image: a translucent layer draped behind the lists, so it
+   restyles the board while the columns/cards stay readable on top. Opacity is
+   set inline from the board's saved strength. */
+.board-bg-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 /* ── Top bar ── */
@@ -38,6 +52,11 @@
   flex-shrink: 0;
 }
 
+.board-icon--brand {
+  background: linear-gradient(135deg, var(--accent), var(--accent-border));
+  box-shadow: 0 6px 16px var(--accent-bg);
+}
+
 .board-name {
   font-weight: 600;
   font-size: 15px;
@@ -65,6 +84,293 @@
   line-height: 1.2;
 }
 
+/* ── Board import / export ── */
+.board-io {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 14px;
+}
+
+.board-io-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.board-io-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.board-io-msg {
+  font-size: 12px;
+  color: var(--accent);
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Notification bell ── */
+.notif {
+  position: relative;
+}
+
+.notif-bell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.notif-bell:hover,
+.notif-bell.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--text-h);
+}
+
+.notif-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--ember, #d2461b);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  z-index: 300;
+}
+
+.notif-header {
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--code-bg);
+}
+
+.notif-empty {
+  padding: 24px 14px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+}
+
+.notif-item {
+  display: flex;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+}
+
+.notif-item:hover {
+  background: var(--bg);
+}
+
+.notif-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--metal-deep, #8b94a3);
+}
+
+.notif-dot--created { background: #22c55e; }
+.notif-dot--edited  { background: var(--accent); }
+.notif-dot--moved   { background: #3b82f6; }
+.notif-dot--deleted { background: var(--ember, #d2461b); }
+
+.notif-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.notif-line {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.notif-line strong {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.notif-card {
+  color: var(--text-h);
+}
+
+.notif-time {
+  font-size: 11px;
+  color: var(--metal-deep, #8b94a3);
+}
+
+.topbar-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 220px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 28px 6px 10px;
+  font-size: 13px;
+  color: var(--text-h);
+  font-family: var(--sans);
+  outline: none;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--accent);
+  }
+
+  &::placeholder {
+    color: var(--text);
+    opacity: 0.7;
+  }
+}
+
+.search-clear {
+  position: absolute;
+  right: 6px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 11px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+
+  &:hover {
+    color: var(--text-h);
+    background: var(--border);
+  }
+}
+
+.search-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+
+  &.active {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+  }
+
+  &:hover:not(.active) {
+    color: var(--text-h);
+  }
+}
+
+.search-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 2px;
+}
+
+.search-count {
+  font-size: 12px;
+  color: var(--text);
+  min-width: 40px;
+  text-align: center;
+}
+
+.search-nav-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+
+  &:hover:not(:disabled) {
+    color: var(--text-h);
+    background: var(--code-bg);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+.search-highlight {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.search-highlight.active {
+  background: #f59e0b;
+  color: #08060d;
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
@@ -83,6 +389,22 @@
   align-items: center;
   justify-content: center;
   cursor: default;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* Base for the <UserAvatar> component: keeps the initial/preset glyph or image
+   centered in a circle. Per-instance classes only override size/border/color. */
+.user-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  line-height: 1;
   user-select: none;
 }
 
@@ -250,24 +572,25 @@
 
 .card-header {
   display: flex;
-  align-items: right;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 6px;
   margin-bottom: 8px;
 }
 
-.card-tag {
-  font-size: 11px;
-  font-weight: 769;
-  padding: 2px 8px;
-  border-radius: 100px;
-  letter-spacing: 0.03em;
-  margin-left: -4px;
+.card-header .card-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .card-actions {
   display: flex;
   align-items: center;
   gap: 3px;
+  flex-shrink: 0;
 }
 
 .card-star {
@@ -326,97 +649,32 @@
   margin-top: 8px;
 }
 
-.card-reactions {
+.card-footer-left {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  position: relative;
-  margin-top: 8px;
+  gap: 6px;
 }
 
-.reaction-pill {
+.card-comment-count {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  background: var(--border);
-  border: 1px solid transparent;
-  border-radius: 12px;
-  padding: 1px 7px;
-  font-size: 13px;
-  cursor: pointer;
-  color: var(--text);
-  transition: background 0.15s, border-color 0.15s;
-}
-.reaction-pill:hover {
-  background: var(--accent-border);
-}
-.reaction-pill.active {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: #6366f1;
-  color: var(--text-h);
-}
-.reaction-pill span {
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 1px 4px;
   font-size: 11px;
   font-weight: 600;
-}
-
-.reaction-add-btn {
-  background: none;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-  width: 24px;
-  height: 20px;
-  font-size: 14px;
   line-height: 1;
-  cursor: pointer;
   color: var(--text-muted, #888);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
+  cursor: pointer;
+  transition: color 0.15s;
 }
-.kanban-card:hover .reaction-add-btn {
-  opacity: 1;
-}
-.reaction-add-btn:hover {
-  background: var(--border);
+.card-comment-count:hover {
   color: var(--text-h);
 }
-
-.reaction-picker {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  max-width: 196px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px;
-  box-shadow: var(--shadow);
-  z-index: 50;
-}
-
-.reaction-option {
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font-size: 18px;
-  padding: 3px 5px;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-  line-height: 1;
-}
-.reaction-option:hover {
-  background: var(--border);
-}
-.reaction-option.active {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: #6366f1;
+.card-comment-count svg {
+  display: block;
 }
 
 .card-by-info {
@@ -424,6 +682,8 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
 .card-last-edited {
@@ -434,12 +694,16 @@
 }
 
 .kanban-card:hover .card-last-edited {
-  max-height: 40px;
+  max-height: 80px;
   opacity: 1;
 }
 
 .card-updated-at {
   text-align: right;
+}
+
+.card-by {
+  overflow-wrap: anywhere;
 }
 
 .card-by {
@@ -484,6 +748,75 @@
   color: var(--text);
   margin: 0;
   line-height: 1.5;
+}
+
+.card-image-thumb {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+/* Image upload control inside the add/edit card forms */
+.card-image-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-image-add {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.card-image-hint {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  opacity: 0.8;
+}
+
+.card-image-error {
+  font-size: 11px;
+  color: #ef4444;
+  flex-basis: 100%;
+}
+
+.card-image-preview {
+  position: relative;
+  display: inline-block;
+}
+.card-image-preview img {
+  max-width: 100%;
+  max-height: 140px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+.card-image-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-image-remove:hover {
+  color: #ef4444;
+  border-color: #ef4444;
 }
 
 /* ── Add column button ── */
@@ -706,32 +1039,133 @@ select.card-input {
 .auth-shell {
   min-height: 100svh;
   display: flex;
+}
+
+.auth-visual {
+  flex: 1.1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: 56px;
+  background: #0b0c10;
+  color: #f3f4f6;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-visual-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.auth-visual-heading {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  max-width: 420px;
+}
+
+.auth-visual-sub {
+  font-size: 14px;
+  color: #a3a5b0;
+  max-width: 380px;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.auth-mock-board {
+  display: flex;
+  gap: 14px;
+}
+
+.auth-mock-col {
+  flex: 1;
+  max-width: 150px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-mock-col-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b8d98;
+}
+
+.auth-mock-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.auth-mock-card--active {
+  background: rgba(192, 132, 252, 0.16);
+  border: 1px solid rgba(192, 132, 252, 0.35);
+}
+
+.auth-mock-card--done {
+  opacity: 0.6;
+}
+
+.auth-mock-tag {
+  width: 22px;
+  height: 5px;
+  border-radius: 3px;
+  background: #c084fc;
+}
+
+.auth-mock-tag--alt {
+  background: #5eead4;
+}
+
+.auth-mock-line {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.auth-form-panel {
+  flex: 1;
+  display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--code-bg);
+  padding: 24px;
+  background: var(--bg);
 }
 
 .auth-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 36px 32px;
   width: 100%;
   max-width: 380px;
-  box-shadow: var(--shadow);
 }
 
-.auth-logo {
-  display: flex;
+.auth-mobile-brand {
+  display: none;
   align-items: center;
   gap: 10px;
   margin-bottom: 24px;
 }
 
-.auth-brand {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-h);
+@media (max-width: 900px) {
+  .auth-visual {
+    display: none;
+  }
+
+  .auth-mobile-brand {
+    display: flex;
+  }
 }
 
 .auth-tabs {
@@ -788,32 +1222,90 @@ select.card-input {
   margin: 0;
 }
 
+/* ── OAuth sign-in ── */
+.auth-oauth {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0 2px;
+  color: var(--text-muted, #888);
+  font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.btn-oauth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  /* border-box so the 1px border is counted *inside* width:100%, matching the
+     inputs and the Log in button (which both use border-box) — otherwise the
+     border pushes these 2px wider and they hang past the form edge */
+  box-sizing: border-box;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+  background: var(--social-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-oauth:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.btn-oauth svg {
+  flex-shrink: 0;
+}
+
 /* ── Dashboard tabs ── */
 .dash-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 28px;
+  display: inline-flex;
   gap: 4px;
+  margin-bottom: 24px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
 }
 
 .dash-tab {
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
-  padding: 10px 18px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
   color: var(--text);
   cursor: pointer;
-  margin-bottom: -1px;
   display: flex;
   align-items: center;
   gap: 7px;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
 
   &.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
+    color: var(--text-h);
+    background: var(--bg);
+    box-shadow: rgba(0, 0, 0, 0.08) 0 1px 2px;
   }
 
   &:hover:not(.active) {
@@ -823,7 +1315,7 @@ select.card-input {
 
 .dash-tab-count {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   background: var(--accent-bg);
   color: var(--accent);
   border-radius: 10px;
@@ -907,55 +1399,271 @@ select.card-input {
   gap: 6px;
 }
 
+/* Let the dashboard header merge into the glow instead of sitting on a flat
+   black bar — scoped so the board view's topbar is unaffected. */
+.dashboard-shell .topbar {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+
 /* ── Dashboard ── */
 .dashboard-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 100svh;
+  height: 100svh;
+  overflow: hidden;
+  /* astral atlas: a single sparse silvered star-dust layer. The pegboard grid
+     was removed so the canvas starfield reads as the only texture — quieter sky */
+  background-image:
+    radial-gradient(color-mix(in srgb, var(--metal) 30%, transparent) 1.2px, transparent 1.3px);
+  background-size: 96px 96px;
+  background-position: 12px 28px;
+}
+
+/* Prototype #1: a soft single-hue brand glow behind the hero only. It's
+   anchored to the top and fades to transparent before the board grid, so the
+   colorful tiles stay the hero and the text keeps its contrast. */
+.dashboard-shell::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 460px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(58% 70% at 20% -8%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 68%),
+    radial-gradient(46% 64% at 82% -16%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 70%);
+}
+
+.dashboard-shell::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 360px;
+  z-index: -1;
+  pointer-events: none;
+  /* anchor the breathing to the glow's own corner so it never drifts off-edge */
+  transform-origin: 100% 100%;
+  background:
+    radial-gradient(54% 66% at 84% 112%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dashboard-shell::before {
+    animation: aurora-drift-a 24s ease-in-out infinite alternate;
+  }
+  .dashboard-shell::after {
+    animation: aurora-drift-b 30s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes aurora-drift-a {
+  from { transform: translate3d(-2%, -1%, 0) scale(1);    opacity: 0.85; }
+  to   { transform: translate3d(3%, 2%, 0)  scale(1.07);  opacity: 1; }
+}
+
+/* corner-anchored breathing (scale + opacity only) so the bottom glow
+   stays pinned to its corner and never exposes an empty edge */
+@keyframes aurora-drift-b {
+  from { transform: scale(1);    opacity: 0.8; }
+  to   { transform: scale(1.12); opacity: 1; }
+}
+
+/* ── Sky comet: an arcane shooting star with a rune-trail ──
+   Streaks diagonally across the upper sky in a brief window of the loop, then
+   rests off-screen, so a comet passes every several seconds. Sits behind the
+   page content. The leading point follows the keyframe path; the streak (a
+   rotated bar) trails behind it. */
+.sky-comet {
+  position: absolute;
+  top: 70px;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: comet-streak 8s linear infinite;
+}
+
+/* the tail: a tapering arcane streak whose bright (right) end is the comet
+   head; anchored so that bright end sits on the comet's travelling point */
+.sky-comet-streak {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 120px;
+  height: 5px;
+  transform-origin: right center;
+  transform: translate(-100%, -50%) rotate(14deg);
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 28%, transparent) 48%,
+    color-mix(in srgb, var(--accent) 72%, #fff) 94%,
+    transparent 100%
+  );
+}
+
+/* the glowing head at the leading end */
+.sky-comet-streak::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--accent) 80%, #fff) 45%, transparent 72%);
+  box-shadow:
+    0 0 14px 4px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 0 6px 2px rgba(255, 255, 255, 0.9);
+}
+
+/* faint platinum runes shimmering along the trail */
+.sky-comet-streak::before {
+  content: '';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  width: 96px;
+  height: 2px;
+  transform: translateY(-50%);
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0 6px,
+    color-mix(in srgb, var(--metal) 75%, transparent) 6px 8px
+  );
+  -webkit-mask: linear-gradient(to right, transparent, #000 65%, transparent);
+  mask: linear-gradient(to right, transparent, #000 65%, transparent);
+  opacity: 0.7;
+}
+
+@keyframes comet-streak {
+  0%   { transform: translate(-12vw, -4vw); opacity: 0; }
+  4%   { opacity: 1; }
+  16%  { transform: translate(116vw, 28vw); opacity: 0; }
+  100% { transform: translate(116vw, 28vw); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sky-comet { display: none; }
+  .dash-star { display: none; }
+}
+
+/* ── Dashboard sparkle stars ── */
+.dash-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.dash-star {
+  position: absolute;
+  opacity: 0;
+  animation: dash-star-pop var(--dur, 2.6s) ease-in-out var(--delay, 0s) infinite;
+}
+
+/* vertical point */
+.dash-star::before,
+.dash-star::after {
+  content: '';
+  position: absolute;
+  border-radius: 99px;
+  background: #fff;
+  box-shadow:
+    0 0 3px 1px rgba(255, 255, 255, 0.85),
+    0 0 8px 2px color-mix(in srgb, var(--accent) 65%, white);
+}
+
+.dash-star::before {
+  width: 14%;
+  height: 100%;
+  left: 43%;
+  top: 0;
+}
+
+.dash-star::after {
+  height: 14%;
+  width: 100%;
+  top: 43%;
+  left: 0;
+}
+
+@keyframes dash-star-pop {
+  0%   { transform: scale(0)    rotate(0deg);  opacity: 0; }
+  8%   { transform: scale(1.15) rotate(45deg); opacity: 1; }
+  18%  { transform: scale(0.92) rotate(45deg); opacity: 0.85; }
+  32%  { transform: scale(1)    rotate(45deg); opacity: 0.6; }
+  46%  { transform: scale(0)    rotate(90deg); opacity: 0; }
+  100% { transform: scale(0)    rotate(90deg); opacity: 0; }
 }
 
 .dashboard-main {
   flex: 1;
-  padding: 32px 40px;
-  max-width: 1100px;
+  padding: 28px 40px 64px;
+  max-width: 1120px;
   width: 100%;
   margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+  .dashboard-main {
+    padding: 28px 20px 40px;
+  }
+}
+
+/* ── Hero ── */
+.dash-hero {
+  margin-bottom: 28px;
+}
+
+.dash-hero-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 8px;
+}
+
+.dash-hero-greeting {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(30px, 4.5vw, 46px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--text-h);
+  margin: 0 0 10px;
+}
+
+.dash-hero-summary {
+  font-size: 15px;
+  color: var(--text);
+  margin: 0;
+  max-width: 60ch;
 }
 
 .dashboard-section {
   margin-bottom: 40px;
 }
 
-.section-heading-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.section-heading {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-h);
-  margin: 0 0 16px;
-  letter-spacing: 0.01em;
-}
-
-.section-heading-row .section-heading {
-  margin-bottom: 0;
-}
-
-.add-board-btn {
-  font-size: 13px;
-  padding: 5px 12px;
-}
-
 .new-board-form {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   align-items: center;
-  max-width: 400px;
+  max-width: 440px;
 }
 
 .new-board-form .card-input {
@@ -963,101 +1671,1502 @@ select.card-input {
 }
 
 .dashboard-empty {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   margin: 0;
+  padding: 28px 0;
 }
 
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  grid-auto-rows: 200px;
+  align-items: stretch;
+  gap: 18px;
 }
 
-.board-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: visible;
-  cursor: pointer;
-  transition: box-shadow 0.15s, border-color 0.15s;
+/* ── Board tile (the signature: each board as a tiny kanban) ── */
+.board-tile {
+  --tile: var(--accent);
+  box-sizing: border-box;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  color: #fff;
+  /* no fill — tile blends with the dashboard background at rest */
+  background: none;
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.28),
+    0 6px 14px -6px rgba(0, 0, 0, 0.5),
+    0 14px 30px -12px rgba(0, 0, 0, 0.45);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  /* orchestrated entrance: each tile rises in, staggered by its position.
+     `backwards` fill hides it during the delay but releases control after,
+     so the hover transform still works once it has landed. */
+  animation: tile-in 0.42s ease backwards;
+  animation-delay: calc(min(var(--stagger, 0), 8) * 45ms);
+}
 
-  &:hover {
-    box-shadow: var(--shadow);
-    border-color: var(--accent-border);
+@keyframes tile-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* clipped layer for the decorative bars + monogram, so the settings popover
+   (a sibling) can still overflow the tile without being cut off */
+.board-tile-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* board background image overlay on the dashboard tile — same image the user
+   uploaded in the board's design panel, scaled to fill the tile face */
+.board-tile-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  /* z-index: auto — paints after ::before (frame) but before columns/monogram
+     in the stacking order, so decorations stay visible on top */
+}
+
+/* each tile's background is its own zodiac constellation — stars connected
+   by a faint line, twinkling independently */
+.board-tile-zodiac {
+  position: absolute;
+  inset: 12%;
+  width: 76%;
+  height: 76%;
+  pointer-events: none;
+}
+.board-tile-zodiac-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.42);
+  stroke-width: 0.7;
+  animation: zodiac-line-shimmer 6s ease-in-out infinite;
+}
+.board-tile-zodiac-star {
+  fill: #fff;
+  /* scale the circle around its own centre (cx/cy) rather than the SVG origin */
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tile) 80%, #fff)) drop-shadow(0 0 2px #fff);
+  /* gentle constant twinkle (opacity) + an occasional bright flare (scale) */
+  animation:
+    zodiac-twinkle 3.2s ease-in-out infinite,
+    zodiac-sparkle 8s ease-in-out infinite;
+}
+@keyframes zodiac-twinkle {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+/* most of the cycle the star is calm; for a brief moment it flares, so each
+   star sparkles once in a while instead of pulsing constantly. Per-star
+   animation-delay (set inline in JSX) staggers the flares across the tile. */
+@keyframes zodiac-sparkle {
+  0%, 76% { transform: scale(1); }
+  /* a soft rise, then a long, gentle decay back to rest so the light fades
+     in and out smoothly rather than snapping on. The window is kept short
+     (~24% of the cycle) so no more than two stars are ever lit at once. */
+  84% { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+@keyframes zodiac-line-shimmer {
+  0%, 100% { stroke: rgba(255, 255, 255, 0.3); }
+  50% { stroke: rgba(255, 255, 255, 0.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-tile-zodiac-star { animation: none; opacity: 0.8; }
+  .board-tile-zodiac-line { animation: none; }
+}
+
+/* heraldic rule: a thin inset platinum frame, like the chased border of a
+   knight's shield */
+.board-tile-face::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--metal) 60%, transparent);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.board-tile:hover,
+.board-tile:focus-visible {
+  transform: translateY(-4px);
+  box-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.3),
+    0 12px 24px -8px rgba(0, 0, 0, 0.55),
+    0 28px 48px -14px rgba(0, 0, 0, 0.5),
+    0 16px 40px -12px color-mix(in srgb, var(--tile) 75%, transparent);
+  outline: none;
+  /* lift above neighbouring tiles so the hover preview isn't clipped by them */
+  z-index: 30;
+}
+
+/* tactile press feedback when a board is clicked, mirroring the New board pop */
+.board-tile:active {
+  transform: translateY(-1px) scale(0.97);
+  transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.board-tile:focus-visible {
+  outline: 2px solid var(--text-h);
+  outline-offset: 2px;
+}
+
+.board-tile-top {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* above the hover preview (z-index 5) so the gear stays reachable on hover */
+  z-index: 6;
+}
+
+.board-tile-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 20px;
+  padding: 3px 9px;
+}
+
+.board-tile-actions {
+  margin-left: auto;
+}
+
+.board-tile-btn {
+  background: rgba(0, 0, 0, 0.22);
+  border: none;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  font-size: 14px;
+  color: #fff;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s, background 0.15s;
+
+  .board-tile:hover &,
+  &.active {
+    opacity: 1;
+  }
+  &:hover, &.active {
+    background: rgba(0, 0, 0, 0.4);
   }
 }
 
-.board-card-stripe {
-  height: 6px;
-  width: 100%;
-}
-
-.board-card-body {
-  padding: 14px 14px 12px;
+.board-tile-info {
+  position: relative;
+  z-index: 2;
   display: flex;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
+  min-width: 0;
 }
 
-.board-card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-h);
-  line-height: 1.3;
+.board-tile-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
   flex: 1;
 }
 
-.board-card-actions {
+/* overlapping member avatars (initials), owner first */
+.board-tile-members {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  padding-left: 7px; /* room for the first avatar's overlap margin */
+}
+.board-tile-avatar {
+  width: 24px;
+  height: 24px;
+  margin-left: -7px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.24);
+  /* a ring in a darkened shade of the tile so overlapping discs stay distinct */
+  border: 1.5px solid color-mix(in srgb, var(--tile) 55%, #000);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  user-select: none;
+  overflow: hidden;
+}
+.board-tile-avatar--more {
+  background: rgba(0, 0, 0, 0.38);
+  font-size: 9.5px;
+}
+
+.board-tile-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  /* keep the title on a single line, truncating with an ellipsis */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-tile-meta {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Create tile (an empty, steel-edged plinth awaiting a new realm) ── */
+.board-tile--create {
+  background: transparent;
+  /* keep the label in the readable UI text colour; the metal lives in the edge */
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--metal) 28%, transparent);
+  box-shadow: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+.board-tile--create::after { content: none; }
+.board-tile--create:hover,
+.board-tile--create:focus-visible {
+  transform: translateY(-3px);
+  border-color: var(--metal);
+  color: var(--text-h);
+  background: color-mix(in srgb, var(--metal) 14%, transparent);
+  box-shadow: 0 10px 30px -16px color-mix(in srgb, var(--metal) 70%, transparent);
+  outline: none;
+}
+/* summoning circle: the glyph sits inside an arcane ring that is forever
+   alive — breathing a glow, pulsing, and wobbling as if barely contained —
+   encircled by a dashed rune-band that orbits it */
+.board-tile-plus {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--metal) 55%, transparent);
+  font-family: var(--fantasy);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1;
+  /* resting glow — also the value reduced-motion users keep */
+  box-shadow:
+    0 0 14px -2px color-mix(in srgb, var(--accent) 50%, transparent),
+    inset 0 0 10px -4px color-mix(in srgb, var(--accent) 38%, transparent);
+  transition: border-color 0.22s ease;
+  animation: summon-pulse 3.2s ease-in-out infinite;
+}
+
+/* the orbiting rune-band — always turning */
+.board-tile-plus::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--metal) 45%, transparent);
+  opacity: 0.6;
+  transition: opacity 0.22s ease;
+  animation: summon-spin 12s linear infinite;
+}
+
+.board-tile--create:hover .board-tile-plus,
+.board-tile--create:focus-visible .board-tile-plus {
+  border-color: var(--metal);
+}
+.board-tile--create:hover .board-tile-plus::before,
+.board-tile--create:focus-visible .board-tile-plus::before {
+  opacity: 1;
+  animation-duration: 5s; /* the band whirls faster as you reach in */
+}
+
+/* constant pulse (scale + glow) and wiggle (drift + tilt) */
+@keyframes summon-pulse {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    box-shadow:
+      0 0 13px -3px color-mix(in srgb, var(--accent) 45%, transparent),
+      inset 0 0 10px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  25% { transform: translate(-2.5px, -1.5px) rotate(-5deg) scale(1.04); }
+  50% {
+    transform: translate(2.5px, 1.5px) rotate(5deg) scale(1.07);
+    box-shadow:
+      0 0 26px 1px color-mix(in srgb, var(--accent) 70%, transparent),
+      inset 0 0 15px -3px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  75% { transform: translate(-1.5px, 2px) rotate(-3deg) scale(1.03); }
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    box-shadow:
+      0 0 13px -3px color-mix(in srgb, var(--accent) 45%, transparent),
+      inset 0 0 10px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+}
+
+@keyframes summon-spin {
+  to { transform: rotate(360deg); }
+}
+
+.board-tile-create-label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+/* ── Board hover preview: a shrunk-down replica of the board, inside the tile ── */
+.board-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: 16px;
+  overflow: hidden;
+  pointer-events: none;
+  padding: 9px;
+  /* a dark "board surface" tinted faintly with the tile's colour */
+  background: color-mix(in srgb, var(--tile) 12%, #0c0d12);
+  animation: preview-in 0.18s ease both;
+}
+
+@keyframes preview-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.board-preview-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.board-preview-board {
+  display: flex;
+  gap: 5px;
+  height: 100%;
+  align-items: stretch;
+}
+
+.mini-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.mini-col-head {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.mini-col-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
-.board-card-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 3px 5px;
-  border-radius: 4px;
-  font-size: 14px;
-  color: var(--text);
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s, color 0.15s;
-
-  .board-card:hover & {
-    opacity: 1;
-  }
-
-  &:hover, &.active {
-    background: var(--code-bg);
-    opacity: 1;
-    color: var(--text-h);
-  }
-
-  &.danger:hover {
-    background: rgba(239, 68, 68, 0.12);
-    color: #ef4444;
-  }
+.mini-col-title {
+  font-size: 6.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.board-card-confirm {
+.mini-col-count {
+  margin-left: auto;
+  font-size: 6px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.mini-col-cards {
   display: flex;
-  gap: 4px;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+  /* fade the overflowing cards at the bottom to hint there's more */
+  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
+  mask-image: linear-gradient(to bottom, #000 78%, transparent);
+}
+
+.mini-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  padding: 3px;
+  overflow: hidden;
+}
+
+.mini-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 6.5px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* ── Loading skeleton tiles ── */
+.board-tile--skeleton {
+  background: var(--code-bg);
+  gap: 9px;
+  cursor: default;
+  pointer-events: none;
+  overflow: hidden;
+  box-shadow: 0 6px 14px -8px rgba(0, 0, 0, 0.4);
+  animation: none; /* skeletons appear immediately, no staggered entrance */
+}
+.board-tile--skeleton::after { content: none; }
+/* sweeping highlight over the placeholder bars */
+.board-tile--skeleton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--text-h) 9%, transparent) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: skeleton-sweep 1.5s ease-in-out infinite;
+}
+
+.skeleton-bar {
+  display: block;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-h) 12%, transparent);
+}
+.skeleton-bar--title { width: 62%; height: 16px; }
+.skeleton-bar--meta { width: 40%; height: 11px; }
+
+@keyframes skeleton-sweep {
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-tile,
+  .board-tile--create,
+  .board-tile-plus {
+    transition: none;
+  }
+  .board-tile {
+    animation: none;
+  }
+  .board-tile--skeleton::before {
+    animation: none;
+  }
+  .board-preview {
+    animation: none;
+  }
+  .board-tile:hover,
+  .board-tile:focus-visible,
+  .board-tile:active,
+  .board-tile--create:hover,
+  .board-tile--create:focus-visible {
+    transform: none;
+  }
+  .board-tile--create:hover .board-tile-plus,
+  .board-tile--create:focus-visible .board-tile-plus {
+    transform: none;
+  }
+  /* still summoning circle: no pulse, wiggle, or orbit — just the resting glow */
+  .board-tile-plus,
+  .board-tile-plus::before {
+    animation: none;
+    transform: none;
+  }
 }
 
 /* ── Dashboard topbar extras ── */
-.dashboard-username {
+.logout-btn {
+  font-size: 13px;
+  padding: 5px 12px;
+}
+
+/* ── User menu ── */
+.user-menu {
+  position: relative;
+}
+
+.user-menu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: var(--text-h);
+  transition: background 0.15s;
+
+  &:hover { background: var(--code-bg); }
+}
+
+.user-menu-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  span {
+    line-height: 1;
+    font-size: 14px;
+  }
+}
+
+.user-menu-name {
   font-size: 13px;
   color: var(--text);
 }
 
-.logout-btn {
+.user-menu-chevron {
+  font-size: 9px;
+  color: var(--text);
+}
+
+.user-menu-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 184px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 200;
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 7px;
   font-size: 13px;
-  padding: 5px 12px;
+  color: var(--text-h);
+  text-align: left;
+  transition: background 0.12s;
+
+  &:hover { background: var(--code-bg); }
+}
+
+.user-menu-item-icon {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+.user-menu-item--danger {
+  color: #ef4444;
+  .user-menu-item-icon { color: #ef4444; }
+  &:hover { background: rgba(239,68,68,0.1); }
+}
+
+.user-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 4px;
+}
+
+/* ── Settings page ── */
+.settings-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  overflow: hidden;
+  /* same astral atlas as the dashboard: a single silvered star-dust layer */
+  background-image:
+    radial-gradient(color-mix(in srgb, var(--metal) 30%, transparent) 1.2px, transparent 1.3px);
+  background-size: 96px 96px;
+  background-position: 12px 28px;
+
+  /* Settings mirrors the dashboard's day/night toggle. Night is the default,
+     pinned dark regardless of OS so it always matches the realm. The user's
+     chosen accent (--accent) is intentionally left untouched here. */
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --bg: #16171d;
+  --border: #2e303a;
+  --code-bg: #1f2028;
+  --social-bg: rgba(47, 48, 58, 0.5);
+  background-color: #14151b;
+  color: var(--text);
+}
+
+/* ── Settings in daylight (mirrors the dashboard's solar theme) ── */
+.settings-shell--day {
+  --text: #6f5a3a;
+  --text-h: #2b2012;
+  --border: rgba(150, 110, 50, 0.24);
+  --code-bg: rgba(255, 224, 170, 0.4);
+  --bg: #f3ead6;
+  --metal: #c69a4e;
+  --metal-deep: #9a7327;
+  --social-bg: rgba(255, 210, 140, 0.18);
+  background-color: #e6d4ac;
+  color: var(--text);
+}
+.settings-shell--day .settings-section {
+  background: linear-gradient(135deg, rgba(252, 244, 226, 0.62) 0%, rgba(243, 229, 200, 0.44) 100%);
+  box-shadow: 0 8px 30px rgba(120, 88, 32, 0.16);
+}
+
+/* accent aurora glow anchored top-left, mirroring the dashboard hero */
+.settings-shell::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 460px;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(52% 68% at 18% -10%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 68%),
+    radial-gradient(44% 62% at 84% -16%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 70%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .settings-shell::before { animation: aurora-drift-a 24s ease-in-out infinite alternate; }
+}
+
+/* the canvas starfield + UI both sit above the grid/glow background */
+.settings-shell > .starfield-canvas { z-index: 0; }
+.settings-shell > .settings-topbar,
+.settings-shell > .settings-layout { position: relative; z-index: 1; }
+
+.settings-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px;
+  height: 56px;
+  flex-shrink: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  background: transparent;
+}
+
+.settings-topbar-title {
+  font-family: var(--fantasy);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-h);
+  letter-spacing: 0.08em;
+  flex: 1;
+}
+
+.settings-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-nav {
+  width: 216px;
+  flex-shrink: 0;
+  margin: 16px 0 16px 16px;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  /* glass panel matching the dashboard sidebar */
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--text);
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+  position: relative;
+
+  &:hover {
+    background: var(--code-bg);
+    color: var(--text-h);
+  }
+
+  &.active {
+    background: var(--accent-bg);
+    color: var(--accent);
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 6px;
+      bottom: 6px;
+      width: 2px;
+      border-radius: 2px;
+      background: var(--accent);
+    }
+  }
+}
+
+.settings-nav-glyph {
+  font-size: 15px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.settings-pane {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 40px 48px;
+  min-width: 0;
+}
+
+.settings-section {
+  max-width: 560px;
+  padding: 28px 32px;
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: 18px;
+  background: linear-gradient(
+    135deg,
+    rgba(28, 32, 42, 0.5) 0%,
+    rgba(12, 14, 20, 0.36) 100%
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+}
+
+.settings-section-title {
+  font-family: var(--fantasy);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 0 0 6px;
+  letter-spacing: 0.04em;
+}
+
+.settings-section-desc {
+  font-size: 13.5px;
+  color: var(--text);
+  margin: 0 0 28px;
+  line-height: 1.5;
+}
+
+/* Avatar hero — large circular sigil display */
+.settings-avatar-hero {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  margin-bottom: 28px;
+  border: 2px solid color-mix(in srgb, var(--metal, #d8dfe9) 55%, transparent);
+  background: var(--code-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 4px 18px rgba(0,0,0,0.35);
+}
+.settings-avatar-hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.settings-avatar-hero-sigil {
+  font-size: 40px;
+  line-height: 1;
+}
+.settings-avatar-hero-monogram {
+  font-family: var(--fantasy);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.settings-avatar-block {
+  margin-bottom: 28px;
+}
+
+.settings-block-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text);
+  margin: 0 0 12px;
+}
+
+/* Sigil grid — the signature element: each glyph is an enchanted seal */
+.settings-avatar-presets {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.settings-avatar-preset {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  cursor: pointer;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+
+  &:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
+    transform: translateY(-1px);
+  }
+
+  &.selected {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+
+  &:disabled { opacity: 0.5; cursor: default; }
+}
+
+.settings-avatar-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-avatar-clear {
+  font-size: 12px;
+}
+
+.settings-avatar-hint {
+  font-size: 12px;
+  color: var(--text);
+  margin: 8px 0 0;
+}
+
+/* Security form */
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 360px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+
+.settings-error {
+  font-size: 13px;
+  color: #ef4444;
+  margin: 0;
+}
+
+.settings-success {
+  font-size: 13px;
+  color: #22c55e;
+  margin: 0;
+}
+
+/* ── Theme picker cards: each previews a live GSAP cosmic orrery ── */
+.settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(120% 78% at 50% 0%, color-mix(in srgb, var(--card-accent) 13%, transparent), transparent 70%),
+    var(--code-bg);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.14s, border-color 0.18s, box-shadow 0.18s;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--card-accent) 55%, var(--border));
+    box-shadow: 0 10px 26px -14px color-mix(in srgb, var(--card-accent) 70%, transparent);
+  }
+
+  &.selected {
+    border-color: var(--card-accent);
+    box-shadow:
+      0 0 0 1px var(--card-accent),
+      0 12px 30px -14px color-mix(in srgb, var(--card-accent) 75%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--card-accent);
+    outline-offset: 2px;
+  }
+}
+
+.theme-card-art {
+  width: 116px;
+  height: 116px;
+  display: block;
+  pointer-events: none;
+}
+
+.theme-card-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.theme-card-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-h);
+  letter-spacing: 0.01em;
+}
+
+.theme-card-tag {
+  font-size: 11px;
+  color: var(--text);
+}
+
+.theme-card-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--card-accent);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.16s, transform 0.16s;
+}
+.theme-card.selected .theme-card-check { opacity: 1; transform: scale(1); }
+
+@media (max-width: 520px) {
+  .settings-theme-grid { grid-template-columns: 1fr; }
+  .theme-card { flex-direction: row; justify-content: flex-start; gap: 14px; padding: 12px 14px; }
+  .theme-card-art { width: 76px; height: 76px; }
+  .theme-card-meta { align-items: flex-start; }
+}
+
+/* ── Themed orrery preview: tinted clone of the dashboard hero art ── */
+.orrery-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 62%, transparent 95%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 62%, transparent 95%);
+}
+.orrery-wheel {
+  fill: none;
+  stroke: color-mix(in srgb, var(--orrery-accent) 28%, rgba(216, 221, 232, 0.18));
+  stroke-width: 0.7;
+  stroke-dasharray: 1 4;
+}
+.orrery-tick {
+  stroke: color-mix(in srgb, var(--orrery-accent) 45%, rgba(216, 221, 232, 0.35));
+  stroke-width: 1;
+}
+.orrery-orbit-path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--orrery-accent) 24%, rgba(216, 221, 232, 0.12));
+  stroke-width: 0.6;
+}
+.orrery-moon {
+  fill: color-mix(in srgb, var(--orrery-accent) 55%, #e8edf5);
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--orrery-accent) 60%, transparent));
+}
+.orrery-moon--sm { fill: color-mix(in srgb, var(--orrery-accent) 40%, #c6cedd); }
+.orrery-ring {
+  fill: none;
+  stroke: color-mix(in srgb, var(--orrery-accent) 70%, #e2e6ee);
+  stroke-width: 1.5;
+}
+.orrery-ring--back { opacity: 0.5; }
+.orrery-band {
+  fill: none;
+  stroke: rgba(28, 30, 40, 0.45);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+.orrery-sun { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--orrery-accent) 75%, transparent)); }
+.orrery-ray {
+  stroke: color-mix(in srgb, var(--orrery-accent) 85%, #ffe9b0);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.orrery-spark {
+  fill: color-mix(in srgb, var(--orrery-accent) 50%, #e8edf5);
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0.4;
+}
+
+.orrery-orbit,
+.orrery-ticks,
+.orrery-rays {
+  transform-box: view-box;
+  transform-origin: 100px 100px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .orrery-orbit--a { animation: hero-spin 54s linear infinite; }
+  .orrery-orbit--b { animation: hero-spin 34s linear infinite reverse; }
+  .orrery-ticks    { animation: hero-spin 170s linear infinite; }
+  .orrery-rays     { animation: hero-spin 60s linear infinite; }
+  .orrery-spark    { animation: hero-twinkle 3.4s ease-in-out infinite; }
+  .orrery-spark--2 { animation-delay: 1.1s; }
+  .orrery-spark--3 { animation-delay: 2.2s; }
+}
+
+/* respect the in-app Reduce motion toggle, mirroring the rest of the realm */
+.force-reduced-motion .orrery-orbit,
+.force-reduced-motion .orrery-ticks,
+.force-reduced-motion .orrery-rays,
+.force-reduced-motion .orrery-spark {
+  animation: none !important;
+}
+
+/* Reduced motion toggle */
+.settings-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+
+.settings-toggle-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  strong {
+    font-size: 13.5px;
+    color: var(--text-h);
+  }
+}
+
+.settings-toggle-sub {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.settings-toggle {
+  width: 36px;
+  height: 20px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Account settings ── */
+.settings-main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 48px 24px;
+}
+
+.settings-stack {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-title--sm {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+/* ── Two-factor auth ── */
+.twofa-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.twofa-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.twofa-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.twofa-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.twofa-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text);
+}
+
+.twofa-badge.on {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.twofa-btn {
+  align-self: flex-start;
+}
+
+.twofa-danger {
+  align-self: flex-start;
+  color: #ef4444;
+}
+
+.twofa-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.twofa-step {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.twofa-qr {
+  width: 168px;
+  height: 168px;
+  align-self: center;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+}
+
+.twofa-secret {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--text-h);
+  background: var(--code-bg);
+  padding: 8px 10px;
+  border-radius: 6px;
+  word-break: break-all;
+  user-select: all;
+}
+
+.twofa-code {
+  letter-spacing: 4px;
+  font-size: 16px;
+  text-align: center;
+}
+
+.twofa-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.auth-2fa-prompt {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.auth-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.auth-remember input {
+  width: 15px;
+  height: 15px;
+
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Force-reduced-motion class mirrors prefers-reduced-motion for user toggle */
+.force-reduced-motion .portal-mote { display: none; }
+.force-reduced-motion .portal-label { animation: none; opacity: 0.92; }
+.force-reduced-motion .sky-comet { display: none; }
+.force-reduced-motion .dash-star { display: none; }
+.force-reduced-motion .board-tile { animation: none; }
+.force-reduced-motion .board-tile-plus,
+.force-reduced-motion .board-tile-plus::before { animation: none; transform: none; }
+
+/* ── Portal: particle settle (board materialises from drifting motes) ── */
+.portal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+/* gather phase: a soft, board-tinted veil held fully opaque while the board
+   renders behind it, so its heavy first paint is never seen as a stutter */
+.portal--settle {
+  background: radial-gradient(
+    circle at 50% 46%,
+    color-mix(in srgb, var(--portal-color, #c084fc) 24%, #07070c) 0%,
+    #07070c 78%
+  );
+  /* own compositor layer so the reveal fade can't be stalled by main-thread
+     work happening behind it */
+  transform: translateZ(0);
+  opacity: 1;
+}
+
+/* daylight veil: a warm, bright wash instead of the near-black void */
+.portal--day.portal--settle {
+  background: radial-gradient(
+    circle at 50% 46%,
+    color-mix(in srgb, var(--portal-color, #c084fc) 20%, #f3e6c8) 0%,
+    #e6d4ac 78%
+  );
+}
+.portal--day .portal-label {
+  color: color-mix(in srgb, var(--portal-color, #c084fc) 26%, #4a3712);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--portal-color, #c084fc) 45%, transparent);
+}
+/* warm, deeper motes so the drifting dust still reads on the bright veil */
+.portal--day .portal-mote {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--portal-color, #c084fc) 42%, #8a5a14) 0%,
+    color-mix(in srgb, var(--portal-color, #c084fc) 72%, transparent) 36%,
+    transparent 72%
+  );
+}
+
+/* reveal phase: board has painted — fade the veil away to show it */
+.portal--reveal {
+  will-change: opacity;
+  animation: portal-reveal 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes portal-reveal {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* each mote drifts gently inward, glows softly, then fades — looping for the
+   length of the gather so the veil never looks frozen while a board loads.
+   Positions/sizes/timing are randomised per-mote in PortalTransition so the
+   scatter reads as organic, not a grid. */
+.portal-mote {
+  position: absolute;
+  width: var(--size, 12px);
+  height: var(--size, 12px);
+  border-radius: 50%;
+  /* glow is baked into the bitmap (gradient, not box-shadow) so the mote is
+     painted once and then only transformed/faded — every animated property
+     stays on the compositor, which is what keeps it at a smooth 60fps */
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--portal-color, #c084fc) 26%, #fff) 0%,
+    color-mix(in srgb, var(--portal-color, #c084fc) 78%, transparent) 36%,
+    transparent 72%
+  );
+  opacity: 0;
+  transform: translate3d(0, 0, 0) scale(0.6);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  animation: portal-mote var(--dur, 1s) ease-in-out var(--delay, 0s) infinite;
+}
+
+@keyframes portal-mote {
+  0%   { opacity: 0; transform: translate3d(calc(var(--mx, 0px) * -1), calc(var(--my, 0px) * -1), 0) scale(0.55); }
+  35%  { opacity: var(--mote-opacity, 0.7); }
+  70%  { opacity: var(--mote-opacity, 0.7); }
+  100% { opacity: 0; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+/* the status word at the centre of the gather, gently breathing. Only opacity
+   animates (the glow is a static text-shadow), so it stays on the compositor. */
+.portal-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  /* celestial-grimoire serif, set in caps with wide tracking so it reads as a
+     star-chart inscription, not a label */
+  font-family: var(--fantasy);
+  font-weight: 700;
+  font-size: clamp(1.3rem, 3.6vw, 2.3rem);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em; /* balance the trailing tracking so caps stay centred */
+  color: color-mix(in srgb, var(--portal-color, #c084fc) 28%, #fff);
+  text-shadow: 0 0 26px color-mix(in srgb, var(--portal-color, #c084fc) 60%, transparent);
+  white-space: nowrap;
+  will-change: opacity;
+  animation: portal-label 1.8s ease-in-out infinite;
+}
+
+@keyframes portal-label {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* no drifting motes or breathing; the veil simply holds, then fades once the
+     board is in */
+  .portal-mote { display: none; }
+  .portal-label { animation: none; opacity: 0.92; }
+  .portal--reveal {
+    animation: portal-fade 0.3s ease forwards;
+  }
+}
+
+@keyframes portal-fade {
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
 /* ── Members panel ── */
@@ -1174,6 +3283,35 @@ select.card-input {
   flex: 1;
 }
 
+/* ── Board design panel ── */
+.board-design-panel {
+  width: 300px;
+}
+.board-design-hint {
+  font-size: 12.5px;
+  color: var(--text);
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+.board-design-opacity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.board-design-opacity input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.board-design-opacity-val {
+  min-width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-h);
+}
+
 /* ── Back button in board topbar ── */
 .back-btn {
   background: none;
@@ -1230,17 +3368,23 @@ select.card-input {
   border: 1px solid var(--border);
   border-radius: 14px;
   width: 100%;
-  max-width: 600px;
+  max-width: 880px;
+  height: min(620px, calc(100vh - 80px));
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
   position: relative;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .card-modal-header {
   padding: 24px 24px 0;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .card-modal-title {
@@ -1249,17 +3393,293 @@ select.card-input {
   color: var(--text-h);
   margin: 0;
   line-height: 1.3;
-  padding-right: 28px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Card assignees ── */
+.card-assign-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.card-assign-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface-2, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.card-assign-btn:hover {
+  background: var(--surface-3, rgba(255, 255, 255, 0.08));
+  border-color: var(--accent, #8b7cf6);
+}
+
+.card-assign-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: 220px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--surface, #1a1a2e);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-assign-picker-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 6px;
+}
+
+.card-assign-empty {
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  font-style: italic;
+  padding: 4px 6px;
+  margin: 0;
+}
+
+.card-assign-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.card-assign-option:hover {
+  background: var(--surface-3, rgba(255, 255, 255, 0.08));
+}
+
+.card-assign-option.active {
+  background: var(--accent-soft, rgba(139, 124, 246, 0.16));
+}
+
+.card-assign-option-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.card-assign-option-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-assign-check {
+  color: var(--accent, #8b7cf6);
+  font-weight: 700;
+}
+
+.card-modal-assignees {
+  padding: 12px 24px 0;
+}
+
+.card-assignee-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card-assignee-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 4px;
+  background: var(--surface-2, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.card-assignee-chip-avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+
+.card-assignee-chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px;
+  border-radius: 50%;
+  transition: color 0.12s ease;
+}
+
+.card-assignee-chip-remove:hover {
+  color: var(--danger, #ff6b6b);
+}
+
+/* Assignee avatar stack shown on the board card */
+.card-assignees {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.card-assignee-avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+  margin-left: -6px;
+  border: 2px solid var(--surface, #1a1a2e);
+  box-sizing: content-box;
+}
+
+.card-assignee-avatar:first-child {
+  margin-left: 0;
 }
 
 .card-modal-body {
-  padding: 16px 24px 24px;
+  padding: 0 24px 24px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
 }
 
 .card-modal-main {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ── Card history (right rail) ── */
+.card-modal-history {
+  flex: 0 0 260px;
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.card-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.card-history-empty {
+  font-size: 13px;
+  color: var(--text-muted, #888);
+  font-style: italic;
+}
+
+.card-history-item {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  padding-left: 16px;
+}
+
+/* Vertical connector line down the rail */
+.card-history-item::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 14px;
+  bottom: -14px;
+  width: 1px;
+  background: var(--border);
+}
+.card-history-item:last-child::before { display: none; }
+
+.card-history-dot {
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent, #8b7cf6);
+  box-shadow: 0 0 6px rgba(139, 124, 246, 0.6);
+}
+
+.card-history-item--moved .card-history-dot { background: #5ab0ff; box-shadow: 0 0 6px rgba(90, 176, 255, 0.6); }
+.card-history-item--created .card-history-dot { background: #57d28a; box-shadow: 0 0 6px rgba(87, 210, 138, 0.6); }
+.card-history-item--assigned .card-history-dot { background: #f0b65a; box-shadow: 0 0 6px rgba(240, 182, 90, 0.6); }
+.card-history-item--unassigned .card-history-dot { background: #e07a7a; box-shadow: 0 0 6px rgba(224, 122, 122, 0.6); }
+
+.card-history-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.card-history-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  margin: 0;
+  word-break: break-word;
+}
+
+.card-history-date {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+}
+
+@media (max-width: 720px) {
+  .card-modal-body { flex-direction: column; }
+  .card-modal-history {
+    flex-basis: auto;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 16px;
+  }
 }
 
 .card-modal-desc {
@@ -1289,6 +3709,7 @@ select.card-input {
 .card-modal-comments {
   border-top: 1px solid var(--border);
   padding-top: 16px;
+  margin-top: auto; /* push the comment section to the bottom of the main column */
 }
 
 .comment-list {
@@ -1306,6 +3727,7 @@ select.card-input {
 }
 
 .comment-item {
+  position: relative;
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -1324,6 +3746,7 @@ select.card-input {
   justify-content: center;
   flex-shrink: 0;
   margin-top: 2px;
+  overflow: hidden;
 }
 
 .comment-content {
@@ -1356,6 +3779,72 @@ select.card-input {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.comment-reactions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.comment-reaction-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--border);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 1px 7px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.15s, border-color 0.15s;
+}
+.comment-reaction-pill:hover {
+  border-color: #6366f1;
+}
+.comment-reaction-pill.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: #6366f1;
+  color: var(--text-h);
+}
+.comment-reaction-pill span {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.comment-reaction-add-wrap {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+/* Reveal on hovering the comment, or keep visible while its picker is open */
+.comment-item:hover .comment-reaction-add-wrap,
+.comment-reaction-add-wrap:focus-within {
+  opacity: 1;
+}
+
+.comment-reaction-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  height: 26px;
+  padding: 0 7px;
+  cursor: pointer;
+  color: var(--text-muted, #888);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.comment-reaction-add:hover {
+  color: var(--text-h);
+  border-color: #6366f1;
 }
 
 .comment-actions {
@@ -1407,4 +3896,2534 @@ select.card-input {
   min-height: 60px;
   resize: vertical;
   line-height: 1.5;
+  width: 100%;
 }
+
+.comment-input-wrap {
+  position: relative;
+  display: flex;
+}
+
+.comment-input-wrap .comment-input {
+  padding-right: 66px;
+}
+
+.comment-input-tools {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.emoji-picker-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.emoji-trigger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  border-radius: 6px;
+  color: var(--text-muted, #888);
+  transition: color 0.15s, background 0.15s;
+}
+.emoji-trigger-btn:hover {
+  color: var(--text-h);
+  background: var(--border);
+}
+.emoji-trigger-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  width: 288px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: var(--shadow);
+  z-index: 50;
+}
+
+.emoji-picker-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: 0 auto;
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+.emoji-picker-option:hover {
+  background: var(--border);
+}
+
+/* Card's own image shown in the detail modal */
+.card-modal-image-link {
+  display: block;
+  margin-bottom: 16px;
+}
+.card-modal-image {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+/* Image in a posted comment */
+.comment-image-link {
+  display: inline-block;
+  margin-top: 6px;
+}
+.comment-image {
+  max-width: 240px;
+  max-height: 240px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+/* Pending image preview in the composer */
+.comment-image-preview {
+  position: relative;
+  display: inline-block;
+  margin-top: 2px;
+}
+.comment-image-preview img {
+  max-width: 160px;
+  max-height: 160px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+.comment-image-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.comment-image-remove:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.comment-upload-disclaimer {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  opacity: 0.8;
+  margin: 0;
+}
+
+.comment-upload-status {
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  margin: 0;
+}
+.comment-upload-status--error {
+  color: #ef4444;
+}
+
+/* ── Guild layout: sidebar + main ── */
+.dash-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px 0 8px 8px;
+}
+
+.dash-layout .dashboard-main {
+  overflow-y: auto;
+}
+
+/* ── Scroll-fade: scrollbar hidden at rest, fades in while scrolling ── */
+.dash-sidebar,
+.dashboard-main {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.dash-sidebar::-webkit-scrollbar,
+.dashboard-main::-webkit-scrollbar {
+  width: 5px;
+}
+
+.dash-sidebar::-webkit-scrollbar-track,
+.dashboard-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dash-sidebar::-webkit-scrollbar-thumb,
+.dashboard-main::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background: transparent;
+  transition: background 0.4s ease;
+}
+
+.dash-sidebar.is-scrolling::-webkit-scrollbar-thumb,
+.dashboard-main.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dash-sidebar.is-scrolling,
+.dashboard-main.is-scrolling {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+/* ── Sidebar ── */
+.dash-sidebar {
+  width: 216px;
+  flex-shrink: 0;
+  padding: 16px 10px 24px;
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* keep rows at natural height; sidebar scrolls instead of squashing them */
+.dash-sidebar > * {
+  flex-shrink: 0;
+}
+
+.sidebar-section-label {
+  font-family: var(--fantasy);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted, #888);
+  padding: 14px 10px 4px;
+  margin: 0;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: var(--sans);
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-item:hover {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.sidebar-item.active {
+  position: relative;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sidebar-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 2.5px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.sidebar-item-icon {
+  font-size: 14px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.sidebar-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.sidebar-item-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-h);
+}
+
+.sidebar-guild-icon {
+  flex-shrink: 0;
+}
+
+.sidebar-create-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: none;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--sans);
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.sidebar-create-btn:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+/* ── Guild Icon ── */
+.guild-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--guild-color, var(--accent)) 68%, #fff),
+    var(--guild-color, var(--accent))
+  );
+  color: #fff;
+  font-family: var(--fantasy);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  flex-shrink: 0;
+  line-height: 1;
+  user-select: none;
+  box-shadow:
+    0 2px 8px -2px color-mix(in srgb, var(--guild-color, var(--accent)) 65%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.guild-icon--md {
+  width: 36px;
+  height: 36px;
+  font-size: 17px;
+  border-radius: 9px;
+}
+
+.guild-icon--lg {
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+  border-radius: 12px;
+}
+
+/* ── Guild context header (shown above guild boards) ── */
+.guild-context-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--guild-color, var(--accent)) 7%, var(--code-bg));
+  border: 1px solid color-mix(in srgb, var(--guild-color, var(--accent)) 22%, var(--border));
+  box-shadow: 0 4px 20px -8px color-mix(in srgb, var(--guild-color, var(--accent)) 35%, transparent);
+}
+
+.guild-context-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.guild-context-name {
+  font-family: var(--fantasy);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-h);
+  margin: 0 0 4px;
+  line-height: 1.1;
+}
+
+.guild-context-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.guild-context-actions {
+  margin-left: auto;
+}
+
+/* ── Guild chip on board tiles ── */
+.board-tile-guild-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--fantasy);
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  line-height: 1;
+}
+
+.board-tile-guild-chip::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--chip-color, #aa3bff);
+  flex-shrink: 0;
+}
+
+/* ── Create Alliance modal ── */
+.guild-modal {
+  max-width: 420px;
+}
+
+.guild-modal-title {
+  font-family: var(--fantasy);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-h);
+  margin: 0;
+}
+
+.guild-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.guild-field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.guild-modal-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+/* ── Guild color picker (create + settings) ── */
+.guild-color-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.guild-color-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--swatch) 68%, #fff),
+    var(--swatch)
+  );
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.guild-color-swatch:hover {
+  transform: scale(1.12);
+}
+
+.guild-color-swatch.active {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px color-mix(in srgb, var(--swatch) 70%, var(--accent)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ── Guild preview chip inside create modal ── */
+.guild-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+}
+
+.guild-preview-name {
+  font-family: var(--fantasy);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-h);
+}
+
+/* ── Guild settings modal ── */
+.guild-settings-modal {
+  max-width: 480px;
+}
+
+.guild-settings-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 24px 0;
+}
+
+.guild-settings-sub {
+  font-size: 13px;
+  color: var(--text);
+  margin: 3px 0 0;
+}
+
+.guild-settings-tabs {
+  display: flex;
+  padding: 12px 24px 0;
+  border-bottom: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.guild-settings-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: var(--sans);
+  color: var(--text);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.guild-settings-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.guild-settings-tab:hover:not(.active) {
+  color: var(--text-h);
+}
+
+.guild-settings-body {
+  padding: 18px 24px 24px;
+}
+
+/* ── Guild add member form ── */
+.guild-add-form {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.guild-add-input {
+  flex: 1;
+  font-size: 13px;
+  padding: 7px 10px;
+}
+
+.guild-add-form .btn-primary {
+  padding: 7px 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* ── Guild member list ── */
+.guild-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.guild-member-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  transition: background 0.12s;
+}
+
+.guild-member-item:hover {
+  background: var(--code-bg);
+}
+
+.guild-member-avatar {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 13px !important;
+  flex-shrink: 0;
+}
+
+.guild-member-name {
+  flex: 1;
+  font-size: 13.5px;
+  color: var(--text-h);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guild-member-role {
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: var(--fantasy);
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  background: var(--accent-bg);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.guild-member-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #888);
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  line-height: 1;
+  transition: color 0.12s, background 0.12s;
+}
+
+.guild-member-remove:hover {
+  color: var(--ember, #e2552b);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ── Guild settings form ── */
+.guild-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.guild-settings-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.guild-settings-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guild-settings-confirm p {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0;
+}
+
+/* ── Mobile: sidebar collapses to a top strip ── */
+@media (max-width: 640px) {
+  .dash-layout {
+    flex-direction: column;
+  }
+
+  .dash-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .sidebar-section-label {
+    display: none;
+  }
+
+  .sidebar-item {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 12.5px;
+  }
+
+  .sidebar-create-btn {
+    flex-shrink: 0;
+    margin-top: 0;
+    white-space: nowrap;
+  }
+}
+
+/* ── Dashboard topbar: breadcrumb+title left, search+bell right ── */
+.dashboard-shell .topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: auto;
+  min-height: 72px;
+  padding: 14px 28px;
+}
+
+.dashboard-shell .topbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+}
+
+.topbar-breadcrumb {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text);
+  opacity: 0.5;
+  margin: 0;
+  font-family: var(--fantasy);
+}
+
+.topbar-page-title {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-shell .topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-searchbar-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 100px;
+  transition: width 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s ease,
+              background 0.2s ease;
+}
+
+.dash-searchbar-wrap.open {
+  width: 240px;
+  box-shadow: 0 0 0 1px var(--accent);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dash-search-icon-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.dash-search-icon-btn:hover {
+  background: rgba(170, 59, 255, 0.14);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dash-searchbar-wrap.open .dash-search-icon-btn {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
+}
+
+.dash-searchbar-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0 12px 0 6px;
+  font-size: 13px;
+  color: var(--text-h);
+  font-family: var(--sans);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s 0.18s;
+}
+
+.dash-searchbar-wrap.open .dash-searchbar-input {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@keyframes search-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.dash-search-cursor {
+  position: absolute;
+  left: 42px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+  animation: search-cursor-blink 1.1s ease-in-out infinite;
+}
+
+/* ── Day / Night mode toggle ── */
+.dash-mode-toggle {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dash-mode-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+.dash-mode-toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Notification bell + dropdown ── */
+.topbar-notif-wrap {
+  position: relative;
+}
+
+.topbar-notif-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  padding: 6px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  &:hover {
+    color: var(--text-h);
+    background: var(--code-bg);
+  }
+}
+
+.notif-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 100px;
+  background: #d9372a;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--sans);
+  line-height: 14px;
+  text-align: center;
+  padding: 0 3px;
+  pointer-events: none;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: auto;
+  right: 0;
+  width: min(320px, calc(100vw - 32px));
+  background: var(--column-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px -4px rgba(0,0,0,0.5);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.notif-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notif-dropdown-title {
+  font-family: var(--fantasy);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-h);
+}
+
+.notif-read-all-btn {
+  font-size: 11px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--sans);
+  padding: 0;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+
+  &:hover { opacity: 1; }
+}
+
+.notif-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.notif-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.55;
+}
+
+.notif-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: rgba(255,255,255,0.03); }
+}
+
+.notif-item--read {
+  opacity: 0.5;
+}
+
+.notif-item-sigil {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(170, 59, 255, 0.15);
+  border: 1px solid rgba(170, 59, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.notif-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-item-text {
+  font-size: 13px;
+  color: var(--text-h);
+  line-height: 1.45;
+  margin: 0 0 4px;
+}
+
+.notif-item-time {
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.55;
+  margin: 0 0 8px;
+}
+
+.notif-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.notif-accept-btn {
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: var(--sans);
+  background: rgba(170, 59, 255, 0.18);
+  border: 1px solid rgba(170, 59, 255, 0.4);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+
+  &:hover {
+    background: rgba(170, 59, 255, 0.28);
+    border-color: var(--accent);
+  }
+}
+
+.notif-decline-btn {
+  font-size: 11.5px;
+  font-weight: 500;
+  font-family: var(--sans);
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+
+  &:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-h);
+  }
+}
+
+/* ── Sidebar guild row with invite button ── */
+.sidebar-guild-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.sidebar-guild-row .sidebar-item--guild {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-guild-invite-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.sidebar-guild-row:hover .sidebar-guild-invite-btn {
+  opacity: 1;
+}
+
+.sidebar-guild-invite-btn:hover {
+  background: rgba(170, 59, 255, 0.14);
+  color: var(--accent);
+}
+
+.sidebar-guild-manage-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.sidebar-guild-row:hover .sidebar-guild-manage-btn {
+  opacity: 1;
+}
+
+.sidebar-guild-manage-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-h);
+}
+
+/* ── Guild context header invite button ── */
+.guild-context-members {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding-left: 9px;
+  margin-left: auto;
+}
+
+.guild-context-avatar {
+  width: 30px;
+  height: 30px;
+  margin-left: -9px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: color-mix(in srgb, var(--guild-color, var(--accent)) 30%, #1e1b2e);
+  border: 2px solid color-mix(in srgb, var(--guild-color, var(--accent)) 20%, var(--bg));
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  user-select: none;
+  overflow: hidden;
+  transition: transform 0.15s, z-index 0s;
+
+  &:hover {
+    transform: translateY(-2px);
+    z-index: 10;
+  }
+}
+
+.guild-context-avatar--more {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: var(--border);
+  font-size: 10px;
+  color: var(--text);
+}
+
+.guild-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+}
+
+.guild-invite-trigger-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--guild-color, var(--accent)) 40%, transparent);
+  background: color-mix(in srgb, var(--guild-color, var(--accent)) 10%, transparent);
+  color: var(--guild-color, var(--accent));
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: color-mix(in srgb, var(--guild-color, var(--accent)) 18%, transparent);
+    border-color: var(--guild-color, var(--accent));
+  }
+}
+
+/* ── Guild invite modal ── */
+.guild-invite-desc {
+  font-size: 13.5px;
+  color: var(--text);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.guild-invite-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guild-invite-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0 8px;
+  text-align: center;
+}
+
+.guild-invite-sent-icon {
+  font-size: 28px;
+  color: var(--accent);
+  display: block;
+  animation: pulse-glow 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { text-shadow: 0 0 8px var(--accent); opacity: 1; }
+  50%       { text-shadow: 0 0 20px var(--accent); opacity: 0.8; }
+}
+
+.guild-invite-sent-text {
+  font-family: var(--fantasy);
+  font-size: 18px;
+  color: var(--text-h);
+  letter-spacing: 0.04em;
+}
+
+.guild-invite-sent-sub {
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.65;
+  margin: 0 0 12px;
+}
+
+/* ── Hero card ── */
+.dash-hero-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.045) 0%,
+    rgba(255, 255, 255, 0.015) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 40px 44px;
+  margin-bottom: 44px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Celestial corner filigree (top-left of the hero card) ── */
+.dash-hero-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 150px;
+  height: 150px;
+  pointer-events: none;
+  color: var(--star, #d8dfe9);
+}
+/* keep the real content above the ornament */
+.dash-hero-left,
+.dash-hero-art { position: relative; }
+
+.dhc-line {
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.72;
+}
+.dhc-line--faint { opacity: 0.38; }
+
+.dhc-arc {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-dasharray: 1.5 5;
+  opacity: 0.45;
+}
+
+.dhc-star { fill: currentColor; opacity: 0.92; }
+.dhc-star--lg {
+  opacity: 1;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 80%, transparent));
+}
+
+.dhc-dot { fill: currentColor; opacity: 0.78; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .dhc-star--lg { animation: dhc-twinkle 7s ease-in-out infinite; }
+}
+/* bright at rest; the glow gradually spreads out, then eases back in.
+   Every stop keeps exactly two drop-shadow() functions so the filter list
+   interpolates continuously (mismatched counts would snap instead). */
+@keyframes dhc-twinkle {
+  0%, 50%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 80%, transparent))
+            drop-shadow(0 0 0 transparent);
+  }
+  62% {
+    filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 88%, transparent))
+            drop-shadow(0 0 9px color-mix(in srgb, currentColor 35%, transparent));
+  }
+  72% {
+    filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 95%, transparent))
+            drop-shadow(0 0 14px color-mix(in srgb, currentColor 55%, transparent));
+  }
+  80% {
+    filter: drop-shadow(0 0 9px color-mix(in srgb, currentColor 100%, transparent))
+            drop-shadow(0 0 18px color-mix(in srgb, currentColor 70%, transparent));
+  }
+  88% {
+    filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 95%, transparent))
+            drop-shadow(0 0 14px color-mix(in srgb, currentColor 55%, transparent));
+  }
+  94% {
+    filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 88%, transparent))
+            drop-shadow(0 0 9px color-mix(in srgb, currentColor 35%, transparent));
+  }
+}
+
+.dash-hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    65% 100% at 5% 30%,
+    color-mix(in srgb, var(--accent) 14%, transparent),
+    transparent 65%
+  );
+  pointer-events: none;
+}
+
+.dash-hero-left {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 820px) {
+  .dash-hero-card { padding: 28px 28px; }
+}
+
+/* ── Hero stats trigger (opens the Cosmic Activity page) ── */
+.hero-stats-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, transform 0.18s;
+}
+.hero-stats-trigger:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  transform: translateY(-1px);
+}
+.hero-stat-streak { display: inline-flex; align-items: center; gap: 6px; }
+.hero-stat-streak strong { color: var(--text-h); font-weight: 700; }
+.hero-stat-flame {
+  width: 15px;
+  height: 15px;
+  color: #ff8a3d;
+  filter: drop-shadow(0 0 5px rgba(255, 138, 61, 0.55));
+}
+.hero-stat-sep { color: var(--text-dim, rgba(255, 255, 255, 0.3)); }
+.hero-stat-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.hero-stat-link svg { width: 14px; height: 14px; transition: transform 0.2s; }
+.hero-stats-trigger:hover .hero-stat-link svg { transform: translateX(2px); }
+
+/* — Activity feed (rows reused in the Cosmic Activity page) — */
+.cosmic-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cosmic-activity-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 13.5px;
+  color: var(--text);
+}
+.cosmic-activity-item:last-child { border-bottom: none; }
+
+.cosmic-activity-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.cosmic-activity-icon svg { width: 15px; height: 15px; }
+.cosmic-activity-icon--board { color: #d8b65a; background: rgba(216, 182, 90, 0.14); }
+.cosmic-activity-icon--guild { color: #6fb1ff; background: rgba(111, 177, 255, 0.14); }
+/* board deletions read in a danger hue, overriding the gold board tint above */
+.cosmic-activity-icon--deleted { color: #ff7a7a; background: rgba(255, 122, 122, 0.14); }
+
+.cosmic-activity-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cosmic-activity-text strong { color: var(--text-h); font-weight: 600; }
+
+.cosmic-activity-time {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-dim, rgba(255, 255, 255, 0.4));
+  opacity: 0.7;
+}
+.cosmic-activity-empty {
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--text-dim, rgba(255, 255, 255, 0.45));
+  font-style: italic;
+}
+
+/* ── Cosmic Activity page (full-screen overlay opened from the hero) ── */
+.cosmic-page-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 8, 18, 0.72);
+  backdrop-filter: blur(6px);
+}
+.cosmic-page {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: min(82vh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, #15131f 0%, #0e0d16 100%);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: 0 30px 80px -16px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+}
+.cosmic-page-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.cosmic-page-close:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-h); }
+
+.cosmic-page-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  flex: 1;
+  min-height: 0;
+}
+@media (max-width: 680px) {
+  .cosmic-page-grid { grid-template-columns: 1fr; }
+}
+
+.cosmic-page-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 16px;
+}
+
+.cosmic-page-streak {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 34px 24px;
+  border-right: 1px solid var(--border);
+  background: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%);
+}
+@media (max-width: 680px) {
+  .cosmic-page-streak { border-right: none; border-bottom: 1px solid var(--border); padding: 26px 24px; }
+}
+.cosmic-page-best {
+  margin-top: 14px;
+  font-size: 11.5px;
+  color: var(--text-dim, rgba(255, 255, 255, 0.45));
+}
+
+.cosmic-page-feed {
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cosmic-page-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.cosmic-page-list {
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 8px;
+  /* native scrollbar hidden — replaced by the custom GSAP overlay thumb */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.cosmic-page-list::-webkit-scrollbar { width: 0; height: 0; }
+
+.cosmic-page-scrollthumb {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  width: 5px;
+  height: 0;
+  border-radius: 99px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 65%, #fff), var(--accent));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 45%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, height;
+}
+
+/* — Streak (shown inside the Cosmic Activity page) — */
+.streak-flame {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #ff8a3d;
+  background: radial-gradient(circle at 50% 65%, rgba(255, 138, 61, 0.28), rgba(255, 138, 61, 0.05) 70%);
+  box-shadow: 0 0 26px rgba(255, 138, 61, 0.28), inset 0 0 0 1px rgba(255, 138, 61, 0.3);
+  margin-bottom: 6px;
+}
+.streak-flame svg {
+  width: 32px;
+  height: 32px;
+  filter: drop-shadow(0 0 6px rgba(255, 138, 61, 0.6));
+  animation: streak-flicker 2.4s ease-in-out infinite;
+}
+@keyframes streak-flicker {
+  0%, 100% { transform: scale(1); opacity: 0.92; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+.streak-count {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--text-h);
+}
+.streak-label {
+  font-size: 12.5px;
+  color: var(--text-dim, rgba(255, 255, 255, 0.5));
+  margin-top: 2px;
+}
+.streak-dots {
+  display: flex;
+  gap: 7px;
+  margin-top: 14px;
+}
+.streak-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.36);
+  transition: background 0.3s, box-shadow 0.3s, transform 0.3s;
+}
+.streak-dot--on {
+  background: radial-gradient(circle at 50% 32%, #ffb15a, #ff7a2e);
+  box-shadow: 0 0 10px rgba(255, 138, 61, 0.7), inset 0 0 0 1px rgba(255, 205, 155, 0.65);
+  transform: scale(1.18);
+}
+
+/* ── Voyager's Log: milestone tracker + quick stats + cosmic rank ── */
+.streak-extras {
+  width: 100%;
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 22px;
+}
+
+.streak-milestone-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 7px;
+}
+.streak-milestone-eyebrow,
+.voyager-log-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim, rgba(255, 255, 255, 0.5));
+}
+.streak-milestone-target {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.streak-milestone-bar {
+  height: 6px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+}
+.streak-milestone-fill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #ffb15a, #ff7a2e);
+  box-shadow: 0 0 10px rgba(255, 138, 61, 0.5);
+}
+.streak-milestone-note {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--text);
+}
+
+.voyager-log-eyebrow {
+  display: block;
+  margin-bottom: 10px;
+}
+.voyager-stats {
+  display: flex;
+  gap: 8px;
+}
+.voyager-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.voyager-stat-num {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--text-h);
+}
+.voyager-stat-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim, rgba(255, 255, 255, 0.45));
+}
+
+.cosmic-rank {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 15px;
+  border-radius: 99px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+.cosmic-rank-glyph {
+  color: var(--accent);
+  font-size: 12px;
+}
+.cosmic-rank-name {
+  font-family: var(--fantasy);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  color: var(--text-h);
+}
+
+/* daylight tweaks for the log surfaces */
+.dashboard-shell--day .streak-milestone-bar { background: rgba(120, 80, 20, 0.14); }
+.dashboard-shell--day .voyager-stat {
+  background: rgba(255, 250, 236, 0.6);
+  border: 1px solid rgba(170, 130, 60, 0.26);
+}
+@media (prefers-reduced-motion: reduce) {
+  .streak-flame svg { animation: none; }
+}
+
+/* ── Sidebar user section at bottom ── */
+.sidebar-bottom {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+  outline: none;
+
+  &:hover, &:focus-visible {
+    background: var(--accent-bg);
+  }
+}
+
+.sidebar-user-avatar {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 13px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.sidebar-user-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #e8a820;
+}
+
+.sidebar-bottom-actions {
+  display: flex;
+  gap: 2px;
+  padding: 0 6px;
+}
+
+.sidebar-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+
+  &:hover {
+    color: var(--text-h);
+    background: var(--accent-bg);
+  }
+}
+
+/* ── Sidebar user profile (top of sidebar) ── */
+.sidebar-profile {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 0 0 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  outline: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+
+  &:hover, &:focus-visible {
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.sidebar-profile-avatar {
+  width: 44px !important;
+  height: 44px !important;
+  font-size: 18px !important;
+  border-radius: 50% !important;
+  border: 2px solid var(--accent) !important;
+  flex-shrink: 0;
+}
+
+.sidebar-profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 10px;
+}
+
+.sidebar-profile-username {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+
+/* ── Sidebar footer (Settings + Log Out) ── */
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar-footer::before {
+  content: '';
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  margin: 0 4px 10px;
+}
+
+.sidebar-footer-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: var(--sans);
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+
+  &:hover {
+    background: var(--accent-bg);
+    color: var(--text-h);
+  }
+
+  svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+}
+
+.sidebar-footer-item--logout:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+
+  svg { opacity: 1; }
+}
+
+/* ── Board section headers (My Boards / Shared with me) ── */
+.board-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  margin-top: 20px;
+}
+
+.board-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.board-section-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.board-section-badge--teal {
+  background: #0ea5e9;
+}
+
+/* ── Board view toggle (swap icon, lives inline in the section title) ── */
+.board-section-title {
+  overflow: visible; /* let tooltip escape the flex container */
+}
+
+.board-view-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.board-view-toggle:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* hover tooltip */
+.bvt-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(5px);
+  white-space: nowrap;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 11px;
+  font-family: var(--sans);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  z-index: 20;
+}
+
+.board-view-toggle:hover .bvt-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* spinning icon on click */
+@keyframes bvt-icon-spin {
+  0%   { transform: rotate(0deg) scale(1); opacity: 1; }
+  45%  { transform: rotate(180deg) scale(0.65); opacity: 0.25; }
+  100% { transform: rotate(360deg) scale(1); opacity: 1; }
+}
+
+.board-view-toggle--flipping {
+  pointer-events: none;
+}
+
+.board-view-toggle--flipping svg {
+  animation: bvt-icon-spin 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ── Board grid fade on view switch ── */
+.board-grid-wrap {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.board-grid-wrap--fading {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+/* ── Board tile arrow ── */
+.board-tile-arrow {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 3;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+  transition: color 0.15s, transform 0.15s;
+  line-height: 1;
+
+  .board-tile:hover & {
+    color: rgba(255, 255, 255, 0.9);
+    transform: translateX(3px);
+  }
+}
+
+/* ── Hero username italic highlight ── */
+.dash-hero-username {
+  color: var(--accent);
+  font-style: italic;
+}
+
+.dash-hero-cta {
+  color: var(--text-h);
+  font-style: italic;
+  opacity: 0.9;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   NIGHT SKY · ASTROLOGY THEME
+   A fixed near-black palette scoped to the dashboard. Redefining the theme
+   tokens here recolors every descendant (buttons, tiles, sidebar, modals)
+   into a silver-on-void register without touching their rules.
+   ════════════════════════════════════════════════════════════════════ */
+.dashboard-shell {
+  --text: #868c9b;            /* cool grey body */
+  --text-h: #e6e9f2;          /* silver-white headings */
+  --bg: #06070b;              /* near-black void */
+  --border: rgba(168, 178, 200, 0.10);
+  --code-bg: rgba(255, 255, 255, 0.035);
+  --accent: #828da3;          /* muted steel — primary actions */
+  --accent-bg: rgba(130, 141, 163, 0.13);
+  --accent-border: rgba(130, 141, 163, 0.42);
+  --social-bg: rgba(255, 255, 255, 0.025);
+  --metal: #c7cedd;
+  --metal-deep: #8b94a3;
+  --star: #d8dde8;            /* silver starlight — zodiac + accents */
+  --shadow:
+    rgba(0, 0, 0, 0.6) 0 10px 24px -6px, rgba(0, 0, 0, 0.4) 0 4px 12px -4px;
+  color: var(--text);
+
+  /* near-black gradient; the canvas paints silver stars + faint haze on top */
+  background-color: #06070b;
+  background-image:
+    radial-gradient(120% 80% at 50% -12%, #11141d 0%, transparent 58%),
+    radial-gradient(100% 70% at 84% 6%, rgba(28, 34, 48, 0.6) 0%, transparent 62%),
+    linear-gradient(180deg, #0a0c12 0%, #070809 56%, #040406 100%);
+  background-size: auto;
+  background-position: center;
+}
+
+/* the old pegboard-grid + aurora pseudo glows are replaced by the canvas */
+.dashboard-shell::before,
+.dashboard-shell::after { display: none; }
+
+/* full-bleed star canvas behind all content */
+.starfield-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* a soft full-screen veil that cross-fades between day and night (GSAP-driven) */
+.mode-fx {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 200;
+  will-change: opacity;
+}
+
+/* lift the actual UI above the canvas */
+.dashboard-shell > .topbar,
+.dashboard-shell > .dash-layout { position: relative; z-index: 1; }
+
+/* ── Hero card: a pane of black glass under the stars ── */
+.dashboard-shell .dash-hero-card {
+  background: linear-gradient(
+    135deg,
+    rgba(28, 32, 42, 0.5) 0%,
+    rgba(12, 14, 20, 0.36) 100%
+  );
+  border: 1px solid rgba(184, 194, 214, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 50px -24px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px) saturate(108%);
+}
+.dashboard-shell .dash-hero-card::before {
+  display: block;
+  background: radial-gradient(
+    70% 120% at 6% 24%,
+    rgba(180, 190, 214, 0.10),
+    transparent 62%
+  );
+}
+.dashboard-shell .dash-hero-eyebrow {
+  color: var(--star);
+  opacity: 0.7;
+  letter-spacing: 0.3em;
+}
+.dashboard-shell .dash-hero-username { color: var(--star); }
+
+/* ── Section title gets a small silver star ── */
+.dashboard-shell .board-section-title::before {
+  content: '✦';
+  margin-right: 10px;
+  color: var(--star);
+  font-size: 0.78em;
+  vertical-align: 1px;
+  opacity: 0.7;
+  text-shadow: 0 0 12px rgba(216, 221, 232, 0.4);
+}
+
+/* ── Sidebar / topbar: smoked glass rail over the void ── */
+.dashboard-shell .dash-sidebar {
+  background: linear-gradient(180deg, rgba(12, 14, 20, 0.78) 0%, rgba(6, 7, 11, 0.66) 100%);
+  border-right: 1px solid rgba(168, 178, 200, 0.09);
+  backdrop-filter: blur(10px) saturate(110%);
+}
+.dashboard-shell .sidebar-item.active {
+  background: linear-gradient(135deg, rgba(150, 160, 184, 0.16), rgba(150, 160, 184, 0.05));
+  box-shadow: inset 0 0 0 1px rgba(168, 178, 200, 0.22);
+}
+.dashboard-shell .sidebar-item.active::before {
+  background: var(--star);
+  box-shadow: 0 0 10px rgba(216, 221, 232, 0.7);
+}
+.dashboard-shell .sidebar-section-label {
+  color: rgba(190, 200, 220, 0.78);
+  letter-spacing: 0.22em;
+}
+/* breadcrumb + page title read clearly against the void */
+.dashboard-shell .topbar-breadcrumb {
+  color: rgba(198, 206, 224, 0.82);
+  opacity: 1;
+}
+
+/* search field + notif button + mode toggle as starlit glass pills */
+.dashboard-shell .dash-searchbar-wrap,
+.dashboard-shell .topbar-notif-btn,
+.dashboard-shell .dash-mode-toggle {
+  background: rgba(16, 18, 26, 0.55);
+  border: 1px solid rgba(168, 178, 200, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+/* ── Board tiles: dark constellation tomes, color is just a faint hint ── */
+/* GSAP drives the entrance now, so retire the CSS keyframe to avoid a clash */
+.dashboard-shell .board-tile { animation: none; }
+.dashboard-shell .board-tile {
+  background:
+    linear-gradient(160deg,
+      color-mix(in srgb, var(--tile) 14%, rgba(9, 10, 15, 0.94)) 0%,
+      rgba(6, 7, 11, 0.96) 80%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 1px rgba(0, 0, 0, 0.5),
+    0 18px 38px -16px rgba(0, 0, 0, 0.75);
+}
+.dashboard-shell .board-tile:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px color-mix(in srgb, var(--tile) 40%, transparent),
+    0 0 26px -6px color-mix(in srgb, var(--tile) 32%, transparent),
+    0 26px 48px -18px rgba(0, 0, 0, 0.85);
+}
+
+.dashboard-shell .board-tile--create {
+  background: rgba(12, 14, 20, 0.45);
+  border: 1px dashed rgba(168, 178, 200, 0.26);
+}
+.dashboard-shell .board-tile--create:hover {
+  border-color: rgba(216, 221, 232, 0.5);
+  box-shadow: 0 0 24px -8px rgba(216, 221, 232, 0.3);
+}
+
+/* primary buttons read as moonlit steel with a soft halo */
+.dashboard-shell .btn-primary {
+  box-shadow: 0 6px 18px -8px rgba(150, 162, 186, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-shell .dash-hero-card { backdrop-filter: none; }
+}
+
+/* ── Hero cosmic orrery: ringed planet, orbiting moons, zodiac wheel ── */
+.dash-hero-art {
+  position: relative;
+  flex: 0 0 auto;
+  width: 196px;
+  height: 196px;
+  align-self: center;
+  margin-right: -8px;
+  pointer-events: none;
+}
+.dash-hero-art-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  /* fade the outer wheel into the card so it doesn't read as a hard disc */
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 96%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 60%, transparent 96%);
+}
+
+.hero-wheel {
+  fill: none;
+  stroke: rgba(216, 221, 232, 0.16);
+  stroke-width: 0.6;
+  stroke-dasharray: 1 4;
+}
+.hero-wheel-ticks line {
+  stroke: rgba(216, 221, 232, 0.3);
+  stroke-width: 1;
+}
+.hero-orbit-path {
+  fill: none;
+  stroke: rgba(216, 221, 232, 0.12);
+  stroke-width: 0.6;
+}
+.hero-moon {
+  fill: #e8edf5;
+  filter: drop-shadow(0 0 3px rgba(216, 221, 232, 0.9));
+}
+.hero-moon--sm { fill: #c6cedd; }
+.hero-ring {
+  fill: none;
+  stroke: rgba(220, 226, 238, 0.55);
+  stroke-width: 1.4;
+}
+.hero-ring--back { opacity: 0.45; }
+.hero-band {
+  fill: none;
+  stroke: rgba(54, 60, 74, 0.55);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+.hero-spark { fill: rgba(232, 237, 246, 0.85); }
+
+/* day body — the sun (revealed in light mode via GSAP) */
+.hero-sun-group { visibility: hidden; }
+.hero-sun {
+  filter: drop-shadow(0 0 10px rgba(255, 180, 70, 0.85));
+}
+.hero-ray {
+  stroke: #f9b53e;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px rgba(255, 180, 70, 0.7));
+}
+
+.hero-orbit,
+.hero-wheel-ticks {
+  transform-box: view-box;
+  transform-origin: 100px 100px;
+}
+.hero-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-orbit--a   { animation: hero-spin 54s linear infinite; }
+  .hero-orbit--b   { animation: hero-spin 34s linear infinite reverse; }
+  .hero-wheel-ticks { animation: hero-spin 170s linear infinite; }
+  .hero-spark      { animation: hero-twinkle 3.4s ease-in-out infinite; }
+  .hero-spark--2   { animation-delay: 1.1s; }
+  .hero-spark--3   { animation-delay: 2.2s; }
+}
+
+@keyframes hero-spin { to { transform: rotate(360deg); } }
+@keyframes hero-twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50%      { opacity: 0.9; transform: scale(1.12); }
+}
+
+@media (max-width: 760px) {
+  .dash-hero-art { display: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DAY · SOLAR THEME
+   The dashboard's light mode. Redefining the same scoped tokens flips the
+   whole realm from a silver-on-void night sky to a warm, sunlit day, while
+   the hero swaps its ringed planet for the sun (handled in JS via GSAP).
+   ════════════════════════════════════════════════════════════════════ */
+.dashboard-shell--day {
+  --text: #6f5a3a;            /* warm taupe body */
+  --text-h: #2b2012;          /* deep espresso headings */
+  --text-dim: rgba(90, 70, 40, 0.42);
+  --bg: #fdf4e3;              /* warm cream */
+  --border: rgba(150, 110, 50, 0.20);
+  --code-bg: rgba(255, 224, 170, 0.38);
+  --accent: #e08b1e;          /* warm amber sun — primary actions */
+  --accent-bg: rgba(224, 139, 30, 0.15);
+  --accent-border: rgba(224, 139, 30, 0.5);
+  --social-bg: rgba(255, 210, 140, 0.18);
+  --metal: #c69a4e;           /* warm brass */
+  --metal-deep: #9a7327;
+  --star: #d98e26;            /* sun-gold for filigree + accents */
+  --shadow:
+    rgba(120, 80, 20, 0.2) 0 10px 24px -6px, rgba(120, 80, 20, 0.12) 0 4px 12px -4px;
+  color: var(--text);
+
+  /* a hazy golden-hour sky — a muted dusty blue up top settling into warm
+     amber sand, dimmed so it never blows out to white and the gold stars
+     still read; a soft corona glows top-right where the hero sun sits */
+  background-color: #ddc8a1;
+  background-image:
+    radial-gradient(88% 66% at 82% -8%, rgba(244, 188, 104, 0.7) 0%, rgba(232, 196, 140, 0.28) 32%, transparent 62%),
+    radial-gradient(120% 82% at 16% 122%, rgba(206, 168, 118, 0.4) 0%, transparent 58%),
+    linear-gradient(180deg, #a9b6bb 0%, #c7bda2 38%, #d8c8a1 70%, #dfcca2 100%);
+}
+
+/* the starfield stays lit by day too — it just repaints in warm gold (see
+   Starfield.jsx), so the interstellar sky carries through both modes */
+
+/* ── Hero card: a pane of warm, sunlit glass ── */
+.dashboard-shell--day .dash-hero-card {
+  background: linear-gradient(135deg, rgba(252, 244, 226, 0.58) 0%, rgba(243, 229, 200, 0.4) 100%);
+  border: 1px solid rgba(180, 142, 76, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 250, 235, 0.5),
+    0 18px 50px -24px rgba(120, 88, 32, 0.4);
+}
+.dashboard-shell--day .dash-hero-card::before {
+  background: radial-gradient(70% 120% at 6% 24%, rgba(244, 190, 110, 0.22), transparent 62%);
+}
+
+/* ── Sidebar / topbar: frosted parchment over the day sky ── */
+.dashboard-shell--day .dash-sidebar {
+  background: linear-gradient(180deg, rgba(248, 240, 224, 0.8) 0%, rgba(240, 228, 204, 0.68) 100%);
+  border-right: 1px solid rgba(160, 120, 50, 0.16);
+}
+.dashboard-shell--day .sidebar-item.active {
+  background: linear-gradient(135deg, rgba(224, 139, 30, 0.18), rgba(224, 139, 30, 0.05));
+  box-shadow: inset 0 0 0 1px rgba(200, 150, 60, 0.3);
+}
+/* the profile card gets a warm raised panel so it reads on the cream sidebar */
+.dashboard-shell--day .sidebar-profile {
+  background: rgba(255, 250, 236, 0.62);
+  border: 1px solid rgba(170, 130, 60, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 4px 14px -10px rgba(120, 88, 32, 0.5);
+}
+.dashboard-shell--day .sidebar-profile:hover,
+.dashboard-shell--day .sidebar-profile:focus-visible {
+  background: rgba(255, 250, 236, 0.82);
+}
+.dashboard-shell--day .sidebar-section-label { color: rgba(90, 64, 24, 0.85); }
+.dashboard-shell--day .topbar-breadcrumb { color: rgba(96, 70, 30, 0.85); opacity: 1; }
+
+.dashboard-shell--day .dash-searchbar-wrap,
+.dashboard-shell--day .topbar-notif-btn,
+.dashboard-shell--day .dash-mode-toggle {
+  background: rgba(255, 250, 238, 0.7);
+  border: 1px solid rgba(160, 120, 50, 0.22);
+}
+
+/* ── Board tiles: warm, sunlit cards ── */
+.dashboard-shell--day .board-tile {
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--tile) 24%, #fffaf0) 0%,
+    color-mix(in srgb, var(--tile) 8%, #fdf3e0) 82%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 1px 1px rgba(150, 110, 40, 0.12),
+    0 18px 38px -16px rgba(150, 110, 40, 0.3);
+}
+.dashboard-shell--day .board-tile:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 1px color-mix(in srgb, var(--tile) 50%, transparent),
+    0 0 26px -6px color-mix(in srgb, var(--tile) 42%, transparent),
+    0 26px 48px -18px rgba(150, 110, 40, 0.4);
+}
+.dashboard-shell--day .board-tile--create {
+  background: rgba(255, 248, 232, 0.5);
+  border: 1px dashed rgba(160, 120, 50, 0.42);
+}
+.dashboard-shell--day .board-tile-title {
+  color: #2b2012;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+.dashboard-shell--day .board-tile-meta {
+  color: rgba(70, 52, 22, 0.85);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+/* the constellation reads as fine ink lines + golden stars on the light card */
+.dashboard-shell--day .board-tile-zodiac-line {
+  stroke: rgba(120, 80, 20, 0.5);
+  animation: none;
+}
+.dashboard-shell--day .board-tile-zodiac-star {
+  fill: #b5791f;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tile) 80%, #fff));
+}
+
+/* ── Hero orrery re-tinted for daylight — kept deep enough to read clearly
+   against the bright sky (sun body handled by its own gradient) ── */
+.dashboard-shell--day .hero-wheel { stroke: rgba(120, 84, 26, 0.5); }
+.dashboard-shell--day .hero-wheel-ticks line { stroke: rgba(112, 78, 22, 0.72); }
+.dashboard-shell--day .hero-orbit-path { stroke: rgba(120, 84, 26, 0.42); }
+.dashboard-shell--day .hero-moon {
+  fill: #c5760f;
+  filter: drop-shadow(0 0 3px rgba(180, 110, 20, 0.85));
+}
+.dashboard-shell--day .hero-moon--sm { fill: #b06c10; }
+.dashboard-shell--day .hero-spark { fill: rgba(150, 98, 16, 0.95); }
+.dashboard-shell--day .hero-ray {
+  stroke: #e07712;
+  filter: drop-shadow(0 0 3px rgba(224, 119, 18, 0.55));
+}
+
+/* the streak chip keeps a visible warm pill against the light card */
+.dashboard-shell--day .hero-stats-trigger {
+  background: rgba(120, 80, 20, 0.06);
+  border: 1px solid rgba(150, 110, 50, 0.24);
+}
+.dashboard-shell--day .hero-stats-trigger:hover {
+  background: rgba(120, 80, 20, 0.1);
+}
+
+/* ── Cosmic Activity page in daylight ── */
+.dashboard-shell--day .cosmic-page-overlay {
+  background: rgba(232, 214, 178, 0.55);
+}
+.dashboard-shell--day .cosmic-page {
+  background: linear-gradient(160deg, #fbf3e2 0%, #f4e8cf 100%);
+  box-shadow: 0 30px 80px -16px rgba(120, 88, 32, 0.4);
+}
+.dashboard-shell--day .cosmic-page-close {
+  background: rgba(120, 80, 20, 0.07);
+}
+.dashboard-shell--day .cosmic-page-close:hover {
+  background: rgba(120, 80, 20, 0.14);
+  color: var(--text-h);
+}
+.dashboard-shell--day .cosmic-activity-item {
+  border-bottom: 1px solid rgba(120, 80, 20, 0.12);
+}
+.dashboard-shell--day .streak-dot {
+  background: rgba(120, 80, 20, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(120, 80, 20, 0.3);
+}
+.dashboard-shell--day .streak-dot--on {
+  background: radial-gradient(circle at 50% 32%, #ff9d3d, #e8631a);
+  box-shadow: 0 0 10px rgba(230, 99, 26, 0.55), inset 0 0 0 1px rgba(255, 210, 160, 0.7);
+}
+/* deepen the activity row glyphs so they read against the light parchment */
+.dashboard-shell--day .cosmic-activity-icon--board { color: #a9791b; background: rgba(169, 121, 27, 0.16); }
+.dashboard-shell--day .cosmic-activity-icon--guild { color: #2f74c4; background: rgba(47, 116, 196, 0.15); }
+.dashboard-shell--day .cosmic-activity-icon--deleted { color: #c63838; background: rgba(198, 56, 56, 0.14); }
