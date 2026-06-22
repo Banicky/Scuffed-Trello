@@ -16,12 +16,26 @@ const NEBULAE_NIGHT = [
   { x: 0.7,  y: 0.94, r: 0.52, color: [60, 92, 110], a: 0.045 },  // faint teal, bottom
 ]
 
-// Daytime haze: warm amber clouds, painted normally (not additively) so they
-// settle softly onto the light sky instead of blowing out to white.
+// Daytime nebula: a layered cloud of three materials painted normally (not
+// additively) — bright white cores clustered through the centre and bottom
+// (the lit heart), soft blue reflection clouds around them, and desaturated
+// gray/charcoal dust lanes that give the cloud depth and keep it from reading
+// as a flat blue. Overlap does the mixing.
 const NEBULAE_DAY = [
-  { x: 0.20, y: 0.08, r: 0.50, color: [232, 196, 130], a: 0.12 }, // warm gold, top-left
-  { x: 0.84, y: 0.04, r: 0.40, color: [240, 200, 138], a: 0.10 }, // sun haze, top-right
-  { x: 0.7,  y: 0.96, r: 0.55, color: [214, 178, 128], a: 0.10 }, // sand, bottom
+  // white cores — the lit heart, centre + bottom
+  { x: 0.44, y: 0.58, r: 0.40, color: [255, 255, 255], a: 0.30 },
+  { x: 0.58, y: 0.78, r: 0.34, color: [255, 255, 255], a: 0.26 },
+  { x: 0.30, y: 0.86, r: 0.30, color: [248, 251, 255], a: 0.22 },
+  { x: 0.86, y: 0.84, r: 0.28, color: [255, 255, 255], a: 0.18 },
+  // blue reflection clouds
+  { x: 0.20, y: 0.40, r: 0.42, color: [150, 184, 224], a: 0.18 },
+  { x: 0.72, y: 0.50, r: 0.40, color: [160, 192, 230], a: 0.16 },
+  { x: 0.50, y: 0.18, r: 0.36, color: [168, 196, 232], a: 0.14 },
+  // light gray dust lanes — soft depth, kept pale + airy (not heavy charcoal)
+  { x: 0.12, y: 0.64, r: 0.34, color: [150, 160, 176], a: 0.08 },
+  { x: 0.66, y: 0.32, r: 0.30, color: [146, 158, 176], a: 0.07 },
+  { x: 0.40, y: 0.98, r: 0.42, color: [140, 152, 172], a: 0.08 },
+  { x: 0.93, y: 0.28, r: 0.26, color: [152, 162, 178], a: 0.06 },
 ]
 
 const STAR_TINTS_NIGHT = [
@@ -31,14 +45,27 @@ const STAR_TINTS_NIGHT = [
   [191, 205, 224], // pale steel-blue
 ]
 
-// Day stars are warm bronze, kept deliberately darker than the sky so they
-// stay legible even over the lightest, warmest part of the gradient (the
-// bottom) where a brighter gold would simply vanish. source-over blended.
+// Day stars are near-black ink with a faint navy cast, kept dark so they read
+// crisply as black specks against the bright sky and white clouds. The depth
+// layers give a natural range from soft grey dust to solid black points.
 const STAR_TINTS_DAY = [
-  [150, 104, 36],  // bronze
-  [132, 92, 40],   // deep bronze
-  [176, 126, 54],  // amber
-  [118, 82, 34],   // umber
+  [20, 25, 36],    // near-black ink
+  [34, 41, 56],    // dark slate
+  [26, 32, 47],    // deep ink-navy
+  [14, 18, 28],    // black
+]
+
+// Faint background constellations — connected star-chains drawn across the
+// whole sky for depth. Anchored in normalized space and scaled to viewport
+// width; present in both modes, recoloured per sky (dark ink by day).
+const CONSTELLATIONS = [
+  { x: 0.06, y: 0.09, s: 0.13, pts: [[0, 0], [0.5, 0.7], [0.2, 1.5], [1.0, 1.7], [1.5, 1.0], [1.3, 0.2]] },
+  { x: 0.25, y: 0.04, s: 0.09, pts: [[0, 0.3], [0.7, 0], [1.1, 0.8], [0.6, 1.2]] },
+  { x: 0.64, y: 0.05, s: 0.11, pts: [[0, 0.6], [0.6, 0], [1.2, 0.5], [1.0, 1.3], [0.3, 1.4]] },
+  { x: 0.89, y: 0.15, s: 0.13, pts: [[0, 0], [0.7, 0.4], [1.3, 0], [1.1, 0.9], [1.6, 1.4], [0.9, 1.5]] },
+  { x: 0.15, y: 0.64, s: 0.12, pts: [[0, 0.2], [0.6, 0.6], [0.4, 1.3], [1.2, 1.2], [1.5, 0.5]] },
+  { x: 0.40, y: 0.74, s: 0.09, pts: [[0, 0], [0.6, 0.5], [1.2, 0.2], [1.0, 1.0]] },
+  { x: 0.85, y: 0.70, s: 0.11, pts: [[0, 0.2], [0.7, 0], [1.1, 0.7], [0.7, 1.3], [0.1, 1.1]] },
 ]
 
 function rand(min, max) { return min + Math.random() * (max - min) }
@@ -53,17 +80,27 @@ export default function Starfield({ mode = 'night' }) {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     // Day vs night palette. Night stacks light additively over the void; day
-    // paints warm specks normally so they stay visible on the bright sky.
+    // paints dark ink specks normally so they read as black on the bright sky.
     const day = mode === 'day'
     const STAR_TINTS = day ? STAR_TINTS_DAY : STAR_TINTS_NIGHT
     const NEBULAE = day ? NEBULAE_DAY : NEBULAE_NIGHT
     const blend = day ? 'source-over' : 'lighter'
     const aBoost = day ? 1.65 : 1   // lift day stars so they read on the bright sky
-    const trail = day ? [196, 150, 70] : [210, 220, 235]   // shooting-star tail tint
-    const head = day ? [120, 84, 30] : [255, 255, 255]     // shooting-star head tint
+    const trail = day ? [96, 116, 156] : [210, 220, 235]   // shooting-star tail tint
+    const head = day ? [22, 28, 42] : [255, 255, 255]      // shooting-star head tint
+    const constLine = day ? [30, 42, 66] : [188, 202, 226]  // constellation lines
+    const constNode = day ? [14, 22, 40] : [224, 232, 246]  // constellation node stars
+    const particleTint = day ? [150, 184, 226] : [202, 214, 234] // drifting motes
+    // by day the constellations read crisp + defined against the bright sky;
+    // by night they stay faint so they don't compete with the stars
+    const constLineA = day ? 0.5 : 0.2
+    const constNodeA = day ? 0.95 : 0.55
+    const constWidth = day ? 1.0 : 0.8
+    const constNodeR = day ? 1.7 : 1.4
 
     let w = 0, h = 0, dpr = Math.min(window.devicePixelRatio || 1, 2)
     let stars = []
+    let particles = []
     let shooting = []
     let raf = 0
     let t = 0
@@ -84,6 +121,20 @@ export default function Starfield({ mode = 'night' }) {
             speed: rand(0.6, 1.8),
           })
         }
+      }
+      // faint cosmic motes — larger, soft, slow-drifting glows with parallax
+      particles = []
+      for (let i = 0; i < 18; i++) {
+        particles.push({
+          x: Math.random(),
+          y: Math.random(),
+          r: rand(2.2, 5.5),
+          baseA: rand(0.04, 0.12),
+          depth: rand(0.2, 0.7),
+          vx: rand(-0.004, 0.004),
+          vy: rand(-0.009, -0.003), // gentle upward drift
+          phase: Math.random() * Math.PI * 2,
+        })
       }
     }
 
@@ -113,15 +164,69 @@ export default function Starfield({ mode = 'night' }) {
       })
     }
 
-    function drawNebulae() {
-      for (const n of NEBULAE) {
-        const cx = n.x * w, cy = n.y * h, rr = n.r * Math.max(w, h)
+    function drawNebulae(time) {
+      const md = Math.max(w, h)
+      for (let i = 0; i < NEBULAE.length; i++) {
+        const n = NEBULAE[i]
+        // slow organic drift so the cloud breathes instead of sitting static
+        const cx = n.x * w + Math.sin(time * 0.035 + i * 1.3) * 9
+        const cy = n.y * h + Math.cos(time * 0.027 + i * 0.7) * 7
+        const rr = n.r * md
         const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rr)
         const [r, gr, b] = n.color
         g.addColorStop(0, `rgba(${r},${gr},${b},${n.a})`)
         g.addColorStop(1, `rgba(${r},${gr},${b},0)`)
         ctx.fillStyle = g
-        ctx.fillRect(0, 0, w, h)
+        // only the blob's bounding box needs painting — the rest is transparent
+        ctx.fillRect(cx - rr, cy - rr, rr * 2, rr * 2)
+      }
+    }
+
+    function drawConstellations(time, p) {
+      const [lr, lg, lb] = constLine
+      const [nr, ng, nb] = constNode
+      CONSTELLATIONS.forEach((c, i) => {
+        const breath = 0.66 + 0.34 * Math.sin(time * 0.32 + i * 1.7)
+        const sPx = c.s * w
+        const ox = p.x * 14 + Math.sin(time * 0.04 + i) * 3 // slow far parallax + drift
+        const oy = p.y * 14
+        const cx = c.x * w + ox, cy = c.y * h + oy
+        ctx.beginPath()
+        c.pts.forEach((pt, j) => {
+          const px = cx + pt[0] * sPx, py = cy + pt[1] * sPx
+          if (j === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
+        })
+        ctx.strokeStyle = `rgba(${lr},${lg},${lb},${constLineA * breath})`
+        ctx.lineWidth = constWidth
+        ctx.stroke()
+        for (const pt of c.pts) {
+          const px = cx + pt[0] * sPx, py = cy + pt[1] * sPx
+          ctx.beginPath()
+          ctx.fillStyle = `rgba(${nr},${ng},${nb},${constNodeA * breath})`
+          ctx.arc(px, py, constNodeR, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      })
+    }
+
+    function drawParticles(dt, time, p) {
+      const [pr, pg, pb] = particleTint
+      for (const q of particles) {
+        q.x += q.vx * dt
+        q.y += q.vy * dt
+        if (q.y < -0.05) q.y = 1.05
+        if (q.x < -0.05) q.x = 1.05
+        else if (q.x > 1.05) q.x = -0.05
+        const px = q.x * w + p.x * q.depth * 30
+        const py = q.y * h + p.y * q.depth * 30
+        const a = q.baseA * (0.7 + 0.3 * Math.sin(time * 0.5 + q.phase))
+        const g = ctx.createRadialGradient(px, py, 0, px, py, q.r)
+        g.addColorStop(0, `rgba(${pr},${pg},${pb},${a})`)
+        g.addColorStop(1, `rgba(${pr},${pg},${pb},0)`)
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(px, py, q.r, 0, Math.PI * 2)
+        ctx.fill()
       }
     }
 
@@ -137,7 +242,8 @@ export default function Starfield({ mode = 'night' }) {
 
       ctx.clearRect(0, 0, w, h)
       ctx.globalCompositeOperation = blend
-      drawNebulae()
+      drawNebulae(time)
+      drawConstellations(time, p)
 
       // stars
       for (const s of stars) {
@@ -158,6 +264,8 @@ export default function Starfield({ mode = 'night' }) {
           ctx.fill()
         }
       }
+
+      drawParticles(dt, time, p)
 
       // shooting stars
       nextShoot -= dt
@@ -194,9 +302,11 @@ export default function Starfield({ mode = 'night' }) {
     }
 
     function staticFrame() {
+      const p0 = { x: 0, y: 0 }
       ctx.clearRect(0, 0, w, h)
       ctx.globalCompositeOperation = blend
-      drawNebulae()
+      drawNebulae(0)
+      drawConstellations(0, p0)
       for (const s of stars) {
         const [r, g, b] = s.tint
         ctx.beginPath()
@@ -204,6 +314,7 @@ export default function Starfield({ mode = 'night' }) {
         ctx.arc(s.x * w, s.y * h, s.r, 0, Math.PI * 2)
         ctx.fill()
       }
+      drawParticles(0, 0, p0)
       ctx.globalCompositeOperation = 'source-over'
     }
 
