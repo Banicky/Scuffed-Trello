@@ -84,6 +84,33 @@
   line-height: 1.2;
 }
 
+/* ── Board import / export ── */
+.board-io {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 14px;
+}
+
+.board-io-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.board-io-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.board-io-msg {
+  font-size: 12px;
+  color: var(--accent);
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Notification bell ── */
 .notif {
   position: relative;

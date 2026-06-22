@@ -976,6 +976,138 @@ app.delete("/api/boards/:id", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── Board import / export ─────────────────────────────────────────────────────
+//
+// A board's structure (title + decorative background + columns + cards) can be
+// serialised to a portable JSON document and re-created on any board. Only the
+// board shape travels: per-user metadata (authors, timestamps, assignees,
+// comments, images, ids) is intentionally dropped so an export is self-contained
+// and import is idempotent regardless of who runs it.
+
+const EXPORT_VERSION = 1;
+
+// GET /api/boards/:id/export — serialise the board to a JSON document.
+app.get("/api/boards/:id/export", requireAuth, async (req, res) => {
+  if (!await canAccessBoard(req.session.userId, req.params.id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const boardRes = await pool.query("SELECT * FROM boards WHERE id = $1", [req.params.id]);
+  const board = boardRes.rows[0];
+  if (!board) return res.status(404).json({ error: "Board not found" });
+
+  const cols = await pool.query(
+    "SELECT id, title, position FROM columns WHERE board_id = $1 ORDER BY position",
+    [req.params.id]
+  );
+  const columns = await Promise.all(cols.rows.map(async col => {
+    const cards = await pool.query(
+      "SELECT title, description, position, starred FROM cards WHERE column_id = $1 ORDER BY position",
+      [col.id]
+    );
+    return {
+      title: col.title,
+      position: col.position,
+      cards: cards.rows.map(c => ({
+        title: c.title,
+        description: c.description,
+        position: c.position,
+        starred: c.starred,
+      })),
+    };
+  }));
+
+  res.json({
+    version: EXPORT_VERSION,
+    exported_at: new Date().toISOString(),
+    board: {
+      title: board.title,
+      background_image: board.background_image,
+      background_opacity: board.background_opacity,
+    },
+    columns,
+  });
+});
+
+// POST /api/boards/:id/import — replace the board's columns/cards (and title +
+// background) with the contents of an exported document. Destructive: existing
+// columns/cards are removed first (cards cascade-delete with their columns).
+app.post("/api/boards/:id/import", requireAuth, async (req, res) => {
+  if (!await canAccessBoard(req.session.userId, req.params.id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const data = req.body || {};
+  if (!Array.isArray(data.columns)) {
+    return res.status(400).json({ error: "Invalid board file: missing columns" });
+  }
+  if (data.version && data.version > EXPORT_VERSION) {
+    return res.status(400).json({ error: "This board file is from a newer version" });
+  }
+  if (data.columns.length > 10) {
+    return res.status(400).json({ error: "Board file exceeds the 10-column limit" });
+  }
+  const boardTitle = data.board?.title;
+  if (tooLong(boardTitle, 255)) return res.status(400).json({ error: "Title must be 255 characters or fewer" });
+  for (const col of data.columns) {
+    if (tooLong(col?.title, 255)) return res.status(400).json({ error: "A column title is too long" });
+    if (!Array.isArray(col?.cards)) return res.status(400).json({ error: "Invalid board file: a column is missing cards" });
+    for (const card of col.cards) {
+      if (tooLong(card?.title, 255)) return res.status(400).json({ error: "A card title is too long" });
+      if (tooLong(card?.description, 3000)) return res.status(400).json({ error: "A card description is too long" });
+    }
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // Wipe the current structure; ON DELETE CASCADE removes the cards too.
+    await client.query("DELETE FROM columns WHERE board_id = $1", [req.params.id]);
+
+    if (boardTitle !== undefined) {
+      await client.query("UPDATE boards SET title = $1 WHERE id = $2", [boardTitle, req.params.id]);
+    }
+    // Background fields are optional; only touch them when present in the file.
+    if (data.board?.background_image !== undefined) {
+      const opacity = Math.max(0, Math.min(100, Number(data.board.background_opacity) || 0));
+      await client.query(
+        "UPDATE boards SET background_image = $1, background_opacity = $2 WHERE id = $3",
+        [data.board.background_image, opacity, req.params.id]
+      );
+    }
+
+    const orderedCols = [...data.columns].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    for (let ci = 0; ci < orderedCols.length; ci++) {
+      const col = orderedCols[ci];
+      const colRes = await client.query(
+        "INSERT INTO columns (board_id, title, position) VALUES ($1, $2, $3) RETURNING id",
+        [req.params.id, col.title || "Untitled", ci]
+      );
+      const columnId = colRes.rows[0].id;
+      const orderedCards = [...col.cards].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      for (let pi = 0; pi < orderedCards.length; pi++) {
+        const card = orderedCards[pi];
+        await client.query(
+          "INSERT INTO cards (column_id, title, description, position, starred, created_by, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW())",
+          [columnId, card.title || "Untitled", card.description || null, pi, !!card.starred, req.session.userId]
+        );
+      }
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  await logBoardActivity({
+    userId: req.session.userId,
+    boardId: Number(req.params.id),
+    action: "imported",
+    title: boardTitle,
+  });
+  res.json({ success: true });
+});
+
 // ── Board members ─────────────────────────────────────────────────────────────
 
 app.get("/api/boards/:boardId/members", requireAuth, async (req, res) => {

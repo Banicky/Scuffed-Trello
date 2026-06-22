@@ -3,7 +3,7 @@ import Column from '../components/Column.jsx'
 import CardDetailModal from '../components/CardDetailModal.jsx'
 import ImageUploadField from '../components/ImageUploadField.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
-import { apiFetch, assetUrl } from '../api.js'
+import { apiFetch, assetUrl, exportBoard, importBoard } from '../api.js'
 import { buildSearchRegex } from '../utils.js'
 
 function MembersPanel({ boardId, isOwner, onClose }) {
@@ -87,7 +87,10 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   const [caseSensitive, setCaseSensitive] = useState(false)
   const [wholeWord, setWholeWord] = useState(false)
   const [activeMatchIndex, setActiveMatchIndex] = useState(0)
+  const [ioBusy, setIoBusy] = useState(false)
+  const [ioMessage, setIoMessage] = useState('')
   const cardRefs = useRef(new Map())
+  const importInputRef = useRef(null)
 
   const isOwner = board?.owner_id === user.id
 
@@ -126,34 +129,72 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
     setActiveMatchIndex(i => (i + delta + matches.length) % matches.length)
   }
 
-  useEffect(() => {
-    async function load() {
-      const [colRes, boardRes] = await Promise.all([
-        apiFetch(`/api/boards/${boardId}/columns`),
-        apiFetch(`/api/boards/${boardId}`),
-      ])
-      
-      // escalates to main dashboard if the id is invalid or user doesn't have access, instead of showing an error message on this page
-      if (!boardRes.ok || !colRes.ok) {
-        onBack()
-        return
-      }
-      const cols = await colRes.json()
-      const boardData = await boardRes.json()
-      setBoard(boardData)
+  // Fetch the board, its columns, and each column's cards into state. Returns
+  // true on success; on access failure it escalates back to the dashboard.
+  async function loadBoard() {
+    const [colRes, boardRes] = await Promise.all([
+      apiFetch(`/api/boards/${boardId}/columns`),
+      apiFetch(`/api/boards/${boardId}`),
+    ])
 
-      const withCards = await Promise.all(cols.map(async col => {
-        const cardRes = await apiFetch(`/api/columns/${col.id}/cards`)
-        const cards = await cardRes.json()
-        const sorted = [...cards].sort((a, b) => b.starred - a.starred)
-        return { ...col, cards: sorted }
-      }))
-
-      setColumns(withCards)
-      setLoading(false)
+    // escalates to main dashboard if the id is invalid or user doesn't have access, instead of showing an error message on this page
+    if (!boardRes.ok || !colRes.ok) {
+      onBack()
+      return false
     }
-    load()
+    const cols = await colRes.json()
+    const boardData = await boardRes.json()
+    setBoard(boardData)
+
+    const withCards = await Promise.all(cols.map(async col => {
+      const cardRes = await apiFetch(`/api/columns/${col.id}/cards`)
+      const cards = await cardRes.json()
+      const sorted = [...cards].sort((a, b) => b.starred - a.starred)
+      return { ...col, cards: sorted }
+    }))
+
+    setColumns(withCards)
+    setLoading(false)
+    return true
+  }
+
+  useEffect(() => {
+    loadBoard()
   }, [boardId])
+
+  async function handleExport() {
+    setIoMessage('')
+    setIoBusy(true)
+    try {
+      await exportBoard(board.id, board.title)
+    } catch (err) {
+      setIoMessage(err.message)
+    } finally {
+      setIoBusy(false)
+    }
+  }
+
+  async function handleImportFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-importing the same file later
+    if (!file) return
+    if (!window.confirm('Importing will replace this board\'s columns and cards. Continue?')) return
+    setIoMessage('')
+    setIoBusy(true)
+    try {
+      const text = await file.text()
+      let doc
+      try { doc = JSON.parse(text) } catch { throw new Error('That file is not valid JSON') }
+      await importBoard(board.id, doc)
+      await loadBoard()
+      setIoMessage('Board imported')
+      setTimeout(() => setIoMessage(''), 3000)
+    } catch (err) {
+      setIoMessage(err.message)
+    } finally {
+      setIoBusy(false)
+    }
+  }
 
   // Tell the portal the board has painted (one rAF after loading clears) so it
   // holds the veil over the heavy first render, then fades to reveal it.
@@ -412,6 +453,32 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
               </div>
             )}
             <div className="board-meta">{totalCards} cards · {doneCount} done</div>
+          </div>
+          <div className="board-io">
+            <button
+              className="btn-ghost board-io-btn"
+              onClick={handleExport}
+              disabled={ioBusy}
+              title="Download this board as a JSON file"
+            >
+              ⬇ Export
+            </button>
+            <button
+              className="btn-ghost board-io-btn"
+              onClick={() => importInputRef.current?.click()}
+              disabled={ioBusy}
+              title="Replace this board from a JSON file"
+            >
+              ⬆ Import
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              style={{ display: 'none' }}
+              onChange={handleImportFile}
+            />
+            {ioMessage && <span className="board-io-msg">{ioMessage}</span>}
           </div>
         </div>
         <div className="topbar-search">

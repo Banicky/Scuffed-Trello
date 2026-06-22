@@ -31,6 +31,39 @@ export async function apiFetch(path, options = {}) {
   return res
 }
 
+// Fetch a board's exportable JSON document and trigger a browser download.
+// The filename is derived from the board title (falls back to the id).
+export async function exportBoard(boardId, boardTitle) {
+  const res = await apiFetch(`/api/boards/${boardId}/export`)
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Export failed')
+  }
+  const doc = await res.json()
+  const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const safeName = (boardTitle || `board-${boardId}`).replace(/[^a-z0-9-_]+/gi, '_').slice(0, 60)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${safeName}.json`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+// Replace a board's structure with an exported JSON document. Destructive on the
+// backend — overwrites existing columns/cards.
+export async function importBoard(boardId, doc) {
+  const res = await apiFetch(`/api/boards/${boardId}/import`, {
+    method: 'POST',
+    body: JSON.stringify(doc),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Import failed')
+  return data
+}
+
 // Upload an image file via multipart/form-data; returns the stored URL path.
 // type controls which uploads/<type>/ folder it lands in on the backend
 // (avatars | cards | boards | comments) — must be appended before the file
