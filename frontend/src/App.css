@@ -3443,6 +3443,13 @@ select.card-input {
 .members-toggle {
   font-size: 13px;
   padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  & .btn-glyph { flex: none; opacity: 0.85; }
+  &.active .btn-glyph,
+  &:hover .btn-glyph { opacity: 1; }
 
   &.active {
     background: var(--accent-bg);

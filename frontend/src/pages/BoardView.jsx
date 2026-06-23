@@ -7,6 +7,30 @@ import AiAssistant from '../components/AiAssistant.jsx'
 import { apiFetch, assetUrl, exportBoard, importBoard } from '../api.js'
 import { buildSearchRegex } from '../utils.js'
 
+// Stylised stroke glyphs for the topbar toggles, matching the app's celestial
+// line-icon language (currentColor stroke, rounded joins). Members = three
+// overlapping community rings; Design = a four-point star set in a hex frame.
+function MembersGlyph() {
+  return (
+    <svg className="btn-glyph" width="15" height="15" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8.5" r="4.4" />
+      <circle cx="8" cy="15" r="4.4" />
+      <circle cx="16" cy="15" r="4.4" />
+    </svg>
+  )
+}
+
+function DesignGlyph() {
+  return (
+    <svg className="btn-glyph" width="15" height="15" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 2.5l8.23 4.75v9.5L12 21.5l-8.23-4.75v-9.5z" />
+      <path d="M12 8l1.15 2.85L16 12l-2.85 1.15L12 16l-1.15-2.85L8 12l2.85-1.15z" />
+    </svg>
+  )
+}
+
 function MembersPanel({ boardId, isOwner, onClose }) {
   const [members, setMembers] = useState([])
   const [invite, setInvite] = useState('')
@@ -521,6 +545,9 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
               placeholder="Search cards…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Escape') { setSearchQuery(''); e.currentTarget.blur() }
+              }}
             />
             {searchQuery && (
               <button className="search-clear" onClick={() => setSearchQuery('')} title="Clear search">✕</button>
@@ -555,14 +582,16 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
               className={`btn-ghost members-toggle${showDesign ? ' active' : ''}`}
               onClick={() => setShowDesign(v => !v)}
             >
-              🎨 Design
+              <DesignGlyph />
+              Design
             </button>
           )}
           <button
             className={`btn-ghost members-toggle${showMembers ? ' active' : ''}`}
             onClick={() => setShowMembers(v => !v)}
           >
-            👥 Members
+            <MembersGlyph />
+            Members
           </button>
           <button
             className={`btn-ghost members-toggle ai-toggle${aiOpen ? ' active' : ''}`}
