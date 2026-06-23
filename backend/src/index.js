@@ -19,10 +19,53 @@ import QRCode from "qrcode";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import Anthropic from "@anthropic-ai/sdk";
 import pool from "./database.js";
 
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 const SERVER_URL = process.env.SERVER_URL || "http://localhost:4000";
+
+// ── AI assistant (BYOK) ───────────────────────────────────────────────────────
+// Each user supplies their OWN Anthropic API key, stored encrypted at rest. The
+// server never holds a global key — every Claude call runs under the requesting
+// user's key, so the assistant can only ever do what that user could do.
+// AI_KEY_SECRET backs the AES-256-GCM envelope around the stored key. A random
+// dev default keeps local dev working, but set a real 64-hex-char secret in prod
+// (a rotated secret makes already-stored keys undecryptable — users re-enter).
+const AI_KEY_SECRET = crypto
+  .createHash("sha256")
+  .update(process.env.AI_KEY_SECRET || process.env.SESSION_SECRET || "scuffed-trello-dev-ai-secret")
+  .digest(); // 32 bytes for AES-256
+
+// The only models the assistant offers. Haiku is the fast/cheap default; Sonnet
+// is the stronger option. The model picker and chat both validate against this
+// list, so a stored or requested model outside it falls back to the default.
+const AI_MODELS = [
+  { id: "claude-haiku-4-5", display_name: "Haiku 4.5" },
+  { id: "claude-sonnet-4-6", display_name: "Sonnet 4.6" },
+];
+const AI_DEFAULT_MODEL = "claude-haiku-4-5";
+const isAllowedModel = m => AI_MODELS.some(x => x.id === m);
+
+function encryptKey(plain) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", AI_KEY_SECRET, iv);
+  const enc = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  // store as iv:tag:ciphertext, all hex
+  return `${iv.toString("hex")}:${tag.toString("hex")}:${enc.toString("hex")}`;
+}
+
+function decryptKey(blob) {
+  try {
+    const [ivHex, tagHex, dataHex] = String(blob).split(":");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", AI_KEY_SECRET, Buffer.from(ivHex, "hex"));
+    decipher.setAuthTag(Buffer.from(tagHex, "hex"));
+    return Buffer.concat([decipher.update(Buffer.from(dataHex, "hex")), decipher.final()]).toString("utf8");
+  } catch {
+    return null; // wrong secret / corrupt blob → treat as "no key"
+  }
+}
 
 // Tolerate ±1 time-step (±30s) of clock drift between the user's device and the
 // server when checking TOTP codes.
@@ -1114,10 +1157,16 @@ app.get("/api/boards/:boardId/members", requireAuth, async (req, res) => {
   if (!await canAccessBoard(req.session.userId, req.params.boardId)) {
     return res.status(403).json({ error: "Forbidden" });
   }
+  // The owner is not stored in board_members, so include them explicitly and
+  // flag them so the UI can mark ownership. Owner first, then members A→Z.
   const result = await pool.query(
-    `SELECT u.id, u.username, u.email, u.avatar_url FROM users u
-     JOIN board_members bm ON bm.user_id = u.id
-     WHERE bm.board_id = $1`,
+    `SELECT u.id, u.username, u.email, u.avatar_url, (u.id = b.owner_id) AS is_owner
+     FROM boards b
+     JOIN users u
+       ON u.id = b.owner_id
+       OR u.id IN (SELECT user_id FROM board_members WHERE board_id = b.id)
+     WHERE b.id = $1
+     ORDER BY (u.id <> b.owner_id), u.username`,
     [req.params.boardId]
   );
   res.json(result.rows);
@@ -1879,6 +1928,326 @@ app.delete("/api/comments/:id", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── AI assistant (BYOK) ───────────────────────────────────────────────────────
+// The assistant runs a manual tool-calling loop against the SAME data-layer
+// helpers the HTTP routes below use, all gated by canAccessBoard(userId, …).
+// Every action it can take is therefore exactly an action the requesting user
+// could perform by hand — there is no privileged path.
+
+// Shared card/column actions. These mirror the validation + history logging the
+// REST handlers do, so the assistant and a human produce identical side effects.
+async function aiCreateColumn({ boardId, title, position }) {
+  const count = await pool.query("SELECT COUNT(*) FROM columns WHERE board_id = $1", [boardId]);
+  if (parseInt(count.rows[0].count) >= 10) throw new Error("Column limit reached (max 10)");
+  if (tooLong(title, 255)) throw new Error("Column title must be 255 characters or fewer");
+  const pos = position ?? parseInt(count.rows[0].count);
+  const r = await pool.query(
+    "INSERT INTO columns (board_id, title, position) VALUES ($1, $2, $3) RETURNING *",
+    [boardId, title, pos]
+  );
+  return r.rows[0];
+}
+
+async function aiCreateCard({ boardId, userId, columnId, title, description }) {
+  const col = await pool.query("SELECT id FROM columns WHERE id = $1 AND board_id = $2", [columnId, boardId]);
+  if (!col.rows[0]) throw new Error("That column is not on this board");
+  if (tooLong(title, 255)) throw new Error("Card title must be 255 characters or fewer");
+  if (tooLong(description, 3000)) throw new Error("Card description must be 3000 characters or fewer");
+  const posRow = await pool.query("SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM cards WHERE column_id = $1", [columnId]);
+  const r = await pool.query(
+    "INSERT INTO cards (column_id, title, description, position, created_by, updated_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *",
+    [columnId, title, description || null, posRow.rows[0].pos, userId]
+  );
+  const card = r.rows[0];
+  await logActivity({ boardId, cardId: card.id, userId, action: "created", cardTitle: card.title });
+  await logCardHistory({ cardId: card.id, userId, action: "created", cardTitle: card.title });
+  return card;
+}
+
+async function aiUpdateCard({ boardId, userId, cardId, title, description }) {
+  const before = (await pool.query(
+    "SELECT cards.title, cards.description FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1 AND columns.board_id = $2",
+    [cardId, boardId]
+  )).rows[0];
+  if (!before) throw new Error("Card not found on this board");
+  const newTitle = title ?? before.title;
+  const newDesc = description ?? before.description;
+  if (tooLong(newTitle, 255)) throw new Error("Card title must be 255 characters or fewer");
+  if (tooLong(newDesc, 3000)) throw new Error("Card description must be 3000 characters or fewer");
+  const r = await pool.query(
+    "UPDATE cards SET title = $1, description = $2, last_edited_by = $3, updated_at = NOW() WHERE id = $4 RETURNING *",
+    [newTitle, newDesc || null, userId, cardId]
+  );
+  await logActivity({ boardId, cardId, userId, action: "edited", cardTitle: newTitle });
+  const changed = [];
+  if (before.title !== newTitle) changed.push("[Title]");
+  if ((before.description || null) !== (newDesc || null)) changed.push("[Description]");
+  if (changed.length) await logCardHistory({ cardId, userId, action: "edited", cardTitle: newTitle, detail: changed.join(", ") });
+  return r.rows[0];
+}
+
+async function aiMoveCard({ boardId, userId, cardId, columnId }) {
+  const before = (await pool.query(
+    "SELECT cards.column_id, cards.title FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1 AND columns.board_id = $2",
+    [cardId, boardId]
+  )).rows[0];
+  if (!before) throw new Error("Card not found on this board");
+  const dest = (await pool.query("SELECT id FROM columns WHERE id = $1 AND board_id = $2", [columnId, boardId])).rows[0];
+  if (!dest) throw new Error("Destination column is not on this board");
+  const posRow = await pool.query("SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM cards WHERE column_id = $1", [columnId]);
+  const r = await pool.query(
+    "UPDATE cards SET column_id = $1, position = $2, last_edited_by = $3, updated_at = NOW() WHERE id = $4 RETURNING *",
+    [columnId, posRow.rows[0].pos, userId, cardId]
+  );
+  if (String(before.column_id) !== String(columnId)) {
+    await logActivity({ boardId, cardId, userId, action: "moved", cardTitle: before.title });
+    const cols = await pool.query("SELECT id, title FROM columns WHERE id = ANY($1)", [[before.column_id, columnId]]);
+    const nameOf = id => `[${cols.rows.find(c => String(c.id) === String(id))?.title || "a column"}]`;
+    await logCardHistory({ cardId, userId, action: "moved", cardTitle: before.title, detail: `to ${nameOf(columnId)} from ${nameOf(before.column_id)}` });
+  }
+  return r.rows[0];
+}
+
+// Snapshot of the whole board, given to Claude as context so it plans against
+// reality. Columns + their cards (id/title/description), nothing private.
+async function aiBoardState(boardId) {
+  const cols = (await pool.query("SELECT id, title, position FROM columns WHERE board_id = $1 ORDER BY position", [boardId])).rows;
+  const out = [];
+  for (const col of cols) {
+    const cards = (await pool.query(
+      "SELECT id, title, description FROM cards WHERE column_id = $1 ORDER BY position",
+      [col.id]
+    )).rows;
+    out.push({ column_id: col.id, title: col.title, cards });
+  }
+  return out;
+}
+
+// Tool schemas exposed to Claude. Each maps to one aiX helper above.
+const AI_TOOLS = [
+  {
+    name: "get_board_state",
+    description: "Get the current columns and cards on the board. Call this first to understand the board before suggesting or making changes.",
+    input_schema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "create_column",
+    description: "Create a new column (list) on the board. Max 10 columns.",
+    input_schema: {
+      type: "object",
+      properties: { title: { type: "string", description: "Column title" } },
+      required: ["title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "create_card",
+    description: "Create a new card in a column. Use get_board_state first to find the column_id.",
+    input_schema: {
+      type: "object",
+      properties: {
+        column_id: { type: "integer", description: "ID of the column to add the card to" },
+        title: { type: "string", description: "Card title" },
+        description: { type: "string", description: "Optional card description" },
+      },
+      required: ["column_id", "title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "update_card",
+    description: "Edit a card's title and/or description.",
+    input_schema: {
+      type: "object",
+      properties: {
+        card_id: { type: "integer", description: "ID of the card to edit" },
+        title: { type: "string", description: "New title (optional)" },
+        description: { type: "string", description: "New description (optional)" },
+      },
+      required: ["card_id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "move_card",
+    description: "Move a card to a different column.",
+    input_schema: {
+      type: "object",
+      properties: {
+        card_id: { type: "integer", description: "ID of the card to move" },
+        column_id: { type: "integer", description: "ID of the destination column" },
+      },
+      required: ["card_id", "column_id"],
+      additionalProperties: false,
+    },
+  },
+];
+
+// Run one tool call and return its result text. `applied` accumulates a
+// human-readable list of write actions for the UI summary.
+async function runAiTool(name, input, { boardId, userId, applied }) {
+  switch (name) {
+    case "get_board_state":
+      return JSON.stringify(await aiBoardState(boardId));
+    case "create_column": {
+      const col = await aiCreateColumn({ boardId, title: input.title });
+      applied.push(`Created column “${col.title}”`);
+      return `Created column id ${col.id} titled "${col.title}".`;
+    }
+    case "create_card": {
+      const card = await aiCreateCard({ boardId, userId, columnId: input.column_id, title: input.title, description: input.description });
+      applied.push(`Created card “${card.title}”`);
+      return `Created card id ${card.id} titled "${card.title}".`;
+    }
+    case "update_card": {
+      const card = await aiUpdateCard({ boardId, userId, cardId: input.card_id, title: input.title, description: input.description });
+      applied.push(`Updated card “${card.title}”`);
+      return `Updated card id ${card.id}.`;
+    }
+    case "move_card": {
+      const card = await aiMoveCard({ boardId, userId, cardId: input.card_id, columnId: input.column_id });
+      applied.push(`Moved card “${card.title}”`);
+      return `Moved card id ${card.id} to column ${input.column_id}.`;
+    }
+    default:
+      throw new Error(`Unknown tool: ${name}`);
+  }
+}
+
+// GET /api/ai/key — does the user have a key configured, and which model?
+// Never returns the key itself.
+app.get("/api/ai/key", requireAuth, async (req, res) => {
+  const r = await pool.query("SELECT ai_api_key, ai_model FROM users WHERE id = $1", [req.session.userId]);
+  res.json({ configured: !!r.rows[0]?.ai_api_key, model: r.rows[0]?.ai_model || AI_DEFAULT_MODEL });
+});
+
+// PUT /api/ai/key — store/replace the user's Anthropic key (validated against the
+// Models API before saving) and/or update the chosen model. Send key:"" to clear.
+app.put("/api/ai/key", requireAuth, async (req, res) => {
+  const { key, model } = req.body || {};
+
+  if (key === "") {
+    await pool.query("UPDATE users SET ai_api_key = NULL WHERE id = $1", [req.session.userId]);
+    return res.json({ configured: false, model: model || AI_DEFAULT_MODEL });
+  }
+
+  if (key !== undefined) {
+    if (typeof key !== "string" || !key.trim()) return res.status(400).json({ error: "Key is required" });
+    // Validate by listing models with it; a bad key throws 401 here.
+    try {
+      const client = new Anthropic({ apiKey: key.trim() });
+      await client.models.list();
+    } catch (e) {
+      const status = e?.status === 401 ? 401 : 400;
+      return res.status(status).json({ error: status === 401 ? "That API key was rejected by Anthropic." : "Could not validate the key. Check it and try again." });
+    }
+    await pool.query("UPDATE users SET ai_api_key = $1 WHERE id = $2", [encryptKey(key.trim()), req.session.userId]);
+  }
+
+  if (model !== undefined) {
+    if (model && !isAllowedModel(model)) return res.status(400).json({ error: "Unsupported model" });
+    await pool.query("UPDATE users SET ai_model = $1 WHERE id = $2", [model || null, req.session.userId]);
+  }
+
+  const r = await pool.query("SELECT ai_api_key, ai_model FROM users WHERE id = $1", [req.session.userId]);
+  res.json({ configured: !!r.rows[0]?.ai_api_key, model: r.rows[0]?.ai_model || AI_DEFAULT_MODEL });
+});
+
+// GET /api/ai/models — the two models the assistant supports (Haiku / Sonnet).
+app.get("/api/ai/models", requireAuth, (_req, res) => {
+  res.json(AI_MODELS);
+});
+
+// POST /api/ai/chat — one assistant turn. Body: { boardId?, message, history? }.
+// Runs a manual tool-calling loop under the user's own key. Returns the assistant
+// reply, the list of applied actions, and whether the board changed (so the UI
+// can reload it).
+app.post("/api/ai/chat", requireAuth, async (req, res) => {
+  const { boardId, message, history } = req.body || {};
+  if (!message || typeof message !== "string" || !message.trim()) {
+    return res.status(400).json({ error: "Message is required" });
+  }
+  if (tooLong(message, 4000)) return res.status(400).json({ error: "Message is too long" });
+
+  const r = await pool.query("SELECT ai_api_key, ai_model FROM users WHERE id = $1", [req.session.userId]);
+  const key = r.rows[0]?.ai_api_key && decryptKey(r.rows[0].ai_api_key);
+  if (!key) return res.status(400).json({ error: "Add your Anthropic API key in Settings → AI Assistant to use the assistant." });
+  const model = isAllowedModel(r.rows[0]?.ai_model) ? r.rows[0].ai_model : AI_DEFAULT_MODEL;
+
+  // A board context means full tool access; without one (dashboard), it's a
+  // read-only planning chat with no tools.
+  const hasBoard = boardId != null;
+  if (hasBoard && !await canAccessBoard(req.session.userId, boardId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const system = hasBoard
+    ? `You are a helpful kanban assistant embedded in a Trello-style board called "Scuffed Trello". ` +
+      `You help the user plan work and manage their board by creating columns, creating cards, editing cards, and moving cards between columns. ` +
+      `Always call get_board_state before creating or moving things so you use correct column and card IDs. ` +
+      `Be concise. After making changes, briefly summarise what you did.`
+    : `You are a helpful planning assistant in a Trello-style app called "Scuffed Trello". ` +
+      `The user is on their board-selection screen, so you cannot modify a board right now — help them plan, brainstrew, and break work down. ` +
+      `If they want you to create or move cards, tell them to open a board first. Be concise.`;
+
+  // Rebuild prior turns (text only) plus this message.
+  const messages = [];
+  if (Array.isArray(history)) {
+    for (const h of history.slice(-10)) {
+      if (h && (h.role === "user" || h.role === "assistant") && typeof h.content === "string") {
+        messages.push({ role: h.role, content: h.content });
+      }
+    }
+  }
+  messages.push({ role: "user", content: message.trim() });
+
+  const client = new Anthropic({ apiKey: key });
+  const applied = [];
+
+  try {
+    let reply = "";
+    // Bounded agentic loop: keep going while Claude asks for tools.
+    for (let step = 0; step < 8; step++) {
+      const resp = await client.messages.create({
+        model,
+        max_tokens: 2048,
+        system,
+        tools: hasBoard ? AI_TOOLS : [],
+        messages,
+      });
+
+      // Collect any text the model emitted this turn.
+      for (const block of resp.content) {
+        if (block.type === "text") reply += (reply ? "\n" : "") + block.text;
+      }
+
+      if (resp.stop_reason !== "tool_use") break;
+
+      // Echo the assistant turn, then run each tool and return all results in ONE
+      // user message (required for parallel tool calls).
+      messages.push({ role: "assistant", content: resp.content });
+      const toolResults = [];
+      for (const block of resp.content) {
+        if (block.type !== "tool_use") continue;
+        try {
+          const out = await runAiTool(block.name, block.input || {}, { boardId, userId: req.session.userId, applied });
+          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: out });
+        } catch (err) {
+          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: `Error: ${err.message}`, is_error: true });
+        }
+      }
+      messages.push({ role: "user", content: toolResults });
+    }
+
+    res.json({ reply: reply.trim() || "(no response)", applied, boardChanged: applied.length > 0 });
+  } catch (e) {
+    if (e?.status === 401) return res.status(401).json({ error: "Your API key was rejected. Re-enter it in Settings." });
+    if (e?.status === 429) return res.status(429).json({ error: "Your Anthropic key is rate limited. Try again shortly." });
+    console.error("AI chat failed:", e?.message || e);
+    res.status(502).json({ error: "The assistant could not complete that request." });
+  }
+});
+
 // ── Migrations ────────────────────────────────────────────────────────────────
 
 async function migrate() {
@@ -1913,6 +2282,11 @@ async function migrate() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_count INTEGER NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak INTEGER NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_last_date DATE`);
+
+  // BYOK AI assistant: the user's own Anthropic API key (AES-256-GCM encrypted,
+  // never returned in plaintext) and the model they chose to run it under.
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_api_key TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_model VARCHAR(64)`);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_oauth_idx ON users (oauth_provider, oauth_id)
     WHERE oauth_provider IS NOT NULL

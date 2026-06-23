@@ -64,6 +64,43 @@ export async function importBoard(boardId, doc) {
   return data
 }
 
+// ── AI assistant (BYOK) ───────────────────────────────────────────────────────
+
+// Whether the user has a key configured + their chosen model. Never returns the key.
+export async function getAiKeyStatus() {
+  const res = await apiFetch('/api/ai/key')
+  if (!res.ok) throw new Error('Failed to load AI settings')
+  return res.json() // { configured, model }
+}
+
+// Save/replace the key and/or model. Pass key:'' to clear it.
+export async function saveAiKey({ key, model }) {
+  const res = await apiFetch('/api/ai/key', { method: 'PUT', body: JSON.stringify({ key, model }) })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Failed to save')
+  return data
+}
+
+// List the models the user's key has access to (for the settings dropdown).
+export async function listAiModels() {
+  const res = await apiFetch('/api/ai/models')
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Failed to list models')
+  return data // [{ id, display_name }]
+}
+
+// One assistant turn. boardId optional (omit for the dashboard planning chat).
+// history is prior [{ role, content }] turns. Returns { reply, applied, boardChanged }.
+export async function aiChat({ boardId, message, history }) {
+  const res = await apiFetch('/api/ai/chat', {
+    method: 'POST',
+    body: JSON.stringify({ boardId, message, history }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'The assistant failed')
+  return data
+}
+
 // Upload an image file via multipart/form-data; returns the stored URL path.
 // type controls which uploads/<type>/ folder it lands in on the backend
 // (avatars | cards | boards | comments) — must be appended before the file

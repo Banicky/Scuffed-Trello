@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { apiFetch, uploadImage, assetUrl } from '../api.js'
+import { useState, useRef, useEffect } from 'react'
+import { apiFetch, uploadImage, assetUrl, getAiKeyStatus, saveAiKey, listAiModels } from '../api.js'
 import TwoFactorSection from '../components/TwoFactorSection.jsx'
 import TwoFactorSetup from './TwoFactorSetup.jsx'
 import Starfield from '../components/Starfield.jsx'
@@ -334,6 +334,152 @@ function CustomizationSection({ userId }) {
   )
 }
 
+function AiSection() {
+  const [configured, setConfigured] = useState(false)
+  const [model, setModel] = useState('')
+  const [models, setModels] = useState([])
+  const [keyInput, setKeyInput] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  // Load current key status + chosen model. If a key exists, also fetch the
+  // model list (which itself validates the key against Anthropic).
+  useEffect(() => {
+    let alive = true
+    getAiKeyStatus()
+      .then(async s => {
+        if (!alive) return
+        setConfigured(s.configured)
+        setModel(s.model)
+        if (s.configured) {
+          try {
+            const list = await listAiModels()
+            if (alive) setModels(list)
+          } catch { /* leave model list empty; the saved model still works */ }
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [])
+
+  async function saveKey(e) {
+    e.preventDefault()
+    if (!keyInput.trim()) return
+    setSaving(true); setError(''); setSuccess('')
+    try {
+      const res = await saveAiKey({ key: keyInput.trim(), model })
+      setConfigured(res.configured)
+      setKeyInput('')
+      setSuccess('API key saved.')
+      try { setModels(await listAiModels()) } catch { /* ignore */ }
+    } catch (err) {
+      setError(err.message)
+    }
+    setSaving(false)
+  }
+
+  async function changeModel(e) {
+    const next = e.target.value
+    setModel(next)
+    setError(''); setSuccess('')
+    try {
+      await saveAiKey({ model: next })
+      setSuccess('Model updated.')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function clearKey() {
+    setSaving(true); setError(''); setSuccess('')
+    try {
+      await saveAiKey({ key: '' })
+      setConfigured(false)
+      setModels([])
+      setSuccess('API key removed.')
+    } catch (err) {
+      setError(err.message)
+    }
+    setSaving(false)
+  }
+
+  return (
+    <div className="settings-section">
+      <h2 className="settings-section-title">AI Assistant</h2>
+      <p className="settings-section-desc">
+        The assistant runs on your own Anthropic API key. It's stored encrypted and
+        only used to power your requests. Get a key at{' '}
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">console.anthropic.com</a>.
+      </p>
+
+      {loading ? (
+        <p className="settings-section-desc">Loading…</p>
+      ) : (
+        <>
+          <div className="settings-avatar-block">
+            <h3 className="settings-block-label">Anthropic API Key</h3>
+            <div className={`ai-key-status${configured ? ' ai-key-status--on' : ''}`}>
+              {configured ? '✓ A key is configured.' : 'No key configured yet.'}
+            </div>
+            <form className="settings-form" onSubmit={saveKey}>
+              <label className="settings-field">
+                <span className="settings-field-label">{configured ? 'Replace key' : 'API key'}</span>
+                <input
+                  className="card-input"
+                  type="password"
+                  placeholder="sk-ant-…"
+                  value={keyInput}
+                  onChange={e => setKeyInput(e.target.value)}
+                  autoComplete="off"
+                />
+              </label>
+              <div className="settings-avatar-upload-row">
+                <button className="btn-primary" type="submit" disabled={saving || !keyInput.trim()}>
+                  {saving ? 'Saving…' : 'Save key'}
+                </button>
+                {configured && (
+                  <button type="button" className="btn-ghost settings-avatar-clear" onClick={clearKey} disabled={saving}>
+                    Remove key
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {configured && (
+            <div className="settings-avatar-block">
+              <h3 className="settings-block-label">Model</h3>
+              <select className="card-input ai-model-select" value={model} onChange={changeModel}>
+                {/* Always include the saved model even if the list didn't load. */}
+                {!models.some(m => m.id === model) && <option value={model}>{model}</option>}
+                {models.map(m => (
+                  <option key={m.id} value={m.id}>{m.display_name || m.id}</option>
+                ))}
+              </select>
+              <p className="settings-avatar-hint">Faster, cheaper models suit quick card edits; stronger models plan better.</p>
+            </div>
+          )}
+
+          {error && <p className="settings-error">{error}</p>}
+          {success && <p className="settings-success">{success}</p>}
+        </>
+      )}
+    </div>
+  )
+}
+
+function IconAi() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z" />
+      <path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9z" />
+    </svg>
+  )
+}
+
 function IconAvatar() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -368,6 +514,7 @@ function IconSecurity() {
 const NAV_ITEMS = [
   { key: 'avatar',         label: 'Change Avatar',  Icon: IconAvatar },
   { key: 'customization',  label: 'Customization',   Icon: IconCustomization },
+  { key: 'ai',             label: 'AI Assistant',    Icon: IconAi },
   { key: 'security',       label: 'Security',        Icon: IconSecurity },
 ]
 
@@ -416,6 +563,7 @@ export default function SettingsPage({ user, section, onSection, onBack, onUpdat
           {section === 'avatar'        && <AvatarSection       user={user} onUpdate={onUpdateUser} />}
           {section === 'security'      && <SecuritySection user={user} onUpdateUser={onUpdateUser} onStartSetup={() => setSettingUp2fa(true)} />}
           {section === 'customization' && <CustomizationSection userId={user.id} />}
+          {section === 'ai'            && <AiSection />}
         </main>
       </div>
     </div>

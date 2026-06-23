@@ -3,6 +3,7 @@ import Column from '../components/Column.jsx'
 import CardDetailModal from '../components/CardDetailModal.jsx'
 import ImageUploadField from '../components/ImageUploadField.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
+import AiAssistant from '../components/AiAssistant.jsx'
 import { apiFetch, assetUrl, exportBoard, importBoard } from '../api.js'
 import { buildSearchRegex } from '../utils.js'
 
@@ -46,7 +47,10 @@ function MembersPanel({ boardId, isOwner, onClose }) {
           <li key={u.id} className="member-row">
             <UserAvatar user={u} className="avatar member-avatar" />
             <span className="member-name">{u.username}</span>
-            {isOwner && (
+            {u.is_owner && (
+              <span className="member-owner-crown" title="Board owner" aria-label="Board owner">👑</span>
+            )}
+            {isOwner && !u.is_owner && (
               <button className="member-remove" onClick={() => handleRemove(u.id)} title="Remove">✕</button>
             )}
           </li>
@@ -89,6 +93,7 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   const [activeMatchIndex, setActiveMatchIndex] = useState(0)
   const [ioBusy, setIoBusy] = useState(false)
   const [ioMessage, setIoMessage] = useState('')
+  const [aiOpen, setAiOpen] = useState(false)
   const cardRefs = useRef(new Map())
   const importInputRef = useRef(null)
 
@@ -432,7 +437,8 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   )
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${aiOpen ? ' ai-open' : ''}`}>
+      <div className="board-stage">
       {board?.background_image && (
         <div
           className="board-bg-overlay"
@@ -543,6 +549,14 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
             onClick={() => setShowMembers(v => !v)}
           >
             👥 Members
+          </button>
+          <button
+            className={`btn-ghost members-toggle ai-toggle${aiOpen ? ' active' : ''}`}
+            onClick={() => setAiOpen(v => !v)}
+            title="AI assistant"
+            aria-pressed={aiOpen}
+          >
+            ✦ Assistant
           </button>
           <button
             className="avatar avatar--btn"
@@ -673,6 +687,14 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
           </p>
         )}
       </main>
+      </div>
+
+      <AiAssistant
+        boardId={boardId}
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        onBoardChanged={loadBoard}
+      />
     </div>
   )
 }
