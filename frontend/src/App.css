@@ -1107,8 +1107,8 @@ select.card-input {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 16px;
-  padding: 56px;
+  gap: 14px;
+  padding: 48px 56px;
   color: var(--text-h);
   position: relative;
   z-index: 1;
@@ -1119,7 +1119,7 @@ select.card-input {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .auth-visual-heading {
@@ -1129,7 +1129,7 @@ select.card-input {
   letter-spacing: -0.03em;
   line-height: 1.08;
   margin: 0;
-  max-width: 460px;
+  max-width: 430px;
   color: var(--text-h);
 }
 
@@ -1137,8 +1137,8 @@ select.card-input {
   font-size: 14px;
   color: var(--text);
   opacity: 0.82;
-  max-width: 400px;
-  margin: 0 0 12px;
+  max-width: 390px;
+  margin: 0;
   line-height: 1.55;
 }
 
@@ -7126,6 +7126,320 @@ select.card-input {
 /* eyebrow uses the silver starlight, like the dashboard hero */
 .auth-visual-brand { color: var(--star); }
 
+/* ════════════════════════════════════════════════════════════════════
+   PRODUCT SHOWCASE (left panel) — an eyebrow, a shimmering headline, and the
+   product's features rendered as a vertical constellation of glowing nodes.
+   ════════════════════════════════════════════════════════════════════ */
+.auth-eyebrow {
+  margin: 0 0 -6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--star);
+  opacity: 0.68;
+}
+
+/* the headline keyword — a solid blue that pops against the headline in either
+   realm: a luminous cornflower on the night void, a deep blue on the day sky
+   (day value is set in the day-realm block below) */
+.auth-accent-word {
+  color: #84a4f5;
+  font-weight: 800;
+}
+
+/* feature list: glowing star-nodes joined by a faint constellation chain */
+.auth-features {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 420px;
+}
+.auth-features::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  bottom: 20px;
+  left: 18px; /* node centre */
+  width: 1px;
+  background: linear-gradient(180deg,
+    transparent,
+    color-mix(in srgb, var(--star) 55%, transparent) 12%,
+    color-mix(in srgb, var(--star) 55%, transparent) 88%,
+    transparent);
+  opacity: 0.55;
+}
+.auth-feature {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.auth-feature-node {
+  flex-shrink: 0;
+  width: 37px;
+  height: 37px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--star);
+  background: radial-gradient(circle at 50% 38%,
+    color-mix(in srgb, var(--accent) 32%, transparent),
+    color-mix(in srgb, var(--bg) 80%, transparent) 76%);
+  border: 1px solid color-mix(in srgb, var(--star) 32%, transparent);
+  box-shadow:
+    0 0 18px -3px color-mix(in srgb, var(--accent) 60%, transparent),
+    inset 0 0 9px -4px color-mix(in srgb, var(--star) 70%, transparent);
+}
+.auth-feature-node svg { width: 18px; height: 18px; }
+.auth-feature-title {
+  display: block;
+  font-family: var(--fantasy);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text-h);
+}
+.auth-feature-desc {
+  display: block;
+  margin-top: 1px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text);
+  opacity: 0.78;
+}
+
+/* staggered rise-in for the whole showcase on load */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-visual-brand,
+  .auth-eyebrow,
+  .auth-visual-heading,
+  .auth-visual-sub,
+  .auth-feature {
+    animation: auth-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .auth-visual-brand   { animation-delay: 0.04s; }
+  .auth-eyebrow        { animation-delay: 0.12s; }
+  .auth-visual-heading { animation-delay: 0.20s; }
+  .auth-visual-sub     { animation-delay: 0.28s; }
+  .auth-feature:nth-child(1) { animation-delay: 0.38s; }
+  .auth-feature:nth-child(2) { animation-delay: 0.46s; }
+  .auth-feature:nth-child(3) { animation-delay: 0.54s; }
+  .auth-feature:nth-child(4) { animation-delay: 0.62s; }
+}
+@keyframes auth-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Floating product collage: a tilted kanban board paired with a streak /
+   cosmic-rank card, parked in the empty right half of the landing panel and
+   kept fully inside it (clear of the form rail). Shown only ≥1440px, where
+   there's room beside the copy. ── */
+.auth-mockups {
+  position: absolute;
+  top: 50%;
+  right: 24px;
+  width: 300px;
+  transform: translateY(-50%);
+  z-index: -1; /* behind the copy, above the starfield */
+  pointer-events: none;
+  /* a vertical cascade: each card separated by a gap and staggered left/right
+     (via align-self) so all three read clearly instead of overlapping */
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (min-width: 1440px) {
+  .auth-mockups { display: flex; }
+}
+@media (prefers-reduced-motion: no-preference) and (min-width: 1440px) {
+  .auth-mockups { animation: auth-mock-float 7s ease-in-out infinite; }
+}
+@keyframes auth-mock-float {
+  0%, 100% { transform: translateY(-50%); }
+  50%      { transform: translateY(calc(-50% - 12px)); }
+}
+
+/* shared glass surface for the mock windows */
+.abm-glass {
+  box-sizing: border-box;
+  border-radius: 14px;
+  background: linear-gradient(155deg, rgba(26, 30, 40, 0.86), rgba(12, 14, 20, 0.82));
+  border: 1px solid rgba(184, 194, 214, 0.14);
+  box-shadow:
+    0 36px 80px -30px rgba(0, 0, 0, 0.92),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* board window — the centerpiece of the cascade */
+.abm-window {
+  order: 0;
+  align-self: center;
+  width: 240px;
+  padding: 12px;
+  transform: perspective(1500px) rotateY(-9deg) rotateX(4deg) rotate(0.5deg);
+  transform-origin: center;
+}
+
+.abm-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px 12px;
+}
+.abm-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(216, 221, 232, 0.28);
+}
+.abm-title {
+  margin-left: 8px;
+  font-family: var(--fantasy);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--star);
+  opacity: 0.82;
+}
+.abm-board { display: flex; gap: 9px; }
+.abm-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(184, 194, 214, 0.08);
+}
+.abm-col-head { display: flex; align-items: center; gap: 5px; }
+.abm-col-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.abm-col-name {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  opacity: 0.72;
+  white-space: nowrap;
+}
+.abm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.55);
+}
+.abm-card--accent {
+  background: color-mix(in srgb, var(--accent) 22%, rgba(255, 255, 255, 0.06));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 4px 10px -4px rgba(0, 0, 0, 0.6);
+}
+.abm-tag { width: 22px; height: 4px; border-radius: 3px; }
+.abm-line { height: 4px; border-radius: 3px; background: rgba(216, 221, 232, 0.22); }
+
+/* secondary mock — the streak / cosmic-rank card, at the bottom of the cascade */
+.asc-card {
+  order: 1;
+  align-self: flex-start;
+  width: 162px;
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transform: perspective(1500px) rotateY(-9deg) rotateX(4deg) rotate(-1.5deg);
+  transform-origin: center;
+}
+.asc-flame {
+  width: 26px;
+  height: 26px;
+  color: #f6a723;
+  filter: drop-shadow(0 0 7px rgba(245, 158, 11, 0.65));
+}
+.asc-flame svg { width: 100%; height: 100%; display: block; }
+/* number on top, "days active" stacked below it so the label reads clearly */
+.asc-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.asc-num {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-h);
+}
+.asc-label { font-size: 10px; color: var(--text); opacity: 0.75; }
+.asc-dots { display: flex; gap: 4px; }
+.asc-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(216, 221, 232, 0.16); }
+.asc-dot--on {
+  background: var(--star);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--star) 70%, transparent);
+}
+.asc-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--fantasy);
+  font-size: 11.5px;
+  letter-spacing: 0.03em;
+  color: var(--star);
+}
+.asc-rank-glyph { color: var(--accent); font-size: 12px; }
+
+/* third mock — the AI co-pilot chat, at the top of the cascade */
+.aic-card {
+  order: -1;
+  align-self: flex-end;
+  width: 162px;
+  padding: 12px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  transform: perspective(1500px) rotateY(-9deg) rotateX(4deg) rotate(1.5deg);
+  transform-origin: center;
+}
+.aic-head { display: flex; align-items: center; gap: 6px; }
+.aic-spark { width: 16px; height: 16px; color: var(--star); flex-shrink: 0; }
+.aic-spark svg { width: 100%; height: 100%; display: block; }
+.aic-title {
+  font-family: var(--fantasy);
+  font-size: 11.5px;
+  letter-spacing: 0.03em;
+  color: var(--star);
+  opacity: 0.9;
+}
+.aic-bubble {
+  border-radius: 9px;
+  padding: 6px 8px;
+  font-size: 9.5px;
+}
+.aic-bubble--user {
+  align-self: flex-end;
+  max-width: 90%;
+  color: var(--text-h);
+  background: color-mix(in srgb, var(--accent) 30%, rgba(255, 255, 255, 0.06));
+  border-bottom-right-radius: 3px;
+}
+.aic-bubble--ai {
+  align-self: flex-start;
+  width: 82%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-bottom-left-radius: 3px;
+}
+.aic-line { height: 4px; border-radius: 3px; background: rgba(216, 221, 232, 0.26); }
+
 /* ── Form chrome: small celestial touches over the auto-themed tokens ── */
 .auth-tab {
   font-family: var(--fantasy);
@@ -7284,3 +7598,28 @@ select.card-input {
   background: linear-gradient(155deg, #2a2e38 0%, #121319 100%);
   box-shadow: 0 6px 16px rgba(38, 64, 116, 0.28);
 }
+
+/* the headline keyword in a deep blue by day so it pops on the bright sky */
+.auth-shell--day .auth-accent-word { color: #1e40af; }
+
+/* the mock windows as light glass by day, mirroring the day board tiles */
+.auth-shell--day .abm-glass {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.86), rgba(232, 242, 252, 0.74));
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 36px 80px -32px rgba(38, 64, 116, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.auth-shell--day .abm-dot { background: rgba(60, 88, 140, 0.3); }
+.auth-shell--day .abm-col {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(110, 145, 200, 0.2);
+}
+.auth-shell--day .abm-card {
+  background: #fff;
+  box-shadow: 0 2px 6px -2px rgba(38, 64, 116, 0.22);
+}
+.auth-shell--day .abm-line { background: rgba(40, 56, 84, 0.18); }
+.auth-shell--day .asc-dot { background: rgba(60, 88, 140, 0.18); }
+.auth-shell--day .aic-bubble--ai { background: rgba(255, 255, 255, 0.7); }
+.auth-shell--day .aic-line { background: rgba(40, 56, 84, 0.2); }

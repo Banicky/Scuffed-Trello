@@ -69,6 +69,61 @@ function AuthConstellation({ data }) {
   )
 }
 
+// Product highlights for the left "landing" panel — each becomes a glowing node
+// on a vertical constellation that advertises what Scuffed Trello actually does.
+const FEATURES = [
+  {
+    title: 'Galaxies of work',
+    desc: 'Spin up boards of columns and cards, then drag tasks across the void.',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="5" height="16" rx="1.5" />
+        <rect x="9.5" y="4" width="5" height="11" rx="1.5" />
+        <rect x="16" y="4" width="5" height="14" rx="1.5" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Forge alliances',
+    desc: 'Invite your crew to shared boards and see who’s online, in real time.',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+  },
+  {
+    title: 'An AI co-pilot',
+    desc: 'Ask it to plan a sprint or shuffle cards — it acts on your board for you.',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3l1.7 5L19 9.7l-5.3 1.6L12 16.7l-1.7-5.4L5 9.7 10.3 8z" />
+        <path d="M18.6 15.4l.6 1.9 2 .6-2 .6-.6 2-.6-2-2-.6 2-.6z" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Chart your streak',
+    desc: 'Daily voyages earn cosmic ranks, from Stardust Drifter to Galactic Voyager.',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2c1 3-1 4-2 6-1.4 2.8.4 4.8 2 4.8 1.2 0 2.1-1 1.9-2.4 1.6 1 2.6 2.7 2.6 4.4A6.4 6.4 0 0 1 5.6 15c0-3 1.9-4.6 3-7 .8-1.9 2.4-3.9 3.4-6z" />
+      </svg>
+    ),
+  },
+]
+
+// A stylized peek at the real product — a kanban board of columns + cards, used
+// as a floating mockup on the landing panel. Colors echo the board palette.
+const MOCK_COLUMNS = [
+  { name: 'To chart', color: '#f59e0b', cards: [{ w: ['82%', '54%'] }, { w: ['64%'] }] },
+  { name: 'In orbit', color: '#8b5cf6', cards: [{ w: ['72%', '42%'], accent: true }, { w: ['80%'] }] },
+  { name: 'Landed',   color: '#10b981', cards: [{ w: ['60%'] }, { w: ['74%', '46%'] }] },
+]
+
 export default function AuthPage({ onLogin }) {
   const [tab, setTab] = useState('login')
   const [error, setError] = useState('')
@@ -285,8 +340,89 @@ export default function AuthPage({ onLogin }) {
           <span className="auth-brand">Scuffed Trello</span>
         </div>
 
-        <h1 className="auth-visual-heading">Chart your universe, together.</h1>
-        <p className="auth-visual-sub">Boards become galaxies and teammates become alliances — keep every quest in sync across the cosmos, from sprint planning to weekend chores.</p>
+        <p className="auth-eyebrow">Cosmic task management</p>
+        <h1 className="auth-visual-heading">Organize anything into a <span className="auth-accent-word">universe</span> worth exploring.</h1>
+        <p className="auth-visual-sub">Boards become galaxies, your team becomes an alliance, and tasks become quests — a project tracker that actually pulls you back in.</p>
+
+        <ul className="auth-features">
+          {FEATURES.map(f => (
+            <li className="auth-feature" key={f.title}>
+              <span className="auth-feature-node">{f.icon}</span>
+              <span className="auth-feature-text">
+                <span className="auth-feature-title">{f.title}</span>
+                <span className="auth-feature-desc">{f.desc}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        {/* a floating peek at the actual product — a tilted kanban board paired
+            with a streak / cosmic-rank card. Shown only on wide screens (see
+            CSS), fully inside the panel and clear of the form rail. */}
+        <div className="auth-mockups" aria-hidden="true">
+          <div className="abm-glass abm-window">
+            <div className="abm-titlebar">
+              <span className="abm-dot" />
+              <span className="abm-dot" />
+              <span className="abm-dot" />
+              <span className="abm-title">Nebula Sprint</span>
+            </div>
+            <div className="abm-board">
+              {MOCK_COLUMNS.map(col => (
+                <div className="abm-col" key={col.name}>
+                  <div className="abm-col-head">
+                    <span className="abm-col-dot" style={{ background: col.color }} />
+                    <span className="abm-col-name">{col.name}</span>
+                  </div>
+                  {col.cards.map((card, i) => (
+                    <div className={`abm-card${card.accent ? ' abm-card--accent' : ''}`} key={i}>
+                      <span className="abm-tag" style={{ background: col.color }} />
+                      {card.w.map((w, j) => (
+                        <span className="abm-line" style={{ width: w }} key={j} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* secondary mock — the streak / cosmic-rank card (gamification) */}
+          <div className="abm-glass asc-card">
+            <span className="asc-flame">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2c1 3-1 4-2 6-1.4 2.8.4 4.8 2 4.8 1.2 0 2.1-1 1.9-2.4 1.6 1 2.6 2.7 2.6 4.4A6.4 6.4 0 0 1 5.6 15c0-3 1.9-4.6 3-7 .8-1.9 2.4-3.9 3.4-6z" />
+              </svg>
+            </span>
+            <div className="asc-stat">
+              <span className="asc-num">12</span>
+              <span className="asc-label">days active</span>
+            </div>
+            <div className="asc-dots">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <span key={i} className={`asc-dot${i < 5 ? ' asc-dot--on' : ''}`} />
+              ))}
+            </div>
+            <div className="asc-rank"><span className="asc-rank-glyph">✦</span> Starfarer</div>
+          </div>
+
+          {/* third mock — the AI co-pilot chat */}
+          <div className="abm-glass aic-card">
+            <div className="aic-head">
+              <span className="aic-spark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 3l1.7 5L19 9.7l-5.3 1.6L12 16.7l-1.7-5.4L5 9.7 10.3 8z" />
+                </svg>
+              </span>
+              <span className="aic-title">AI co-pilot</span>
+            </div>
+            <div className="aic-bubble aic-bubble--user">Plan my sprint</div>
+            <div className="aic-bubble aic-bubble--ai">
+              <span className="aic-line" style={{ width: '92%' }} />
+              <span className="aic-line" style={{ width: '58%' }} />
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="auth-form-panel">
