@@ -2019,14 +2019,16 @@ select.card-input {
   font-weight: 700;
   font-size: 24px;
   line-height: 1;
+  /* pulse/colorwave tint — the accent by default; day mode recolours it */
+  --summon-glow: var(--accent);
   /* a soft ambient light source: a glowing core inside the ring … */
   background: radial-gradient(circle at 50% 50%,
-    color-mix(in srgb, var(--accent) 24%, transparent) 0%,
+    color-mix(in srgb, var(--summon-glow) 24%, transparent) 0%,
     transparent 70%);
   /* … and a wide breathing halo (resting value reduced-motion users keep) */
   box-shadow:
-    0 0 20px 0 color-mix(in srgb, var(--accent) 45%, transparent),
-    inset 0 0 12px -3px color-mix(in srgb, var(--accent) 40%, transparent);
+    0 0 20px 0 color-mix(in srgb, var(--summon-glow) 45%, transparent),
+    inset 0 0 12px -3px color-mix(in srgb, var(--summon-glow) 40%, transparent);
   transition: border-color 0.22s ease;
   animation: summon-pulse 3.2s ease-in-out infinite;
 }
@@ -2058,22 +2060,22 @@ select.card-input {
   0% {
     transform: translate(0, 0) rotate(0deg) scale(1);
     box-shadow:
-      0 0 18px -2px color-mix(in srgb, var(--accent) 42%, transparent),
-      inset 0 0 12px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+      0 0 18px -2px color-mix(in srgb, var(--summon-glow) 42%, transparent),
+      inset 0 0 12px -4px color-mix(in srgb, var(--summon-glow) 35%, transparent);
   }
   25% { transform: translate(-2.5px, -1.5px) rotate(-5deg) scale(1.04); }
   50% {
     transform: translate(2.5px, 1.5px) rotate(5deg) scale(1.07);
     box-shadow:
-      0 0 40px 4px color-mix(in srgb, var(--accent) 65%, transparent),
-      inset 0 0 16px -3px color-mix(in srgb, var(--accent) 55%, transparent);
+      0 0 40px 4px color-mix(in srgb, var(--summon-glow) 65%, transparent),
+      inset 0 0 16px -3px color-mix(in srgb, var(--summon-glow) 55%, transparent);
   }
   75% { transform: translate(-1.5px, 2px) rotate(-3deg) scale(1.03); }
   100% {
     transform: translate(0, 0) rotate(0deg) scale(1);
     box-shadow:
-      0 0 13px -3px color-mix(in srgb, var(--accent) 45%, transparent),
-      inset 0 0 10px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+      0 0 13px -3px color-mix(in srgb, var(--summon-glow) 45%, transparent),
+      inset 0 0 10px -4px color-mix(in srgb, var(--summon-glow) 35%, transparent);
   }
 }
 
@@ -6400,10 +6402,13 @@ select.card-input {
     rgba(40, 70, 120, 0.18) 0 10px 24px -6px, rgba(40, 70, 120, 0.1) 0 4px 12px -4px;
   color: var(--text);
 
-  /* a clean flat-white sky — the nebula (see NebulaVeil) is the only color,
-     painted as blue gas on top. */
+  /* an airy near-white sky carrying the faintest cool-blue cast — bluest up top
+     and toward Saturn (upper-right), washing back to clean white at the lower-
+     left. The NebulaVeil paints the soft blue cloud gas (blending to white) on top. */
   background-color: #ffffff;
-  background-image: none;
+  background-image:
+    radial-gradient(130% 95% at 50% -12%, rgba(178, 209, 239, 0.78) 0%, rgba(206, 227, 246, 0.4) 42%, transparent 74%),
+    radial-gradient(72% 62% at 84% 26%, rgba(170, 203, 237, 0.6) 0%, transparent 64%);
 }
 
 /* the starfield stays lit by day too — it just repaints in cool blue (see
@@ -6564,6 +6569,9 @@ select.card-input {
   background: rgba(255, 255, 255, 0.4);
   border: 1px dashed rgba(18, 22, 34, 0.5);
 }
+/* the summoning circle's pulse/colorwave reads as a soft "light black" glow by
+   day rather than the periwinkle accent */
+.dashboard-shell--day .board-tile-plus { --summon-glow: #3d424c; }
 .dashboard-shell--day .board-tile-title {
   color: #18202e;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
@@ -6668,15 +6676,19 @@ select.card-input {
 .dashboard-shell--day .cosmic-activity-item {
   border-bottom: 1px solid rgba(50, 84, 140, 0.12);
 }
+/* empty days read as clear hollow circles; active days as filled blue orbs, so
+   the row plainly shows how many days the user has been active */
 .dashboard-shell--day .streak-dot {
-  background: rgba(50, 84, 140, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(50, 84, 140, 0.3);
+  background: rgba(50, 84, 140, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(50, 84, 140, 0.42);
 }
 .dashboard-shell--day .streak-dot--on {
   background: radial-gradient(circle at 50% 32%, #6f95e0, #3f63c0);
   box-shadow: 0 0 10px rgba(63, 99, 192, 0.55), inset 0 0 0 1px rgba(200, 218, 255, 0.7);
 }
-/* deepen the activity row glyphs so they read against the light sky */
-.dashboard-shell--day .cosmic-activity-icon--board { color: #3a64b0; background: rgba(58, 100, 176, 0.16); }
-.dashboard-shell--day .cosmic-activity-icon--guild { color: #2f74c4; background: rgba(47, 116, 196, 0.15); }
+/* discovery glyphs take a unique cosmic violet by day — distinct from the blue
+   UI around them so each entry's icon stands out and reads as a "discovery".
+   Deletions keep their danger red. */
+.dashboard-shell--day .cosmic-activity-icon--board { color: #6a4fd0; background: rgba(106, 79, 208, 0.15); }
+.dashboard-shell--day .cosmic-activity-icon--guild { color: #8a52c8; background: rgba(138, 82, 200, 0.15); }
 .dashboard-shell--day .cosmic-activity-icon--deleted { color: #c63838; background: rgba(198, 56, 56, 0.14); }

@@ -1052,7 +1052,11 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       if (activityPageRef.current) gsap.from(activityPageRef.current, { opacity: 0, duration: 0.25, ease: 'power1.out' })
       gsap.from('.cosmic-page', { y: 34, scale: 0.96, opacity: 0, duration: 0.5, ease: 'power3.out' })
       gsap.from('.cosmic-page .streak-flame', { scale: 0.5, opacity: 0, duration: 0.6, ease: 'back.out(1.7)', delay: 0.18 })
-      gsap.from('.cosmic-page .streak-dot', { scale: 0, opacity: 0, duration: 0.4, ease: 'back.out(2)', stagger: 0.05, delay: 0.34 })
+      // pop the dots in with a fromTo so they always settle visible — a plain
+      // from(scale:0) can leave them stuck invisible if the open tween is cut short
+      gsap.fromTo('.cosmic-page .streak-dot',
+        { scale: 0, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(2)', stagger: 0.05, delay: 0.34, clearProps: 'transform,opacity' })
       // Voyager's Log slides in, and the milestone bar grows from empty
       gsap.from('.cosmic-page .streak-extras > *', { y: 14, opacity: 0, duration: 0.5, ease: 'power2.out', stagger: 0.08, delay: 0.46 })
       gsap.from('.cosmic-page .streak-milestone-fill', { scaleX: 0, transformOrigin: 'left center', duration: 0.9, ease: 'power2.out', delay: 0.62 })

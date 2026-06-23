@@ -1,8 +1,9 @@
 // Day-sky nebula texture. A static SVG painted *under* the Starfield canvas so
 // the constellations + stars (drawn on the canvas above) stay fully legible.
 //
-// Two tones of scattered puffs: blue gas (~70% of the sky) and light cool-gray
-// dust (~15%), leaving ~15% open white. Each puff starts as a radial bloom, then a
+// Tones of scattered puffs: blue gas across most of the sky, light cool-gray
+// dust in the gaps, and a few bright near-white highlights that blend into the
+// blue. Each puff starts as a radial bloom, then a
 // filter displaces *and* noise-carves it into a structured cloud SHAPE —
 // billowing lobes with concave, broken edges, not a smooth blob — while the
 // bright core keeps it reading as a lit cloud. Gray is painted *after* blue, so
@@ -37,24 +38,36 @@ const GRAY_PUFFS = [
 ]
 
 const FILTERS = [
-  { id: 'nbA', seed: 7,  freq: '0.006 0.008',   scale: 62 },
-  { id: 'nbB', seed: 19, freq: '0.0072 0.009',  scale: 52 },
-  { id: 'nbC', seed: 33, freq: '0.0055 0.0072', scale: 70 },
+  { id: 'nbA', seed: 7,  freq: '0.006 0.008',   scale: 56 },
+  { id: 'nbB', seed: 19, freq: '0.0072 0.009',  scale: 48 },
+  { id: 'nbC', seed: 33, freq: '0.0055 0.0072', scale: 62 },
 ]
 
-// flatten to one render pass: blue first (painted under), gray second (on top)
+// A few bright near-white highlight puffs, painted last (on top) so they blend
+// into the blue gas as occasional sunlit lobes rather than tiling beside it.
+const WHITE_PUFFS = [
+  { cx: 360,  cy: 180, hw: 185, hh: 150, deep: false, f: 'nbC' }, // upper-left highlight
+  { cx: 1080, cy: 235, hw: 175, hh: 145, deep: false, f: 'nbB' }, // top-right highlight
+  { cx: 880,  cy: 430, hw: 205, hh: 165, deep: false, f: 'nbA' }, // mid-right highlight
+  { cx: 600,  cy: 660, hw: 195, hh: 150, deep: false, f: 'nbB' }, // lower-centre highlight
+]
+
+// flatten to one render pass: blue under, gray mid, white highlights on top
 const ALL_PUFFS = [
   ...BLUE_PUFFS.map(p => ({ ...p, tone: 'blue' })),
   ...GRAY_PUFFS.map(p => ({ ...p, tone: 'gray' })),
+  ...WHITE_PUFFS.map(p => ({ ...p, tone: 'white' })),
 ]
 
 function fillFor(p) {
+  if (p.tone === 'white') return 'nbPuffWhite'
   if (p.tone === 'gray') return p.deep ? 'nbPuffGrayDeep' : 'nbPuffGray'
   return p.deep ? 'nbPuffDeep' : 'nbPuff'
 }
 function opacityFor(p) {
-  if (p.tone === 'gray') return p.deep ? 0.95 : 0.85
-  return p.deep ? 1 : 0.94
+  if (p.tone === 'white') return 0.62
+  if (p.tone === 'gray') return p.deep ? 0.55 : 0.42
+  return p.deep ? 1 : 0.92
 }
 
 export default function NebulaVeil() {
@@ -66,44 +79,54 @@ export default function NebulaVeil() {
       aria-hidden="true"
     >
       <defs>
-        {/* blue gas — saturated cores fading out through pale #DAE8F0 edges */}
+        {/* blue gas — soft baby-blue puffs that fade out through a pale edge.
+            Cores stay light so the white highlight puffs blend cleanly, and the
+            mids hold a gentle baby blue rather than a rich, saturated azure. */}
         <radialGradient id="nbPuff" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#93C3E8" stopOpacity="0.96" />
-          <stop offset="50%" stopColor="#B4D6EE" stopOpacity="0.76" />
-          <stop offset="100%" stopColor="#DAE8F0" stopOpacity="0" />
+          <stop offset="0%" stopColor="#CDE8F8" stopOpacity="0.94" />
+          <stop offset="50%" stopColor="#A7D7F1" stopOpacity="0.82" />
+          <stop offset="100%" stopColor="#DCEFF8" stopOpacity="0" />
         </radialGradient>
         <radialGradient id="nbPuffDeep" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#66A8DD" stopOpacity="1" />
-          <stop offset="54%" stopColor="#97C6EA" stopOpacity="0.86" />
-          <stop offset="100%" stopColor="#DAE8F0" stopOpacity="0" />
+          <stop offset="0%" stopColor="#8FCDEE" stopOpacity="1" />
+          <stop offset="54%" stopColor="#ABDAF2" stopOpacity="0.88" />
+          <stop offset="100%" stopColor="#DCEFF8" stopOpacity="0" />
         </radialGradient>
 
-        {/* cool-grey dust — lightened: paler cores fading to #DEE2E7 */}
+        {/* cool-slate dust — a faint blue-grey, kept very light so it adds quiet
+            depth in the gaps without muddying the clean powder-blue clouds */}
         <radialGradient id="nbPuffGray" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#B6BFC9" stopOpacity="0.85" />
-          <stop offset="50%" stopColor="#CCD2D9" stopOpacity="0.66" />
-          <stop offset="100%" stopColor="#DEE2E7" stopOpacity="0" />
+          <stop offset="0%" stopColor="#C6D4E4" stopOpacity="0.5" />
+          <stop offset="50%" stopColor="#CFDAE8" stopOpacity="0.36" />
+          <stop offset="100%" stopColor="#DEE6EF" stopOpacity="0" />
         </radialGradient>
         <radialGradient id="nbPuffGrayDeep" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#9AA4B0" stopOpacity="0.95" />
-          <stop offset="54%" stopColor="#C2C8D0" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#DEE2E7" stopOpacity="0" />
+          <stop offset="0%" stopColor="#B6C7DC" stopOpacity="0.6" />
+          <stop offset="54%" stopColor="#C7D5E6" stopOpacity="0.46" />
+          <stop offset="100%" stopColor="#DEE6EF" stopOpacity="0" />
         </radialGradient>
 
-        {/* turn each round bloom into a structured cloud SHAPE (not a blob):
-            (1) feDisplacementMap warps the outline organically, then
-            (2) feColorMatrix maps the noise red→alpha and feComposite carves
-                that mask in — removing low-density regions splits the form into
-                billowing lobes with concave, broken edges. The bright core
-                survives, so it still reads as a lit cloud; a light blur smooths
-                the tooth without flattening the lobes back into a blob. */}
+        {/* bright near-white highlight — a soft sunlit core that blends into the
+            blue gas where the two overlap, then fades clear */}
+        <radialGradient id="nbPuffWhite" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.88" />
+          <stop offset="48%" stopColor="#F1F7FD" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#EAF3FB" stopOpacity="0" />
+        </radialGradient>
+
+        {/* turn each round bloom into an organic cloud SHAPE with soft edges:
+            (1) feDisplacementMap warps the outline so no two puffs match, then
+            (2) feColorMatrix maps the noise red→alpha and feComposite carves it
+                in *gently* — just enough to break the perfect oval into a cloud
+                form without tearing it into broken lobes. A wider blur then
+                feathers the whole edge so each shape stays soft, not crisp. */}
         {FILTERS.map(({ id, seed, freq, scale }) => (
           <filter key={id} id={id} x="-40%" y="-40%" width="180%" height="180%" colorInterpolationFilters="sRGB">
             <feTurbulence type="fractalNoise" baseFrequency={freq} numOctaves="3" seed={seed} stitchTiles="stitch" result="noise" />
             <feDisplacementMap in="SourceGraphic" in2="noise" scale={scale} xChannelSelector="R" yChannelSelector="G" result="disp" />
-            <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 0 0 0 -0.14" result="mask" />
+            <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 0 0 0 -0.05" result="mask" />
             <feComposite in="disp" in2="mask" operator="in" result="shaped" />
-            <feGaussianBlur in="shaped" stdDeviation="1" />
+            <feGaussianBlur in="shaped" stdDeviation="3.2" />
           </filter>
         ))}
       </defs>
