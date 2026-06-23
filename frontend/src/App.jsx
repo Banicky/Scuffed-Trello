@@ -46,6 +46,22 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
+  // Presence heartbeat: while logged in, ping the server every 30s (and on
+  // regaining focus) so board member lists can flag who is currently active.
+  // Lives at the app root so it runs on the dashboard and inside a board alike.
+  useEffect(() => {
+    if (status !== 'ready') return
+    const ping = () => apiFetch('/api/heartbeat', { method: 'POST' }).catch(() => {})
+    ping()
+    const id = setInterval(ping, 30000)
+    const onVisible = () => { if (!document.hidden) ping() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [status])
+
   function handleLogin(u) {
     setUser(u)
     setStatus('ready')

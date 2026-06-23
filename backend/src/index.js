@@ -1153,14 +1153,26 @@ app.post("/api/boards/:id/import", requireAuth, async (req, res) => {
 
 // ── Board members ─────────────────────────────────────────────────────────────
 
+// Presence heartbeat — the client pings this on an interval (~30s) while the app
+// is open; we stamp last_seen so member lists can flag who is currently active.
+app.post("/api/heartbeat", requireAuth, async (req, res) => {
+  await pool.query("UPDATE users SET last_seen = NOW() WHERE id = $1", [req.session.userId]);
+  res.json({ ok: true });
+});
+
 app.get("/api/boards/:boardId/members", requireAuth, async (req, res) => {
   if (!await canAccessBoard(req.session.userId, req.params.boardId)) {
     return res.status(403).json({ error: "Forbidden" });
   }
   // The owner is not stored in board_members, so include them explicitly and
   // flag them so the UI can mark ownership. Owner first, then members A→Z.
+  // is_active is computed server-side (server NOW() vs server last_seen) to avoid
+  // client clock skew — a member counts as active for 75s after their last ping
+  // (2.5× the 30s heartbeat, so a single dropped beat doesn't flicker them off).
   const result = await pool.query(
-    `SELECT u.id, u.username, u.email, u.avatar_url, (u.id = b.owner_id) AS is_owner
+    `SELECT u.id, u.username, u.email, u.avatar_url, u.last_seen,
+            (u.id = b.owner_id) AS is_owner,
+            (u.last_seen IS NOT NULL AND u.last_seen > NOW() - INTERVAL '75 seconds') AS is_active
      FROM boards b
      JOIN users u
        ON u.id = b.owner_id
@@ -2287,6 +2299,10 @@ async function migrate() {
   // never returned in plaintext) and the model they chose to run it under.
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_api_key TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_model VARCHAR(64)`);
+
+  // Presence: last_seen is bumped by the client heartbeat (~30s) while the app
+  // is open, so board member lists can flag who is currently active.
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ`);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_oauth_idx ON users (oauth_provider, oauth_id)
     WHERE oauth_provider IS NOT NULL

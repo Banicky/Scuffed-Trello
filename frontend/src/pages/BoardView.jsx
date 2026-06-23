@@ -13,9 +13,16 @@ function MembersPanel({ boardId, isOwner, onClose }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    apiFetch(`/api/boards/${boardId}/members`)
+    let active = true
+    const load = () => apiFetch(`/api/boards/${boardId}/members`)
       .then(r => r.json())
-      .then(setMembers)
+      .then(data => { if (active) setMembers(Array.isArray(data) ? data : []) })
+      .catch(() => {})
+    load()
+    // refresh while the panel is open so the active/inactive glow stays live as
+    // members come and go (heartbeat-driven; see is_active on the members API)
+    const id = setInterval(load, 20000)
+    return () => { active = false; clearInterval(id) }
   }, [boardId])
 
   async function handleInvite(e) {
@@ -45,7 +52,14 @@ function MembersPanel({ boardId, isOwner, onClose }) {
       <ul className="members-list">
         {members.map(u => (
           <li key={u.id} className="member-row">
-            <UserAvatar user={u} className="avatar member-avatar" />
+            <span className="member-avatar-wrap">
+              <UserAvatar user={u} className="avatar member-avatar" />
+              <span
+                className={`member-status ${u.is_active ? 'member-status--active' : 'member-status--inactive'}`}
+                title={u.is_active ? 'Active' : 'Offline'}
+                aria-label={u.is_active ? 'Active' : 'Offline'}
+              />
+            </span>
             <span className="member-name">{u.username}</span>
             {u.is_owner && (
               <span className="member-owner-crown" title="Board owner" aria-label="Board owner">👑</span>
