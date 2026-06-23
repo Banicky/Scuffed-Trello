@@ -5,6 +5,7 @@ import { relativeTime } from '../utils.js'
 import { COLUMN_PALETTE, ZODIAC_CONSTELLATIONS } from '../constants.js'
 import UserAvatar from '../components/UserAvatar.jsx'
 import Starfield from '../components/Starfield.jsx'
+import NebulaVeil from '../components/NebulaVeil.jsx'
 import AiAssistant from '../components/AiAssistant.jsx'
 
 const GUILD_COLORS = [
@@ -500,6 +501,17 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
             className="board-tile-zodiac-line"
             points={zodiac.points.map(([x, y]) => `${x},${y}`).join(' ')}
           />
+          {/* soft blurred halo behind each node — the luminous aura */}
+          {zodiac.points.map(([x, y], i) => (
+            <circle
+              key={`halo-${i}`}
+              className="board-tile-zodiac-halo"
+              cx={x}
+              cy={y}
+              r={i % 3 === 0 ? 5 : 4}
+              style={{ animationDelay: `${(sparkleDelays[i] % 3.2).toFixed(2)}s` }}
+            />
+          ))}
           {zodiac.points.map(([x, y], i) => (
             <circle
               key={i}
@@ -763,14 +775,14 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const activityPageRef = useRef(null)
   const feedListRef = useRef(null)
   const scrollThumbRef = useRef(null)
-  // hero day/night swap (saturn ⇄ sun)
+  // hero ringed planet — rides through both skies; only the sky tone changes
   const heroPlanetRef = useRef(null)
-  const heroSunRef = useRef(null)
+  const heroGlowRef = useRef(null)  // breathing aura behind the planet
+  const heroSunRef = useRef(null)   // retired sun body, kept hidden in both modes
   const heroRaysRef = useRef(null)
   const modeIconRef = useRef(null)
-  const modeFxRef = useRef(null)    // full-screen ink-wipe overlay for mode switches
-  const sunSpinRef = useRef(null)   // the looping GSAP ray-rotation tween
-  const heroBodyInit = useRef(false) // skip the swap animation on first paint
+  const modeFxRef = useRef(null)    // full-screen wipe overlay for mode switches
+  const heroBodyInit = useRef(false) // skip the settle animation on first paint
 
   const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
@@ -827,7 +839,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
     // gentle cross-fade: a veil in the incoming sky's tone fades in, we swap the
     // theme underneath while it's opaque, then it fades back out to reveal it
-    fx.style.background = next === 'day' ? '#dcc8a0' : '#06070b'
+    fx.style.background = next === 'day' ? '#ccd4e0' : '#06070b'
     gsap.timeline()
       .set(fx, { autoAlpha: 0 })
       .to(fx, { autoAlpha: 1, duration: 0.26, ease: 'power1.inOut' })
@@ -991,36 +1003,28 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     return () => ctx.revert()
   }, [])
 
-  // ── GSAP: morph the hero between Saturn (night) and the Sun (day) ──
+  // ── GSAP: the ringed planet rides through both skies — only the sky tone
+  //    cross-fades between day and night (see toggleColorMode's wipe). The sun
+  //    body stays retired; on a mode switch the planet gives a soft settle. ──
   useEffect(() => {
     const planet = heroPlanetRef.current
     const sun = heroSunRef.current
     if (!planet || !sun) return
-    const day = colorMode === 'day'
+    gsap.set(sun, { autoAlpha: 0 })
 
     if (!heroBodyInit.current) {
-      // first paint — set the correct body instantly, no transition
-      gsap.set(planet, { autoAlpha: day ? 0 : 1, scale: day ? 0.4 : 1, svgOrigin: '100 100' })
-      gsap.set(sun,    { autoAlpha: day ? 1 : 0, scale: day ? 1 : 0.4, svgOrigin: '100 100' })
+      gsap.set(planet, { autoAlpha: 1, scale: 1.1, svgOrigin: '100 100' })
       heroBodyInit.current = true
-    } else {
-      // cross-fade + scale the outgoing body out and the incoming body in
-      gsap.to(planet, { autoAlpha: day ? 0 : 1, scale: day ? 0.4 : 1, svgOrigin: '100 100',
-        duration: 0.6, ease: day ? 'power2.in' : 'back.out(1.7)', overwrite: 'auto' })
-      gsap.to(sun, { autoAlpha: day ? 1 : 0, scale: day ? 1 : 0.4, svgOrigin: '100 100',
-        duration: 0.6, ease: day ? 'back.out(1.7)' : 'power2.in', overwrite: 'auto' })
+    } else if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      gsap.fromTo(planet,
+        { scale: 0.95, svgOrigin: '100 100' },
+        { scale: 1.1, autoAlpha: 1, duration: 0.6, ease: 'back.out(1.7)', overwrite: 'auto' })
     }
-
-    // the sun's rays turn slowly — only while the sun is showing
-    sunSpinRef.current?.kill()
-    sunSpinRef.current = null
-    if (day && heroRaysRef.current && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      sunSpinRef.current = gsap.to(heroRaysRef.current, {
-        rotation: 360, svgOrigin: '100 100', duration: 44, ease: 'none', repeat: -1,
-      })
-    }
-    return () => { sunSpinRef.current?.kill() }
   }, [colorMode])
+
+  // The planet's aura now breathes via a pure-CSS keyframe pulse
+  // (.hero-glow-core in App.css) rather than GSAP, so it honors
+  // prefers-reduced-motion and never touches layout.
 
   // ── GSAP reveal: board tiles rise + constellation lines stroke-draw ──
   useEffect(() => {
@@ -1050,7 +1054,11 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       if (activityPageRef.current) gsap.from(activityPageRef.current, { opacity: 0, duration: 0.25, ease: 'power1.out' })
       gsap.from('.cosmic-page', { y: 34, scale: 0.96, opacity: 0, duration: 0.5, ease: 'power3.out' })
       gsap.from('.cosmic-page .streak-flame', { scale: 0.5, opacity: 0, duration: 0.6, ease: 'back.out(1.7)', delay: 0.18 })
-      gsap.from('.cosmic-page .streak-dot', { scale: 0, opacity: 0, duration: 0.4, ease: 'back.out(2)', stagger: 0.05, delay: 0.34 })
+      // pop the dots in with a fromTo so they always settle visible — a plain
+      // from(scale:0) can leave them stuck invisible if the open tween is cut short
+      gsap.fromTo('.cosmic-page .streak-dot',
+        { scale: 0, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(2)', stagger: 0.05, delay: 0.34, clearProps: 'transform,opacity' })
       // Voyager's Log slides in, and the milestone bar grows from empty
       gsap.from('.cosmic-page .streak-extras > *', { y: 14, opacity: 0, duration: 0.5, ease: 'power2.out', stagger: 0.08, delay: 0.46 })
       gsap.from('.cosmic-page .streak-milestone-fill', { scaleX: 0, transformOrigin: 'left center', duration: 0.9, ease: 'power2.out', delay: 0.62 })
@@ -1243,6 +1251,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
   return (
     <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}${aiOpen ? ' ai-open' : ''}`} ref={rootRef}>
+      {colorMode === 'day' && <NebulaVeil />}
       <Starfield mode={colorMode} />
       <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
 
@@ -1366,6 +1375,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             <UserAvatar user={user} className="sidebar-profile-avatar" />
             <div className="sidebar-profile-info">
               <span className="sidebar-profile-username">{user.username}</span>
+              <span className="sidebar-profile-rank">{cosmicRank}</span>
             </div>
           </div>
 
@@ -1471,6 +1481,22 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               <circle className="dhc-dot" cx="100" cy="62" r="1.4" />
               <circle className="dhc-dot" cx="50" cy="100" r="1.2" />
             </svg>
+            {/* diamond stars scattered across the banner for depth & texture */}
+            {[
+              { cls: 'hero-card-star--md', pos: { top: '62%', left: '3%' } },     // bottom-left of the summary line
+              { cls: 'hero-card-star--sm', pos: { top: '8%', left: '13%' } },     // near the top border, left side
+              { cls: 'hero-card-star--sm', pos: { top: '47%', left: '6.5%' } },   // directly below the greeting name
+              { cls: 'hero-card-star--sm', pos: { top: '85%', left: '20%' } },    // below "Cosmic Activity"
+              { cls: 'hero-card-star--md', pos: { top: '9%', right: '3%' } },     // upper-right corner
+              // cluster plastered in the open band right of the name / summary
+              { cls: 'hero-card-star--md', pos: { top: '36%', left: '57%' } },    // top (nudged right)
+              { cls: 'hero-card-star--lg', pos: { top: '86%', left: '70%' } },    // bottom-right, kept clear of the Saturn orrery
+              { cls: 'hero-card-star--md', pos: { top: '70%', left: '31%' } },    // below — next to Cosmic Activity
+            ].map((s, i) => (
+              <svg key={i} className={`hero-card-star ${s.cls}`} style={s.pos} viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 0 L13.6 10.4 L24 12 L13.6 13.6 L12 24 L10.4 13.6 L0 12 L10.4 10.4 Z" />
+              </svg>
+            ))}
             <div className="dash-hero-left">
               <p className="dash-hero-eyebrow">{today.toUpperCase()}</p>
               <h1 className="dash-hero-greeting">{greeting}, <em className="dash-hero-username">{user.username}</em>.</h1>
@@ -1505,9 +1531,21 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                     <stop offset="52%" stopColor="#aab2c6" />
                     <stop offset="100%" stopColor="#363c4a" />
                   </radialGradient>
+                  {/* daylight: a deep, saturated navy sphere fading to near-black */}
+                  <radialGradient id="heroPlanetDay" cx="38%" cy="32%" r="80%">
+                    <stop offset="0%" stopColor="#46587e" />
+                    <stop offset="48%" stopColor="#222c44" />
+                    <stop offset="100%" stopColor="#0a0e1a" />
+                  </radialGradient>
                   <radialGradient id="heroGlow" cx="50%" cy="50%" r="50%">
                     <stop offset="0%" stopColor="rgba(198,208,230,0.45)" />
                     <stop offset="100%" stopColor="rgba(198,208,230,0)" />
+                  </radialGradient>
+                  {/* daylight: a soft dark-blue aura/halo so the navy planet has depth */}
+                  <radialGradient id="heroGlowDay" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="rgba(34,52,102,0.5)" />
+                    <stop offset="55%" stopColor="rgba(26,40,82,0.24)" />
+                    <stop offset="100%" stopColor="rgba(26,40,82,0)" />
                   </radialGradient>
                   <radialGradient id="heroSun" cx="42%" cy="38%" r="72%">
                     <stop offset="0%" stopColor="#fff3d0" />
@@ -1518,6 +1556,15 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                     <stop offset="0%" stopColor="rgba(255,190,90,0.55)" />
                     <stop offset="100%" stopColor="rgba(255,190,90,0)" />
                   </radialGradient>
+                  {/* surface latitude lines: light gray fading to dark gray */}
+                  <linearGradient id="heroBandLight" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#eef1f6" />
+                    <stop offset="50%" stopColor="#9aa0ad" />
+                    <stop offset="100%" stopColor="#3c414c" />
+                  </linearGradient>
+                  {/* the four-pointed compass star, normalized to the origin so it can be
+                      scattered at any size/position via <use transform> */}
+                  <path id="heroStarShape" d="M0,-13 L1.6,-1.6 L13,0 L1.6,1.6 L0,13 L-1.6,1.6 L-13,0 L-1.6,-1.6 Z" />
                 </defs>
 
                 {/* zodiac wheel */}
@@ -1532,22 +1579,23 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                   ))}
                 </g>
 
-                {/* central glow */}
-                <circle cx="100" cy="100" r="50" fill="url(#heroGlow)" />
+                {/* central glow — pulses via GSAP so the planet breathes light */}
+                <circle className="hero-glow-core" ref={heroGlowRef} cx="100" cy="100" r="50" fill="url(#heroGlow)" />
 
-                {/* night body — tilted ringed planet (saturn) */}
-                <g className="hero-planet-group" ref={heroPlanetRef} style={{ visibility: colorMode === 'day' ? 'hidden' : 'visible' }}>
+                {/* the tilted ringed planet (saturn) — shown in both day and night */}
+                <g className="hero-planet-group" ref={heroPlanetRef} style={{ visibility: 'visible' }}>
                   <g transform="rotate(-18 100 100)">
                     <ellipse className="hero-ring hero-ring--back" cx="100" cy="100" rx="42" ry="13" />
-                    <circle cx="100" cy="100" r="21" fill="url(#heroPlanet)" />
-                    <path className="hero-band" d="M82,95 q18,7 38,-2" />
-                    <path className="hero-band" d="M81,104 q19,7 39,-1" />
+                    <circle className="hero-planet-body" cx="100" cy="100" r="21" fill="url(#heroPlanet)" />
+                    {/* two latitude lines meeting the planet's edge so they read as curving over the sphere, sitting just above the front ring */}
+                    <path className="hero-band-light" d="M79,98 q21,7 42,-3" />
+                    <path className="hero-band-light" d="M80,104 q20,7 40,-3" />
                     <path className="hero-ring hero-ring--front" d="M58,100 a42,13 0 0 0 84,0" />
                   </g>
                 </g>
 
-                {/* day body — radiant sun */}
-                <g className="hero-sun-group" ref={heroSunRef} style={{ visibility: colorMode === 'day' ? 'visible' : 'hidden' }}>
+                {/* retired sun body — kept in the DOM but hidden in both modes */}
+                <g className="hero-sun-group" ref={heroSunRef} style={{ visibility: 'hidden' }}>
                   <circle className="hero-sun-glow" cx="100" cy="100" r="50" fill="url(#heroSunGlow)" />
                   <g className="hero-rays" ref={heroRaysRef}>
                     {Array.from({ length: 12 }).map((_, i) => (
@@ -1567,10 +1615,26 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                   <circle className="hero-moon hero-moon--sm" cx="100" cy="38" r="2.4" />
                 </g>
 
-                {/* sparkles */}
+                {/* ambient sparkles scattered to the corners */}
                 <path className="hero-spark hero-spark--1" d="M34,52 l1.4,4 4,1.4 -4,1.4 -1.4,4 -1.4,-4 -4,-1.4 4,-1.4 z" />
                 <path className="hero-spark hero-spark--2" d="M168,140 l1.1,3.2 3.2,1.1 -3.2,1.1 -1.1,3.2 -1.1,-3.2 -3.2,-1.1 3.2,-1.1 z" />
-                <path className="hero-spark hero-spark--3" d="M150,40 l0.9,2.6 2.6,0.9 -2.6,0.9 -0.9,2.6 -0.9,-2.6 -2.6,-0.9 2.6,-0.9 z" />
+                <path className="hero-spark hero-spark--3" d="M150,38 l0.9,2.6 2.6,0.9 -2.6,0.9 -0.9,2.6 -0.9,-2.6 -2.6,-0.9 2.6,-0.9 z" />
+                {/* two echo stars nudged outward so their centres rest on the outer orbit
+                    ring (r=80) — top-right + bottom-left */}
+                <path className="hero-star hero-star--c" transform="translate(2.5,-2)" d="M160,44 L161,51 L168,52 L161,53 L160,60 L159,53 L152,52 L159,51 Z" />
+                <path className="hero-star hero-star--d" transform="translate(-3.7,3.3)" d="M44,142 L45,149 L52,150 L45,151 L44,158 L43,151 L36,150 L43,149 Z" />
+                {/* scattered star dust — small & medium echoes of the compass star spread
+                    across the card to add depth and texture */}
+                <use href="#heroStarShape" className="hero-star hero-star--md" transform="translate(34,80) scale(0.46)" />
+                <use href="#heroStarShape" className="hero-star hero-star--md" transform="translate(168,116) scale(0.42)" />
+                <use href="#heroStarShape" className="hero-star hero-star--md" transform="translate(98,176) scale(0.4)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(22,34) scale(0.22)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(181,30) scale(0.2)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(16,126) scale(0.24)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(186,152) scale(0.2)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(118,18) scale(0.22)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(78,160) scale(0.18)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(150,168) scale(0.22)" />
               </svg>
             </div>
           </section>
