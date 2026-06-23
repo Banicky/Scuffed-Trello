@@ -7102,8 +7102,8 @@ select.card-input {
 /* day / night realm toggle, pinned to the top-left corner above everything */
 .auth-mode-toggle {
   position: absolute;
-  top: 22px;
-  left: 24px;
+  bottom: 40px;
+  right: 32px;
   z-index: 2;
 }
 

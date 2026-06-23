@@ -124,15 +124,52 @@ export default function Starfield({ mode = 'night', randomConstellations = false
       // Constellations: the fixed star-chart by default. When asked (e.g. the
       // auth page) we re-roll their placement + shape each build so the chains
       // differ on every page load rather than sitting in the same spots.
+      // Placement uses rejection sampling on pixel bounding boxes so the chains
+      // never overlap — non-overlapping boxes guarantee no line from one chain
+      // crosses another. Boxes are computed in pixels (parallax/drift ignored)
+      // since x scales by w and the shape by w too, while y scales by h.
       if (randomConstellations) {
         const shapes = CONSTELLATIONS.map(c => c.pts)
         const n = 5 + Math.floor(Math.random() * 3) // 5–7 chains
-        constellations = Array.from({ length: n }, () => ({
-          x: rand(0.04, 0.9),
-          y: rand(0.03, 0.88),
-          s: rand(0.08, 0.15),
-          pts: shapes[Math.floor(Math.random() * shapes.length)],
-        }))
+        const pad = 0.02 * w // keep a little air between neighbouring chains
+        const placed = [] // pixel boxes {l,t,r,b}
+        constellations = []
+        for (let k = 0; k < n; k++) {
+          const pts = shapes[Math.floor(Math.random() * shapes.length)]
+          // shape extents in shape-space (pre-scale)
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+          for (const pt of pts) {
+            if (pt[0] < minX) minX = pt[0]
+            if (pt[0] > maxX) maxX = pt[0]
+            if (pt[1] < minY) minY = pt[1]
+            if (pt[1] > maxY) maxY = pt[1]
+          }
+          let chain = null
+          for (let attempt = 0; attempt < 40; attempt++) {
+            const s = rand(0.08, 0.15)
+            const sPx = s * w
+            const bw = (maxX - minX) * sPx
+            const bh = (maxY - minY) * sPx
+            // pick a top-left so the whole box stays on-screen
+            const lMax = w - bw - pad, tMax = h - bh - pad
+            if (lMax <= pad || tMax <= pad) continue // box too big for this roll
+            const l = rand(pad, lMax)
+            const t = rand(pad, tMax)
+            const box = { l: l - pad, t: t - pad, r: l + bw + pad, b: t + bh + pad }
+            const hits = placed.some(b => !(box.r < b.l || box.l > b.r || box.b < b.t || box.t > b.b))
+            if (hits) continue
+            placed.push(box)
+            // convert box top-left back to the chain origin (anchor) the draw expects
+            chain = {
+              x: (l - minX * sPx) / w,
+              y: (t - minY * sPx) / h,
+              s,
+              pts,
+            }
+            break
+          }
+          if (chain) constellations.push(chain)
+        }
       } else {
         constellations = CONSTELLATIONS
       }
