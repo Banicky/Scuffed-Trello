@@ -3,21 +3,20 @@ import { apiFetch, uploadImage, assetUrl, getAiKeyStatus, saveAiKey, listAiModel
 import TwoFactorSection from '../components/TwoFactorSection.jsx'
 import TwoFactorSetup from './TwoFactorSetup.jsx'
 import Starfield from '../components/Starfield.jsx'
-import ThemeOrrery from '../components/ThemeOrrery.jsx'
 
 const AVATAR_PRESETS = [
-  { key: '⚔', label: 'Knight' },
-  { key: '🔮', label: 'Oracle' },
-  { key: '🐉', label: 'Dragon' },
-  { key: '🏰', label: 'Warden' },
-  { key: '🧙', label: 'Mage' },
-  { key: '⚡', label: 'Stormcaller' },
-  { key: '🛡', label: 'Guardian' },
-  { key: '🌙', label: 'Moonsworn' },
-  { key: '💫', label: 'Wanderer' },
-  { key: '🌟', label: 'Starborn' },
-  { key: '🦁', label: 'Lionheart' },
-  { key: '🌿', label: 'Verdant' },
+  { key: '♈', label: 'Aries' },
+  { key: '♉', label: 'Taurus' },
+  { key: '♊', label: 'Gemini' },
+  { key: '♋', label: 'Cancer' },
+  { key: '♌', label: 'Leo' },
+  { key: '♍', label: 'Virgo' },
+  { key: '♎', label: 'Libra' },
+  { key: '♏', label: 'Scorpio' },
+  { key: '♐', label: 'Sagittarius' },
+  { key: '♑', label: 'Capricorn' },
+  { key: '♒', label: 'Aquarius' },
+  { key: '♓', label: 'Pisces' },
 ]
 
 // Three curated themes. Each renders the same GSAP cosmic-orrery format in the
@@ -103,8 +102,8 @@ function AvatarSection({ user, onUpdate }) {
 
   return (
     <div className="settings-section">
-      <h2 className="settings-section-title">Your Sigil</h2>
-      <p className="settings-section-desc">Choose the mark that precedes your name throughout the realm.</p>
+      <h2 className="settings-section-title">Your Avatar</h2>
+      <p className="settings-section-desc">Choose the symbol precedes your name throughout the galaxy.</p>
 
       <div className="settings-avatar-hero">
         {hasCustomImage ? (
@@ -117,7 +116,7 @@ function AvatarSection({ user, onUpdate }) {
       </div>
 
       <div className="settings-avatar-block">
-        <h3 className="settings-block-label">Arcane Sigils</h3>
+        <h3 className="settings-block-label">Zodiac Signs</h3>
         <div className="settings-avatar-presets">
           {AVATAR_PRESETS.map(p => (
             <button
@@ -126,7 +125,7 @@ function AvatarSection({ user, onUpdate }) {
               onClick={() => selectPreset(p.key)}
               disabled={saving || uploading}
               title={p.label}
-              aria-label={`${p.label} sigil${currentPresetKey === p.key ? ' (active)' : ''}`}
+              aria-label={`${p.label} sign${currentPresetKey === p.key ? ' (active)' : ''}`}
             >
               {p.key}
             </button>
@@ -247,89 +246,6 @@ function SecuritySection({ user, onUpdateUser, onStartSetup }) {
         onStartSetup={onStartSetup}
         onChange={next => onUpdateUser({ totp_enabled: next })}
       />
-    </div>
-  )
-}
-
-function CustomizationSection({ userId }) {
-  const [activeTheme, setActiveTheme] = useState(() => {
-    const stored = localStorage.getItem(`accent-theme-${userId}`)
-    return THEME_PRESETS.some(t => t.value === stored) ? stored : 'arcane'
-  })
-  const [reducedMotion, setReducedMotion] = useState(
-    () => localStorage.getItem('force-reduced-motion') === 'true'
-  )
-
-  function selectTheme(value) {
-    setActiveTheme(value)
-    localStorage.setItem(`accent-theme-${userId}`, value)
-    applyAccentTheme(value)
-  }
-
-  function toggleReducedMotion(e) {
-    const val = e.target.checked
-    setReducedMotion(val)
-    localStorage.setItem('force-reduced-motion', String(val))
-    if (val) {
-      document.documentElement.classList.add('force-reduced-motion')
-    } else {
-      document.documentElement.classList.remove('force-reduced-motion')
-    }
-  }
-
-  const active = THEME_PRESETS.find(t => t.value === activeTheme) || THEME_PRESETS[0]
-
-  return (
-    <div className="settings-section">
-      <h2 className="settings-section-title">Customization</h2>
-      <p className="settings-section-desc">Shape how the realm looks to you. Preferences are saved to this device.</p>
-
-      <div className="settings-avatar-block">
-        <h3 className="settings-block-label">Theme</h3>
-        <div className="settings-theme-grid">
-          {THEME_PRESETS.map(t => (
-            <button
-              key={t.value}
-              type="button"
-              className={`theme-card${activeTheme === t.value ? ' selected' : ''}`}
-              style={{ '--card-accent': t.accent }}
-              onClick={() => selectTheme(t.value)}
-              aria-pressed={activeTheme === t.value}
-              aria-label={`${t.label} theme${activeTheme === t.value ? ' (active)' : ''}`}
-            >
-              <span className="theme-card-art">
-                <ThemeOrrery variant={t.variant} accent={t.accent} idKey={t.value} />
-              </span>
-              <span className="theme-card-meta">
-                <span className="theme-card-name">{t.label}</span>
-                <span className="theme-card-tag">{t.tagline}</span>
-              </span>
-              <span className="theme-card-check" aria-hidden="true">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 8.5l3.5 3.5L13 4.5" />
-                </svg>
-              </span>
-            </button>
-          ))}
-        </div>
-        <p className="settings-avatar-hint">{active.label} · applies to buttons, links, and highlights</p>
-      </div>
-
-      <div className="settings-avatar-block">
-        <h3 className="settings-block-label">Motion</h3>
-        <label className="settings-toggle-row">
-          <span className="settings-toggle-label">
-            <strong>Reduce motion</strong>
-            <span className="settings-toggle-sub">Turns off portal particles, the sky comet, and tile entrance animations</span>
-          </span>
-          <input
-            type="checkbox"
-            className="settings-toggle"
-            checked={reducedMotion}
-            onChange={toggleReducedMotion}
-          />
-        </label>
-      </div>
     </div>
   )
 }
@@ -489,19 +405,6 @@ function IconAvatar() {
   )
 }
 
-function IconCustomization() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="4" y1="6" x2="20" y2="6" />
-      <circle cx="8" cy="6" r="2" fill="var(--bg)" />
-      <line x1="4" y1="12" x2="20" y2="12" />
-      <circle cx="16" cy="12" r="2" fill="var(--bg)" />
-      <line x1="4" y1="18" x2="20" y2="18" />
-      <circle cx="10" cy="18" r="2" fill="var(--bg)" />
-    </svg>
-  )
-}
-
 function IconSecurity() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -513,7 +416,6 @@ function IconSecurity() {
 
 const NAV_ITEMS = [
   { key: 'avatar',         label: 'Change Avatar',  Icon: IconAvatar },
-  { key: 'customization',  label: 'Customization',   Icon: IconCustomization },
   { key: 'ai',             label: 'AI Assistant',    Icon: IconAi },
   { key: 'security',       label: 'Security',        Icon: IconSecurity },
 ]
@@ -562,7 +464,6 @@ export default function SettingsPage({ user, section, onSection, onBack, onUpdat
         <main className="settings-pane">
           {section === 'avatar'        && <AvatarSection       user={user} onUpdate={onUpdateUser} />}
           {section === 'security'      && <SecuritySection user={user} onUpdateUser={onUpdateUser} onStartSetup={() => setSettingUp2fa(true)} />}
-          {section === 'customization' && <CustomizationSection userId={user.id} />}
           {section === 'ai'            && <AiSection />}
         </main>
       </div>

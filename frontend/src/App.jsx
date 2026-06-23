@@ -21,7 +21,7 @@ export default function App() {
   const [route, setRoute] = useState(parseHash)
   const [portal, setPortal] = useState(null) // { color } while opening a board
   const [boardReady, setBoardReady] = useState(false) // board has rendered behind the portal
-  const [settingsSection, setSettingsSection] = useState(null) // null | 'avatar' | 'security' | 'customization'
+  const [settingsSection, setSettingsSection] = useState(null) // null | 'avatar' | 'security' | 'ai'
 
   useEffect(() => {
     apiFetch('/api/auth/me').then(res => {
