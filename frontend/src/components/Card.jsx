@@ -99,7 +99,7 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
             onClick={() => onToggleStar(card.id, card.starred)}
             title={card.starred ? 'Unstar' : 'Star'}
           >
-            {card.starred ? '★' : '☆'}
+            <span className="card-star-glyph">{card.starred ? '★' : '☆'}</span>
           </button>
           <button className="card-delete" onClick={() => onDelete(card.id)} title="Remove card">
             ✕

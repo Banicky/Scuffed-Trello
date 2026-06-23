@@ -408,6 +408,17 @@
   overflow: hidden;
 }
 
+/* Avatar used as a clickable button (e.g. board topbar → account settings). */
+.avatar--btn,
+.avatar--btn .avatar {
+  cursor: pointer;
+}
+.avatar--btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
 /* Base for the <UserAvatar> component: keeps the initial/preset glyph or image
    centered in a circle. Per-instance classes only override size/border/color. */
 .user-avatar {
@@ -623,6 +634,7 @@
 }
 
 .card-star {
+  position: relative;
   background: none;
   border: none;
   cursor: pointer;
@@ -640,13 +652,40 @@
 
   &.active {
     opacity: 1;
-    color: #f59e0b;
+    /* bright turquoise pushed close to white, with a turquoise starlight glow */
+    color: #d6fff9;
+    text-shadow:
+      0 0 4px rgba(45, 212, 191, 0.9),
+      0 0 9px rgba(45, 212, 191, 0.55);
   }
 
   &:hover {
-    background: rgba(245, 158, 11, 0.12);
-    color: #f59e0b;
+    background: rgba(45, 212, 191, 0.14);
+    color: #d6fff9;
   }
+
+  /* keep the turquoise identity on hover when already starred */
+  &.active:hover {
+    background: rgba(45, 212, 191, 0.14);
+    color: #eafffb;
+  }
+}
+
+/* The glyph rolls clockwise like a star tumbling across the card. The roll lives
+   on this inner span so the button's hover background stays still. */
+.card-star-glyph {
+  display: inline-block;
+  transform-origin: 50% 50%;
+}
+.card-star.active .card-star-glyph {
+  animation: card-star-roll 1.8s linear infinite;
+}
+@keyframes card-star-roll {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-star.active .card-star-glyph { animation: none; }
 }
 
 .card-delete {
