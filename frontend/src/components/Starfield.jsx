@@ -54,7 +54,7 @@ const CONSTELLATIONS = [
 
 function rand(min, max) { return min + Math.random() * (max - min) }
 
-export default function Starfield({ mode = 'night' }) {
+export default function Starfield({ mode = 'night', randomConstellations = false }) {
   const canvasRef = useRef(null)
   const pointerRef = useRef({ x: 0, y: 0, tx: 0, ty: 0 })
 
@@ -85,6 +85,7 @@ export default function Starfield({ mode = 'night' }) {
     let w = 0, h = 0, dpr = Math.min(window.devicePixelRatio || 1, 2)
     let stars = []
     let particles = []
+    let constellations = CONSTELLATIONS
     let shooting = []
     let raf = 0
     let t = 0
@@ -119,6 +120,21 @@ export default function Starfield({ mode = 'night' }) {
           vy: rand(-0.009, -0.003), // gentle upward drift
           phase: Math.random() * Math.PI * 2,
         })
+      }
+      // Constellations: the fixed star-chart by default. When asked (e.g. the
+      // auth page) we re-roll their placement + shape each build so the chains
+      // differ on every page load rather than sitting in the same spots.
+      if (randomConstellations) {
+        const shapes = CONSTELLATIONS.map(c => c.pts)
+        const n = 5 + Math.floor(Math.random() * 3) // 5–7 chains
+        constellations = Array.from({ length: n }, () => ({
+          x: rand(0.04, 0.9),
+          y: rand(0.03, 0.88),
+          s: rand(0.08, 0.15),
+          pts: shapes[Math.floor(Math.random() * shapes.length)],
+        }))
+      } else {
+        constellations = CONSTELLATIONS
       }
     }
 
@@ -169,7 +185,7 @@ export default function Starfield({ mode = 'night' }) {
     function drawConstellations(time, p) {
       const [lr, lg, lb] = constLine
       const [nr, ng, nb] = constNode
-      CONSTELLATIONS.forEach((c, i) => {
+      constellations.forEach((c, i) => {
         const breath = 0.66 + 0.34 * Math.sin(time * 0.32 + i * 1.7)
         const sPx = c.s * w
         const ox = p.x * 14 + Math.sin(time * 0.04 + i) * 3 // slow far parallax + drift
@@ -326,7 +342,7 @@ export default function Starfield({ mode = 'night' }) {
       window.removeEventListener('resize', onResize)
       window.removeEventListener('pointermove', onPointer)
     }
-  }, [mode])
+  }, [mode, randomConstellations])
 
   return <canvas ref={canvasRef} className="starfield-canvas" aria-hidden="true" />
 }

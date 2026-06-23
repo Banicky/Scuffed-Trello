@@ -1252,7 +1252,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
   return (
     <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}${aiOpen ? ' ai-open' : ''}`} ref={rootRef}>
-      <Starfield mode={colorMode} />
+      <Starfield mode={colorMode} randomConstellations />
       <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
 
       <header className="topbar">

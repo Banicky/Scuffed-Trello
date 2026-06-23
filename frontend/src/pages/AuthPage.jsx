@@ -1,5 +1,73 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { apiFetch, API_BASE } from '../api.js'
+import Starfield from '../components/Starfield.jsx'
+import { ZODIAC_CONSTELLATIONS } from '../constants.js'
+
+const rand = (min, max) => min + Math.random() * (max - min)
+
+// Build a fresh decorative sky for the form rail: a couple of randomly-chosen
+// zodiac constellations plus scattered lone stars, each at a random position,
+// size, tilt and twinkle phase. Computed once per mount (via useMemo) so it
+// differs on every page load but stays stable across re-renders. All of it is
+// anchored near the right edge so it sits behind the frosted rail and reads
+// softly through its blur. (x in px from the rail's right edge, y in %.)
+function buildAuthSky() {
+  const signs = [...ZODIAC_CONSTELLATIONS]
+  for (let i = signs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[signs[i], signs[j]] = [signs[j], signs[i]]
+  }
+  const constellations = signs.slice(0, 2 + Math.floor(Math.random() * 2)).map((sign, i) => ({
+    key: `c${i}`,
+    sign,
+    right: rand(-24, 120),
+    top: rand(3, 68),
+    size: rand(150, 200),
+    rotate: rand(-22, 22),
+    opacity: rand(0.62, 0.95),
+    stars: sign.points.map(() => ({
+      td: rand(0, 3.2).toFixed(2),    // twinkle (opacity) phase
+      sd: rand(0, 8).toFixed(2),      // sparkle (scale flare) phase
+      dur: rand(2.6, 3.8).toFixed(2), // twinkle duration
+    })),
+  }))
+  const stars = Array.from({ length: 7 + Math.floor(Math.random() * 5) }, (_, i) => ({
+    key: `s${i}`,
+    right: rand(8, 230),
+    top: rand(3, 95),
+    r: rand(0.8, 1.9),
+    td: rand(0, 3.2).toFixed(2),
+    sd: rand(0, 8).toFixed(2),
+    dur: rand(2.6, 4).toFixed(2),
+  }))
+  return { constellations, stars }
+}
+
+// A faint, twinkling zodiac star-chain — the same constellation motif drawn on
+// the dashboard's board tiles, reused behind the auth form for depth.
+function AuthConstellation({ data }) {
+  const { sign, right, top, size, rotate, opacity, stars } = data
+  return (
+    <svg
+      className="auth-decor-constellation"
+      viewBox="0 0 100 100"
+      aria-hidden="true"
+      style={{ right: `${right}px`, top: `${top}%`, width: `${size}px`, height: `${size}px`, opacity, transform: `rotate(${rotate}deg)` }}
+    >
+      <polyline className="auth-decor-line" points={sign.points.map(([x, y]) => `${x},${y}`).join(' ')} />
+      {sign.points.map(([x, y], i) => (
+        <circle
+          key={i}
+          className="auth-decor-star"
+          cx={x}
+          cy={y}
+          r={i % 3 === 0 ? 1.7 : 1.2}
+          style={{ animationDelay: `${stars[i].td}s, ${stars[i].sd}s`, animationDuration: `${stars[i].dur}s, 8s` }}
+        />
+      ))}
+    </svg>
+  )
+}
 
 export default function AuthPage({ onLogin }) {
   const [tab, setTab] = useState('login')
@@ -15,6 +83,20 @@ export default function AuthPage({ onLogin }) {
 
   const [loginForm, setLoginForm] = useState({ username: '', password: '' })
   const [registerForm, setRegisterForm] = useState({ username: '', email: '', password: '' })
+
+  // Match whichever realm (day / night) the user last chose on the dashboard so
+  // the front door feels like the same cosmos they left. New visitors get night.
+  // Toggling here persists the choice so the dashboard opens in the same realm.
+  const [colorMode, setColorMode] = useState(() => localStorage.getItem('dash-color-mode') || 'night')
+
+  function toggleColorMode() {
+    const next = colorMode === 'night' ? 'day' : 'night'
+    localStorage.setItem('dash-color-mode', next)
+    setColorMode(next)
+  }
+
+  // A freshly randomized constellation sky, generated once per page load.
+  const decor = useMemo(() => buildAuthSky(), [])
 
   // Which OAuth buttons to show — the backend only enables providers that are
   // configured with client credentials.
@@ -113,6 +195,16 @@ export default function AuthPage({ onLogin }) {
     onLogin(data)
   }
 
+  // Cosmic brand mark — the four-point compass star echoed across the dashboard
+  // (hero filigree, section titles, ranks), set in the accent badge.
+  const brandMark = (
+    <span className="board-icon board-icon--brand auth-brand-mark" style={{ width: 36, height: 36, borderRadius: 10 }}>
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path d="M12 0 L13.6 10.4 L24 12 L13.6 13.6 L12 24 L10.4 13.6 L0 12 L10.4 10.4 Z" fill="currentColor" />
+      </svg>
+    </span>
+  )
+
   const hasOAuth = providers.google || providers.github
   const oauthBlock = hasOAuth && (
     <div className="auth-oauth">
@@ -140,67 +232,81 @@ export default function AuthPage({ onLogin }) {
   )
 
   return (
-    <div className="auth-shell">
+    <div className={`auth-shell${colorMode === 'day' ? ' auth-shell--day' : ''}`}>
+      <Starfield mode={colorMode} randomConstellations />
+
+      <button
+        className="dash-mode-toggle auth-mode-toggle"
+        onClick={toggleColorMode}
+        aria-label={colorMode === 'day' ? 'Switch to night mode' : 'Switch to day mode'}
+        title={colorMode === 'day' ? 'Night mode' : 'Day mode'}
+      >
+        <span className="dash-mode-toggle-icon">
+          {colorMode === 'day' ? (
+            // currently day → offer the moon
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          ) : (
+            // currently night → offer the sun
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+            </svg>
+          )}
+        </span>
+      </button>
+      {/* constellations + lone stars live in the background (behind the form
+          rail) so the frosted pane blurs them through its backdrop-filter — the
+          same way the dashboard hero card softens the starfield behind its
+          glass. Positions/twinkles are randomized per page load. */}
+      <div className="auth-bg-decor" aria-hidden="true">
+        {decor.constellations.map(c => (
+          <AuthConstellation key={c.key} data={c} />
+        ))}
+        {decor.stars.map(s => (
+          <span
+            key={s.key}
+            className="auth-sky-star"
+            style={{
+              right: `${s.right.toFixed(1)}px`,
+              top: `${s.top.toFixed(1)}%`,
+              width: `${(s.r * 2).toFixed(1)}px`,
+              height: `${(s.r * 2).toFixed(1)}px`,
+              animationDelay: `${s.td}s, ${s.sd}s`,
+              animationDuration: `${s.dur}s, 8s`,
+            }}
+          />
+        ))}
+      </div>
       <div className="auth-visual">
         <div className="auth-visual-brand">
-          <div className="board-icon board-icon--brand" style={{ width: 36, height: 36, borderRadius: 10 }}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
-              <rect x="3" y="4" width="5" height="16" rx="1.6" fill="currentColor" />
-              <rect x="9.5" y="4" width="5" height="10" rx="1.6" fill="currentColor" opacity="0.85" />
-              <rect x="16" y="4" width="5" height="13" rx="1.6" fill="currentColor" opacity="0.65" />
-            </svg>
-          </div>
+          {brandMark}
           <span className="auth-brand">Scuffed Trello</span>
         </div>
 
-        <h1 className="auth-visual-heading">Organize anything, together.</h1>
-        <p className="auth-visual-sub">Boards, columns, and cards that keep your whole team in sync — from sprint planning to weekend chores.</p>
-
-        <div className="auth-mock-board" aria-hidden="true">
-          <div className="auth-mock-col">
-            <div className="auth-mock-col-title">To do</div>
-            <div className="auth-mock-card">
-              <span className="auth-mock-tag" />
-              <span className="auth-mock-line" style={{ width: '80%' }} />
-              <span className="auth-mock-line" style={{ width: '55%' }} />
-            </div>
-            <div className="auth-mock-card">
-              <span className="auth-mock-tag auth-mock-tag--alt" />
-              <span className="auth-mock-line" style={{ width: '65%' }} />
-            </div>
-          </div>
-          <div className="auth-mock-col">
-            <div className="auth-mock-col-title">In progress</div>
-            <div className="auth-mock-card auth-mock-card--active">
-              <span className="auth-mock-tag" />
-              <span className="auth-mock-line" style={{ width: '70%' }} />
-              <span className="auth-mock-line" style={{ width: '40%' }} />
-            </div>
-          </div>
-          <div className="auth-mock-col">
-            <div className="auth-mock-col-title">Done</div>
-            <div className="auth-mock-card auth-mock-card--done">
-              <span className="auth-mock-tag auth-mock-tag--alt" />
-              <span className="auth-mock-line" style={{ width: '60%' }} />
-            </div>
-            <div className="auth-mock-card auth-mock-card--done">
-              <span className="auth-mock-tag" />
-              <span className="auth-mock-line" style={{ width: '75%' }} />
-            </div>
-          </div>
-        </div>
+        <h1 className="auth-visual-heading">Chart your universe, together.</h1>
+        <p className="auth-visual-sub">Boards become galaxies and teammates become alliances — keep every quest in sync across the cosmos, from sprint planning to weekend chores.</p>
       </div>
 
       <div className="auth-form-panel">
+      <div className="auth-decor" aria-hidden="true">
+        {/* soft accent glow pooling at the top of the rail */}
+        <span className="auth-decor-glow" />
+        {/* corner filigree — the dashboard hero's ornament, mirrored into the
+            top-right corner to frame the rail */}
+        <svg className="auth-decor-corner" viewBox="0 0 120 120" fill="none">
+          <path className="dhc-line" d="M24 92 L24 32 Q24 24 32 24 L92 24" />
+          <path className="dhc-line dhc-line--faint" d="M36 100 L36 42 Q36 36 42 36 L100 36" />
+          <path className="dhc-arc" d="M104 28 A76 76 0 0 0 28 104" />
+          <path className="dhc-star dhc-star--lg" d="M24 5 L26 22 L43 24 L26 26 L24 43 L22 26 L5 24 L22 22 Z" />
+          <circle className="dhc-dot" cx="60" cy="50" r="1.2" />
+          <circle className="dhc-dot" cx="98" cy="64" r="1.4" />
+        </svg>
+      </div>
       <div className="auth-card">
         <div className="auth-mobile-brand">
-          <div className="board-icon board-icon--brand" style={{ width: 36, height: 36, borderRadius: 10 }}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
-              <rect x="3" y="4" width="5" height="16" rx="1.6" fill="currentColor" />
-              <rect x="9.5" y="4" width="5" height="10" rx="1.6" fill="currentColor" opacity="0.85" />
-              <rect x="16" y="4" width="5" height="13" rx="1.6" fill="currentColor" opacity="0.65" />
-            </svg>
-          </div>
+          {brandMark}
           <span className="auth-brand">Scuffed Trello</span>
         </div>
         <div className="auth-tabs">
