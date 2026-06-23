@@ -56,7 +56,7 @@ function CreateGuildModal({ onClose, onCreate }) {
       body: JSON.stringify({ name: name.trim(), icon_color: color }),
     })
     const data = await res.json()
-    if (!res.ok) { setError(data.error || 'Failed to create guild'); setBusy(false); return }
+    if (!res.ok) { setError(data.error || 'Failed to create alliance'); setBusy(false); return }
     onCreate(data)
     onClose()
   }
@@ -186,7 +186,7 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
       ref={overlayRef}
       onClick={e => { if (e.target === overlayRef.current) onClose() }}
     >
-      <div className="card-modal guild-settings-modal" role="dialog" aria-modal="true" aria-label="Guild Settings">
+      <div className="card-modal guild-settings-modal" role="dialog" aria-modal="true" aria-label="Alliance Settings">
         <div className="guild-settings-header">
           <GuildIcon guild={{ name: guild.name, icon_color: iconColor }} className="guild-icon--md" />
           <div>
@@ -256,7 +256,7 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
           {tab === 'settings' && isOwner && (
             <form className="guild-settings-form" onSubmit={handleSaveSettings}>
               <div>
-                <label className="guild-field-label">Guild Name</label>
+                <label className="guild-field-label">Alliance Name</label>
                 <input
                   className="card-input"
                   value={renameVal}
@@ -286,7 +286,7 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
               <div className="guild-settings-divider" />
               {confirming ? (
                 <div className="guild-settings-confirm">
-                  <p>This disbands the guild and unassigns all its boards. Continue?</p>
+                  <p>This disbands the alliance and unassigns all its boards. Continue?</p>
                   <div className="board-popover-confirm-actions">
                     <button type="button" className="btn-danger-sm" onClick={handleDelete}>Disband</button>
                     <button type="button" className="btn-ghost-sm" onClick={() => setConfirming(false)}>Cancel</button>
@@ -294,7 +294,7 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
                 </div>
               ) : (
                 <button type="button" className="board-popover-delete" onClick={() => setConfirming(true)}>
-                  Disband Guild
+                  Disband Alliance
                 </button>
               )}
             </form>
@@ -676,7 +676,7 @@ function NotificationItem({ notif, onAccept, onDecline }) {
       <div className="notif-item-sigil" aria-hidden="true">⚔</div>
       <div className="notif-item-body">
         <p className="notif-item-text">
-          <strong>{d.inviter_username}</strong> summons you to join the guild <strong>{d.guild_name}</strong>.
+          <strong>{d.inviter_username}</strong> summons you to join the alliance <strong>{d.guild_name}</strong>.
         </p>
         <p className="notif-item-time">{relativeTime(notif.created_at) || 'just now'}</p>
         {!notif.read && (
@@ -758,8 +758,8 @@ function activityText(a) {
     case 'board:created': return <>Charted a new galaxy, {title}</>
     case 'board:renamed': return <>Renamed the galaxy <strong>{a.context}</strong> to {title}</>
     case 'board:deleted': return <>Collapsed the galaxy {title}</>
-    case 'guild:founded': return <>Founded the guild {title}</>
-    case 'guild:joined':  return <>Joined the guild {title}</>
+    case 'guild:founded': return <>Founded the alliance {title}</>
+    case 'guild:joined':  return <>Joined the alliance {title}</>
     default:              return title
   }
 }
@@ -789,7 +789,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const [newTitle, setNewTitle] = useState('')
   const [addingBoard, setAddingBoard] = useState(false)
 
-  // Guild state
+  // Alliance state
   const [guilds, setGuilds] = useState([])
   const [activeContext, setActiveContext] = useState('personal') // 'personal' | guildId (number)
   const [guildBoards, setGuildBoards] = useState([])
@@ -1244,8 +1244,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
         </>
 
   const guildSummary = guildDetails
-    ? `${guildBoards.length} board${guildBoards.length !== 1 ? 's' : ''} · ${(guildDetails.members || []).length} member${(guildDetails.members || []).length !== 1 ? 's' : ''} · your guild's shared quests.`
-    : 'Loading guild…'
+    ? `${guildBoards.length} board${guildBoards.length !== 1 ? 's' : ''} · ${(guildDetails.members || []).length} member${(guildDetails.members || []).length !== 1 ? 's' : ''} · your alliance's shared quests.`
+    : 'Loading alliance…'
 
   const isPersonal = activeContext === 'personal'
 
@@ -1257,8 +1257,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
       <header className="topbar">
         <div className="topbar-left">
-          <p className="topbar-breadcrumb">DASHBOARD › {isPersonal ? 'MY BOARDS' : (guildDetails?.name?.toUpperCase() || 'GUILD')}</p>
-          <h1 className="topbar-page-title">{isPersonal ? 'My Universe' : (guildDetails?.name || 'Guild')}</h1>
+          <p className="topbar-breadcrumb">DASHBOARD › {isPersonal ? 'MY BOARDS' : (guildDetails?.name?.toUpperCase() || 'ALLIANCE')}</p>
+          <h1 className="topbar-page-title">{isPersonal ? 'My Universe' : (guildDetails?.name || 'Alliance')}</h1>
         </div>
         <div className="topbar-right">
           <button
@@ -1281,15 +1281,6 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                 </svg>
               )}
             </span>
-          </button>
-          <button
-            className={`dash-mode-toggle dash-ai-toggle${aiOpen ? ' active' : ''}`}
-            onClick={() => setAiOpen(v => !v)}
-            aria-label="AI assistant"
-            aria-pressed={aiOpen}
-            title="AI assistant"
-          >
-            <span className="dash-ai-toggle-icon" aria-hidden="true">✦</span>
           </button>
           <div
             className={`dash-searchbar-wrap${searchOpen ? ' open' : ''}`}
@@ -1399,7 +1390,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
           </button>
 
           {guilds.length > 0 && (
-            <p className="sidebar-section-label">Guilds</p>
+            <p className="sidebar-section-label">Alliances</p>
           )}
 
           {guilds.map(g => (
@@ -1731,7 +1722,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               </section>
             </>
           ) : (
-            /* Guild view */
+            /* Alliance view */
             <>
               {guildDetails && (
                 <div className="guild-context-header" style={{ '--guild-color': guildHex(guildDetails.icon_color) }}>

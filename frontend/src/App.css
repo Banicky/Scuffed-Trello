@@ -4407,15 +4407,37 @@ select.card-input {
 }
 
 /* ── Create Alliance modal ── */
+/* ── Guild modals: compact, auto-fit, clean minimal ── */
+.guild-modal,
+.guild-settings-modal,
+.guild-invite-modal {
+  height: auto;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
 .guild-modal {
-  max-width: 420px;
+  max-width: 400px;
+}
+
+/* Stop guild forms inheriting the card-modal's row/stretch body */
+.guild-modal .card-modal-body,
+.guild-invite-modal .card-modal-body {
+  display: block;
+  flex: none;
+  padding: 16px 24px 24px;
+}
+
+.guild-modal .card-modal-header,
+.guild-invite-modal .card-modal-header {
+  padding: 22px 24px 0;
 }
 
 .guild-modal-title {
-  font-family: var(--fantasy);
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   color: var(--text-h);
   margin: 0;
 }
@@ -4423,23 +4445,28 @@ select.card-input {
 .guild-modal-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .guild-field-label {
   display: block;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text);
-  margin-bottom: 6px;
+  opacity: 0.7;
+  margin-bottom: 8px;
 }
 
 .guild-modal-actions {
   display: flex;
   gap: 8px;
-  padding-top: 2px;
+  padding-top: 4px;
+}
+
+.guild-modal-actions .btn-primary {
+  flex: 1;
 }
 
 /* ── Guild color picker (create + settings) ── */
@@ -4450,30 +4477,25 @@ select.card-input {
 }
 
 .guild-color-swatch {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--swatch) 68%, #fff),
-    var(--swatch)
-  );
-  border: 2px solid transparent;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--swatch);
+  border: none;
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.12s;
   outline: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .guild-color-swatch:hover {
-  transform: scale(1.12);
+  transform: scale(1.1);
 }
 
 .guild-color-swatch.active {
   box-shadow:
     0 0 0 2px var(--bg),
-    0 0 0 4px color-mix(in srgb, var(--swatch) 70%, var(--accent)),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    0 0 0 4px var(--swatch);
 }
 
 /* ── Guild preview chip inside create modal ── */
@@ -4488,23 +4510,23 @@ select.card-input {
 }
 
 .guild-preview-name {
-  font-family: var(--fantasy);
-  font-size: 15px;
+  font-family: var(--sans);
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: -0.01em;
   color: var(--text-h);
 }
 
 /* ── Guild settings modal ── */
 .guild-settings-modal {
-  max-width: 480px;
+  max-width: 440px;
 }
 
 .guild-settings-header {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 24px 24px 0;
+  padding: 22px 24px 0;
 }
 
 .guild-settings-sub {
@@ -5180,6 +5202,10 @@ select.card-input {
 }
 
 /* ── Guild invite modal ── */
+.guild-invite-modal {
+  max-width: 380px;
+}
+
 .guild-invite-desc {
   font-size: 13.5px;
   color: var(--text);
@@ -5215,10 +5241,11 @@ select.card-input {
 }
 
 .guild-invite-sent-text {
-  font-family: var(--fantasy);
-  font-size: 18px;
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 650;
   color: var(--text-h);
-  letter-spacing: 0.04em;
+  letter-spacing: -0.01em;
 }
 
 .guild-invite-sent-sub {
