@@ -3308,6 +3308,49 @@ select.card-input {
   flex-shrink: 0;
 }
 
+/* member presence dot — anchored to the avatar's bottom-right corner, mirroring
+   the sidebar profile status. Active members glow accent + pulse; inactive ones
+   are a flat grey. is_active is heartbeat-driven (see the board members API). */
+.member-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.member-status {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--bg); /* "cut-out" ring matching the panel behind it */
+  box-sizing: border-box;
+}
+/* presence is a fixed traffic-light signal, deliberately independent of the
+   user's accent theme: green = active, grey = offline */
+.member-status--active {
+  background: #22c55e;
+  box-shadow: 0 0 6px color-mix(in srgb, #22c55e 70%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .member-status--active { animation: member-status-pulse 2.6s ease-in-out infinite; }
+}
+/* green "alive" pulse — a soft ring that expands + fades (mirrors the sidebar
+   pulse but pinned to the presence green rather than --accent) */
+@keyframes member-status-pulse {
+  0%, 100% {
+    box-shadow: 0 0 6px color-mix(in srgb, #22c55e 70%, transparent),
+                0 0 0 0 color-mix(in srgb, #22c55e 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 6px color-mix(in srgb, #22c55e 70%, transparent),
+                0 0 0 5px transparent;
+  }
+}
+.member-status--inactive {
+  background: #6b7280; /* muted grey — offline */
+}
+
 .member-name {
   font-size: 13px;
   color: var(--text-h);
