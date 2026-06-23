@@ -16,10 +16,10 @@ const NEBULAE_NIGHT = [
   { x: 0.7,  y: 0.94, r: 0.52, color: [60, 92, 110], a: 0.045 },  // faint teal, bottom
 ]
 
-// Daytime nebula now lives in the SVG NebulaVeil (fractal-turbulence "paint"
-// clouds) painted beneath this canvas — smooth radial blooms here only read as
-// the flat blue→white wash we were trying to escape. The canvas keeps the day
-// constellations, stars, motes, and shooting stars; the veil owns the gas.
+// Daytime gas now comes from the watercolor sky image (assets/day-sky.png) set
+// as the .dashboard-shell--day background — soft radial blooms here only read as
+// a flat wash. The canvas keeps the day constellations, stars, motes, and
+// shooting stars; the background image owns the clouds.
 const NEBULAE_DAY = []
 
 const STAR_TINTS_NIGHT = [

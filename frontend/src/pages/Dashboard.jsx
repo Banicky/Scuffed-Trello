@@ -5,7 +5,6 @@ import { relativeTime } from '../utils.js'
 import { COLUMN_PALETTE, ZODIAC_CONSTELLATIONS } from '../constants.js'
 import UserAvatar from '../components/UserAvatar.jsx'
 import Starfield from '../components/Starfield.jsx'
-import NebulaVeil from '../components/NebulaVeil.jsx'
 import AiAssistant from '../components/AiAssistant.jsx'
 
 const GUILD_COLORS = [
@@ -1221,6 +1220,12 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const today = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
+  // location derived from the browser's timezone (no stored user location), e.g.
+  // "America/New_York" → "New York"; falls back gracefully if unavailable
+  const userLocation = (() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop().replace(/_/g, ' ') }
+    catch { return 'Unknown Sector' }
+  })()
 
   // one Cosmic Activity row — shared by the 3-row preview and the "View all" panel
   const renderActivityRow = (a, i) => (
@@ -1251,7 +1256,6 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
   return (
     <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}${aiOpen ? ' ai-open' : ''}`} ref={rootRef}>
-      {colorMode === 'day' && <NebulaVeil />}
       <Starfield mode={colorMode} />
       <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
 
@@ -1363,11 +1367,35 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
         {/* ── Sidebar ── */}
         <nav className="dash-sidebar" ref={sidebarRef} aria-label="Navigation">
           <div className="sidebar-profile" onClick={() => onOpenSettings('avatar')} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') onOpenSettings('avatar') }}>
-            <UserAvatar user={user} className="sidebar-profile-avatar" />
-            <div className="sidebar-profile-info">
+            <div className="sidebar-profile-top">
+              <span className="sidebar-profile-av">
+                <UserAvatar user={user} className="sidebar-profile-avatar" />
+                <span className="sidebar-profile-status" aria-hidden="true" />
+              </span>
               <span className="sidebar-profile-username">{user.username}</span>
-              <span className="sidebar-profile-rank">{cosmicRank}</span>
             </div>
+            <span className="sidebar-profile-rank">
+              <svg className="sidebar-profile-spark" width="9" height="9" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 0 L13.6 10.4 L24 12 L13.6 13.6 L12 24 L10.4 13.6 L0 12 L10.4 10.4 Z" />
+              </svg>
+              {cosmicRank}
+            </span>
+            <span className="sidebar-profile-location">
+              <svg className="sidebar-profile-ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              {userLocation}
+            </span>
+            <span className="sidebar-profile-date">
+              <svg className="sidebar-profile-ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              {today}
+            </span>
           </div>
 
           <p className="sidebar-section-label">HOME SYSTEM</p>

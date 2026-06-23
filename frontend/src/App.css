@@ -4179,7 +4179,7 @@ select.card-input {
 
 /* ── Sidebar ── */
 .dash-sidebar {
-  width: 216px;
+  width: 230px;
   flex-shrink: 0;
   padding: 16px 10px 24px;
   border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
@@ -5305,7 +5305,9 @@ select.card-input {
 .dhc-star { fill: currentColor; opacity: 0.92; }
 .dhc-star--lg {
   opacity: 1;
-  filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 80%, transparent));
+  /* a constant two-layer glow; the twinkle below breathes this via opacity */
+  filter: drop-shadow(0 0 5px color-mix(in srgb, currentColor 85%, transparent))
+          drop-shadow(0 0 12px color-mix(in srgb, currentColor 42%, transparent));
 }
 
 .dhc-dot { fill: currentColor; opacity: 0.78; }
@@ -5336,40 +5338,17 @@ select.card-input {
   height: 12px;
   opacity: 0.6;
 }
-.dashboard-shell--day .hero-card-star { color: #363b43; }
+.dashboard-shell--day .hero-card-star { color: #181c24; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .dhc-star--lg { animation: dhc-twinkle 7s ease-in-out infinite; }
+  .dhc-star--lg { animation: dhc-twinkle 6s ease-in-out infinite; will-change: opacity; }
 }
-/* bright at rest; the glow gradually spreads out, then eases back in.
-   Every stop keeps exactly two drop-shadow() functions so the filter list
-   interpolates continuously (mismatched counts would snap instead). */
+/* a smooth, continuous glow breathe: the star keeps its constant drop-shadow
+   glow (above) and we pulse only its opacity — which the compositor handles, so
+   it eases in and out continuously instead of stepping through filter frames. */
 @keyframes dhc-twinkle {
-  0%, 50%, 100% {
-    opacity: 1;
-    filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 80%, transparent))
-            drop-shadow(0 0 0 transparent);
-  }
-  62% {
-    filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 88%, transparent))
-            drop-shadow(0 0 9px color-mix(in srgb, currentColor 35%, transparent));
-  }
-  72% {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 95%, transparent))
-            drop-shadow(0 0 14px color-mix(in srgb, currentColor 55%, transparent));
-  }
-  80% {
-    filter: drop-shadow(0 0 9px color-mix(in srgb, currentColor 100%, transparent))
-            drop-shadow(0 0 18px color-mix(in srgb, currentColor 70%, transparent));
-  }
-  88% {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 95%, transparent))
-            drop-shadow(0 0 14px color-mix(in srgb, currentColor 55%, transparent));
-  }
-  94% {
-    filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 88%, transparent))
-            drop-shadow(0 0 9px color-mix(in srgb, currentColor 35%, transparent));
-  }
+  0%, 100% { opacity: 0.9; }
+  50%      { opacity: 1; }
 }
 
 .dash-hero-card::before {
@@ -5896,29 +5875,102 @@ select.card-input {
   flex-shrink: 0;
 }
 
-.sidebar-profile-info {
+/* avatar + name share the top row, the name centred to the right of the orb */
+.sidebar-profile-top {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 14px;
+  align-items: center;
+  gap: 12px;
+}
+
+/* avatar wrapper anchors the live status dot to the orb's bottom-right edge */
+.sidebar-profile-av {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.sidebar-profile-status {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2.5px solid var(--bg); /* "cut-out" ring matching the card behind it */
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar-profile-status { animation: profile-status-pulse 2.6s ease-in-out infinite; }
+}
+/* a soft accent ring that expands + fades out — the "alive" pulse */
+@keyframes profile-status-pulse {
+  0%, 100% {
+    box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent),
+                0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent),
+                0 0 0 5px transparent;
+  }
 }
 
 .sidebar-profile-username {
+  font-family: var(--display); /* Bricolage Grotesque — match the Hero greeting */
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text-h);
+  min-width: 0; /* allow long names to truncate instead of overflowing the rail */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-profile-rank {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-family: var(--fantasy);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
-  opacity: 0.85;
+  opacity: 0.9;
+  margin-top: 12px; /* sit just below the avatar + name row */
 }
+/* twinkling diamond leading the rank — ties it to the page's star motif */
+.sidebar-profile-spark {
+  flex-shrink: 0;
+  fill: var(--accent);
+  transform-origin: center;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 55%, transparent));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar-profile-spark { animation: profile-spark-twinkle 5s ease-in-out infinite; }
+}
+@keyframes profile-spark-twinkle {
+  0%, 100% { opacity: 0.55; transform: scale(0.82); }
+  50%      { opacity: 1;    transform: scale(1.05); }
+}
+
+/* secondary lines stacked under the rank: location, then date, each led by an
+   accent line-icon to match the rest of the sidebar's iconography */
+.sidebar-profile-location,
+.sidebar-profile-date {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+}
+.sidebar-profile-ic {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.sidebar-profile-location { margin-top: 8px; }
+.sidebar-profile-date { margin-top: 4px; }
 
 
 /* ── Sidebar footer (Settings + Log Out) ── */
@@ -6175,19 +6227,6 @@ select.card-input {
   pointer-events: none;
 }
 
-/* Day-sky nebula paint. Sits on the same plane as the canvas but earlier in the
-   DOM, so the canvas (constellations + stars) paints over it and stays legible.
-   Static fractal-turbulence clouds — see NebulaVeil.jsx — that texturize the
-   blue→white gradient into a painted nebula rather than a flat wash. */
-.nebula-veil {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  pointer-events: none;
-}
-
 /* a soft full-screen veil that cross-fades between day and night (GSAP-driven) */
 .mode-fx {
   position: fixed;
@@ -6433,7 +6472,7 @@ select.card-input {
   transform-origin: center;
   opacity: 0.92;
 }
-.dashboard-shell--day .hero-star { fill: #363b43; }
+.dashboard-shell--day .hero-star { fill: #181c24; }
 /* scattered star dust — dimmer at smaller sizes so they recede for depth */
 .hero-star--md { opacity: 0.62; }
 .hero-star--sm { opacity: 0.42; }
@@ -6471,57 +6510,67 @@ select.card-input {
     rgba(40, 70, 120, 0.18) 0 10px 24px -6px, rgba(40, 70, 120, 0.1) 0 4px 12px -4px;
   color: var(--text);
 
-  /* an airy near-white sky carrying the faintest cool-blue cast — bluest up top
-     and toward Saturn (upper-right), washing back to clean white at the lower-
-     left. The NebulaVeil paints the soft blue cloud gas (blending to white) on top. */
-  background-color: #ffffff;
-  background-image:
-    radial-gradient(130% 95% at 50% -12%, rgba(178, 209, 239, 0.78) 0%, rgba(206, 227, 246, 0.4) 42%, transparent 74%),
-    radial-gradient(72% 62% at 84% 26%, rgba(170, 203, 237, 0.6) 0%, transparent 64%);
+  /* the day sky is the watercolor reference image (assets/day-sky.png): a soft
+     powder-blue field washed with warm-cream blooms. It carries the full cloud
+     texture, so NebulaVeil is disabled by day; the Starfield canvas paints the
+     stars + constellations on top. cover/center keeps it filling the fixed-
+     height shell at any aspect ratio. */
+  background-color: #eaf4fc;
+  background-image: url('./assets/day-sky.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 /* the starfield stays lit by day too — it just repaints in cool blue (see
    Starfield.jsx), so the interstellar sky carries through both modes */
 
-/* ── Hero card: a true pane of luminous glass — translucent, heavily blurred,
-   edged with a crisp white hairline that catches the nebula light ── */
+/* ── Hero card (day): a light pane of glass — a faint low-opacity fill + a soft
+   frosted blur keep the watercolor sky clearly readable through the card, while
+   a crisp light edge, an inset top highlight and a soft ambient shadow lift it
+   off the background so it "pops". The shared ::after pass adds the glossy
+   specular sheen (top-edge bloom + diagonal glance). ── */
 .dashboard-shell--day .dash-hero-card {
-  /* a true pane of glass — more transparent now so the nebula reads through it,
-     with a heavier frosted blur doing the legibility work: the gas behind the
-     greeting softens to a calm wash rather than crowding the text. The first
-     background layer is the top-left specular gloss (the static "shine"). */
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.1) 13%, transparent 34%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(232, 242, 252, 0.22) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  /* a near-clear glass pane: no fill, only a light backdrop blur so the sky
+     behind it stays almost untouched while reading faintly as glass. A bright
+     white rim (border + inset edge highlight) plus the drop shadow define it,
+     giving the clean mirror-edge look. */
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-    0 24px 60px -44px rgba(46, 78, 132, 0.3);
-  backdrop-filter: blur(30px) saturate(130%);
-  -webkit-backdrop-filter: blur(30px) saturate(130%);
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 24px 52px -20px rgba(38, 64, 116, 0.5),
+    0 10px 24px -12px rgba(38, 64, 116, 0.34);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
-.dashboard-shell--day .dash-hero-card::before {
-  background: radial-gradient(70% 120% at 6% 24%, rgba(150, 188, 238, 0.22), transparent 62%);
+/* nothing should veil the sky inside the pane — kill both the accent corner-glow
+   and the glossy interior sheen so the inside is identical to the background */
+.dashboard-shell--day .dash-hero-card::before,
+.dashboard-shell--day .dash-hero-card::after {
+  display: none;
 }
 
 /* ── Sidebar: light, floating glass rail over the day sky. Glassmorphic — a
    top-left specular gloss, a crisp translucent white edge, and a heavier
    frosted blur so the nebula reads softly through the rail. ── */
 .dashboard-shell--day .dash-sidebar {
-  position: relative; /* anchor the glass-reflection ::after to the rail */
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.08) 14%, transparent 36%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.46) 0%, rgba(238, 246, 254, 0.3) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  position: relative;
+  /* soft gray rim + a very slight ~10% white overlay; light frosted blur, no
+     drop shadow. The faint wash gives the rail just enough body to read as a
+     panel against the sky. */
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(140, 150, 165, 0.55);
   border-radius: 22px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.75),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
-    0 20px 50px -28px rgba(50, 84, 140, 0.5);
-  backdrop-filter: blur(24px) saturate(135%);
-  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  box-shadow: none;
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
   margin: 0 10px 0 2px; /* float clear of both edges */
+}
+/* drop the glossy interior sheen so the inside stays clear, matching the others */
+.dashboard-shell--day .dash-sidebar::after {
+  display: none;
 }
 
 /* ── Glassy reflection (day): a static highlight pass that makes the frosted
@@ -6602,41 +6651,47 @@ select.card-input {
    paper. Crisp white edge, wide diffuse ambient shadow (no hard drop). ── */
 /* clean, bright-white cards: softer corners, a barely-there cool border, and a
    light diffuse lift instead of a heavy drop — more air around each one */
+/* same treatment as the hero card: a near-clear pane — no fill, only a light
+   backdrop blur — so the watercolor sky reads through it, defined by a bright
+   white rim + a drop shadow that lifts it off the background */
 .dashboard-shell--day .board-tile {
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.14) 12%, transparent 30%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.68) 0%, rgba(244, 249, 254, 0.52) 100%);
-  border: 1px solid rgba(206, 222, 240, 0.6);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow:
-    0 14px 34px -26px rgba(46, 78, 132, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(16px) saturate(125%);
-  -webkit-backdrop-filter: blur(16px) saturate(125%);
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 24px 52px -20px rgba(38, 64, 116, 0.5),
+    0 10px 24px -12px rgba(38, 64, 116, 0.34);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .dashboard-shell--day .board-tile,
 .dashboard-shell--day .board-tile-face { border-radius: 20px; }
-/* the black outline sits inset from the card edge, framing the constellation
-   with a little breathing room between it and the rounded outer edge */
+/* keep the black constellation frame inset from the edge; drop only the glossy
+   interior sheen so the inside stays clear */
 .dashboard-shell--day .board-tile-face::before {
   inset: 6px;
   border-radius: 14px;
   border-color: rgba(18, 22, 34, 0.82);
   box-shadow: none;
 }
+.dashboard-shell--day .board-tile-face::after {
+  display: none;
+}
 .dashboard-shell--day .board-tile:hover {
-  border-color: rgba(150, 178, 220, 0.55);
+  border-color: rgba(255, 255, 255, 0.85);
   box-shadow:
-    0 0 26px -8px rgba(54, 84, 150, 0.4),
-    0 22px 48px -30px rgba(46, 78, 132, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 30px 60px -20px rgba(38, 64, 116, 0.58),
+    0 12px 28px -12px rgba(38, 64, 116, 0.4);
 }
 .dashboard-shell--day .board-tile:hover .board-tile-face::before {
   border-color: rgba(8, 12, 22, 0.95);
 }
 .dashboard-shell--day .board-tile--create {
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px dashed rgba(18, 22, 34, 0.5);
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.75);
 }
 /* the summoning circle's pulse/colorwave reads as a soft "light black" glow by
    day rather than the periwinkle accent */
@@ -6672,11 +6727,15 @@ select.card-input {
 .dashboard-shell--day .board-tile-zodiac-halo {
   fill: rgba(54, 58, 68, 0.92);
   opacity: 0.5;
+  /* static blur (a touch larger than the night halo) so the day bloom keeps its
+     soft size; the breathe pulses opacity only — animating the blur radius
+     re-rasterises every node each frame and tanks scroll (see night halo above) */
+  filter: blur(3px);
   animation: zodiac-halo-breathe-day 4.6s ease-in-out infinite;
 }
 @keyframes zodiac-halo-breathe-day {
-  0%, 100% { opacity: 0.28; filter: blur(2.2px); }
-  50%      { opacity: 0.72; filter: blur(3.6px); }
+  0%, 100% { opacity: 0.28; }
+  50%      { opacity: 0.72; }
 }
 @media (prefers-reduced-motion: reduce) {
   .dashboard-shell--day .board-tile-zodiac-halo { animation: none; opacity: 0.5; }
@@ -6715,7 +6774,7 @@ select.card-input {
 .dashboard-shell--day .hero-spark { fill: rgba(56, 86, 140, 0.95); }
 
 /* hero accent text drops its blue for a neutral grayish-black by day */
-.dashboard-shell--day .dash-hero-username { color: #363b43; }
+.dashboard-shell--day .dash-hero-username { color: #2b4a8c; }
 .dashboard-shell--day .hero-stat-link { color: #363b43; }
 
 /* the streak chip keeps a visible cool pill against the light card */
