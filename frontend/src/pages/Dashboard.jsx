@@ -5,6 +5,7 @@ import { relativeTime } from '../utils.js'
 import { COLUMN_PALETTE, ZODIAC_CONSTELLATIONS } from '../constants.js'
 import UserAvatar from '../components/UserAvatar.jsx'
 import Starfield from '../components/Starfield.jsx'
+import AiAssistant from '../components/AiAssistant.jsx'
 
 const GUILD_COLORS = [
   { key: 'arcane',  hex: '#aa3bff' },
@@ -805,6 +806,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
   // Day/Night dashboard mode — defaults to night (the original design).
   const [colorMode, setColorMode] = useState(() => localStorage.getItem('dash-color-mode') || 'night')
+  const [aiOpen, setAiOpen] = useState(false)
   function applyColorMode(next) {
     localStorage.setItem('dash-color-mode', next)
     setColorMode(next)
@@ -1240,7 +1242,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const isPersonal = activeContext === 'personal'
 
   return (
-    <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}`} ref={rootRef}>
+    <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}${aiOpen ? ' ai-open' : ''}`} ref={rootRef}>
       <Starfield mode={colorMode} />
       <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
 
@@ -1270,6 +1272,15 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                 </svg>
               )}
             </span>
+          </button>
+          <button
+            className={`dash-mode-toggle dash-ai-toggle${aiOpen ? ' active' : ''}`}
+            onClick={() => setAiOpen(v => !v)}
+            aria-label="AI assistant"
+            aria-pressed={aiOpen}
+            title="AI assistant"
+          >
+            <span className="dash-ai-toggle-icon" aria-hidden="true">✦</span>
           </button>
           <div
             className={`dash-searchbar-wrap${searchOpen ? ' open' : ''}`}
@@ -1880,6 +1891,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
           onMemberRemove={userId => setGuildDetails(prev => ({ ...prev, members: (prev.members || []).filter(m => m.id !== userId) }))}
         />
       )}
+
+      <AiAssistant open={aiOpen} onClose={() => setAiOpen(false)} />
     </div>
   )
 }
