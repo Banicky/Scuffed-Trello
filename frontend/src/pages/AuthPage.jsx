@@ -253,7 +253,7 @@ export default function AuthPage({ onLogin }) {
   // Cosmic brand mark — the four-point compass star echoed across the dashboard
   // (hero filigree, section titles, ranks), set in the accent badge.
   const brandMark = (
-    <span className="board-icon board-icon--brand auth-brand-mark" style={{ width: 36, height: 36, borderRadius: 10 }}>
+    <span className="board-icon board-icon--brand auth-brand-mark" style={{ width: 'calc(36 * var(--u))', height: 'calc(36 * var(--u))', borderRadius: 'calc(10 * var(--u))' }}>
       <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
         <path d="M12 0 L13.6 10.4 L24 12 L13.6 13.6 L12 24 L10.4 13.6 L0 12 L10.4 10.4 Z" fill="currentColor" />
       </svg>
