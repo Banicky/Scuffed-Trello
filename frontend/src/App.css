@@ -1134,6 +1134,10 @@ select.card-input {
   min-height: 100svh;
   display: flex;
 
+  /* resolution scale */
+  --u: clamp(1px, 0.0625vw, 1.6px);
+  --s: tan(atan2(var(--u), 1px));
+
   background-color: #06070b;
   background-image:
     radial-gradient(120% 80% at 50% -12%, #11141d 0%, transparent 58%),
@@ -1146,8 +1150,8 @@ select.card-input {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 14px;
-  padding: 48px 56px;
+  gap: calc(14 * var(--u));
+  padding: calc(48 * var(--u)) calc(56 * var(--u));
   color: var(--text-h);
   position: relative;
   z-index: 1;
@@ -1157,26 +1161,27 @@ select.card-input {
 .auth-visual-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
+  gap: calc(10 * var(--u));
+  margin-bottom: calc(6 * var(--u));
 }
 
 .auth-visual-heading {
   font-family: var(--display);
-  font-size: clamp(30px, 3.4vw, 40px);
+  /* keep the sub-reference vw shrink for small screens; scale up past it */
+  font-size: clamp(30px, 3.4vw, calc(40 * var(--u)));
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.08;
   margin: 0;
-  max-width: 430px;
+  max-width: calc(430 * var(--u));
   color: var(--text-h);
 }
 
 .auth-visual-sub {
-  font-size: 14px;
+  font-size: calc(14 * var(--u));
   color: var(--text);
   opacity: 0.82;
-  max-width: 390px;
+  max-width: calc(390 * var(--u));
   margin: 0;
   line-height: 1.55;
 }
@@ -1184,11 +1189,13 @@ select.card-input {
 /* The form is a full-height smoked-glass rail covering the right side of the
    page — width and length — rather than a small floating card. */
 .auth-form-panel {
-  flex: 0 0 clamp(400px, 42%, 560px);
+  /* the 560px cap scales with the viewport so the rail widens on big screens
+     instead of stranding the form in a fixed-width column */
+  flex: 0 0 clamp(400px, 42%, calc(560 * var(--u)));
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px;
+  padding: calc(48 * var(--u));
   position: relative;
   z-index: 1;
   /* translucent black glass + a slight 2px blur (matching the hero card) so the
@@ -1207,8 +1214,17 @@ select.card-input {
 /* the card is now just a centered content column inside the rail */
 .auth-card {
   width: 100%;
-  max-width: 360px;
+  max-width: calc(360 * var(--u));
   box-sizing: border-box;
+}
+
+/* form inputs scale with the rail so they don't look stranded-small inside a
+   widened card on big monitors (auth-scoped so the shared .card-input used
+   elsewhere in the app is untouched) */
+.auth-card .card-input {
+  padding: calc(7 * var(--u)) calc(10 * var(--u));
+  font-size: calc(13 * var(--u));
+  border-radius: calc(6 * var(--u));
 }
 
 .auth-mobile-brand {
@@ -1238,14 +1254,14 @@ select.card-input {
 .auth-tabs {
   display: flex;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 20px;
+  margin-bottom: calc(20 * var(--u));
 }
 
 .auth-tab {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  padding: 8px 16px;
+  padding: calc(8 * var(--u)) calc(16 * var(--u));
   font-size: 14px;
   font-weight: 500;
   color: var(--text);
@@ -1266,25 +1282,25 @@ select.card-input {
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: calc(8 * var(--u));
 }
 
 .auth-label {
-  font-size: 12px;
+  font-size: calc(12 * var(--u));
   font-weight: 500;
   color: var(--text);
-  margin-bottom: -2px;
+  margin-bottom: calc(-2 * var(--u));
 }
 
 .auth-submit {
-  margin-top: 8px;
+  margin-top: calc(8 * var(--u));
   width: 100%;
-  padding: 10px;
-  font-size: 14px;
+  padding: calc(10 * var(--u));
+  font-size: calc(14 * var(--u));
 }
 
 .auth-error {
-  font-size: 12px;
+  font-size: calc(12 * var(--u));
   color: #ef4444;
   margin: 0;
 }
@@ -1293,16 +1309,16 @@ select.card-input {
 .auth-oauth {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: calc(10 * var(--u));
 }
 
 .auth-divider {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 6px 0 2px;
+  gap: calc(12 * var(--u));
+  margin: calc(6 * var(--u)) 0 calc(2 * var(--u));
   color: var(--text-muted, #888);
-  font-size: 12px;
+  font-size: calc(12 * var(--u));
 }
 
 .auth-divider::before,
@@ -1317,14 +1333,14 @@ select.card-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: calc(10 * var(--u));
   width: 100%;
   /* border-box so the 1px border is counted *inside* width:100%, matching the
      inputs and the Log in button (which both use border-box) — otherwise the
      border pushes these 2px wider and they hang past the form edge */
   box-sizing: border-box;
-  padding: 10px;
-  font-size: 14px;
+  padding: calc(10 * var(--u));
+  font-size: calc(14 * var(--u));
   font-weight: 500;
   color: var(--text-h);
   background: var(--social-bg);
@@ -1480,6 +1496,12 @@ select.card-input {
   flex-direction: column;
   height: 100svh;
   overflow: hidden;
+  /* Gentle fluid scale — a lighter version of the auth page's --u. The dashboard
+     content is capped + centered (.dashboard-main), so on big monitors it would
+     otherwise sit as a narrow column with wide empty margins; this lets it grow
+     slightly to use more of the screen. Holds at 1x below ~2220px (laptops/1080p
+     unchanged) and tops out at a subtle 1.35x. Scalable sizes are calc(N*var(--u)). */
+  --u: clamp(1px, 0.045vw, 1.35px);
   /* astral atlas: a single sparse silvered star-dust layer. The pegboard grid
      was removed so the canvas starfield reads as the only texture — quieter sky */
   background-image:
@@ -1678,8 +1700,8 @@ select.card-input {
 
 .dashboard-main {
   flex: 1;
-  padding: 28px 40px 64px;
-  max-width: 1120px;
+  padding: calc(28 * var(--u)) calc(40 * var(--u)) calc(64 * var(--u));
+  max-width: calc(1120 * var(--u));
   width: 100%;
   margin: 0 auto;
 }
@@ -1692,30 +1714,31 @@ select.card-input {
 
 /* ── Hero ── */
 .dash-hero {
-  margin-bottom: 28px;
+  margin-bottom: calc(28 * var(--u));
 }
 
 .dash-hero-eyebrow {
-  font-size: 12px;
+  font-size: calc(12 * var(--u));
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
-  margin: 0 0 8px;
+  margin: 0 0 calc(8 * var(--u));
 }
 
 .dash-hero-greeting {
   font-family: var(--display);
   font-weight: 800;
-  font-size: clamp(31px, 4.7vw, 48px);
+  /* keep the small-screen vw shrink; scale the upper bound on big monitors */
+  font-size: clamp(31px, 4.7vw, calc(48 * var(--u)));
   line-height: 1.0;
   letter-spacing: -0.035em;
   color: var(--text-h);
-  margin: 0 0 12px;
+  margin: 0 0 calc(12 * var(--u));
 }
 
 .dash-hero-summary {
-  font-size: 15px;
+  font-size: calc(15 * var(--u));
   color: var(--text);
   opacity: 0.74;
   margin: 0;
@@ -1723,7 +1746,7 @@ select.card-input {
 }
 
 .dashboard-section {
-  margin-bottom: 40px;
+  margin-bottom: calc(40 * var(--u));
 }
 
 .new-board-form {
@@ -1750,10 +1773,10 @@ select.card-input {
   /* tiles stretch to fill each row so the grid spans the full content width
      (matching the hero card above), while a generous min keeps each chart
      compact and the track count responsive */
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  grid-auto-rows: 168px;
+  grid-template-columns: repeat(auto-fill, minmax(calc(210 * var(--u)), 1fr));
+  grid-auto-rows: calc(168 * var(--u));
   align-items: stretch;
-  gap: 24px;
+  gap: calc(24 * var(--u));
 }
 
 /* ── Board tile (the signature: each board as a tiny kanban) ── */
@@ -1765,7 +1788,7 @@ select.card-input {
   flex-direction: column;
   justify-content: flex-end;
   height: 100%;
-  padding: 16px;
+  padding: calc(16 * var(--u));
   border: none;
   border-radius: 16px;
   cursor: pointer;
@@ -2021,7 +2044,7 @@ select.card-input {
 .board-tile-title {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 14px;
+  font-size: calc(14 * var(--u));
   line-height: 1.2;
   letter-spacing: -0.01em;
   color: #fff;
@@ -2731,6 +2754,97 @@ select.card-input {
   color: var(--text);
   margin: 8px 0 0;
 }
+
+/* Save / discard bar for the staged avatar edits */
+.settings-avatar-savebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.settings-avatar-dirty-note {
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+/* Unsaved-changes prompt — a compact glass panel mirroring .settings-section */
+.settings-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 8, 14, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: settings-confirm-fade 0.16s ease-out;
+}
+
+.settings-confirm-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 26px 28px;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(28, 32, 42, 0.85) 0%, rgba(12, 14, 20, 0.78) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  animation: settings-confirm-pop 0.18s ease-out;
+}
+
+.settings-shell--day .settings-confirm-card {
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+  background: linear-gradient(135deg, rgba(252, 254, 255, 0.94) 0%, rgba(226, 237, 249, 0.88) 100%);
+  box-shadow: 0 20px 60px rgba(50, 84, 140, 0.28);
+}
+
+.settings-confirm-title {
+  font-family: var(--fantasy);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-h);
+  margin: 0 0 8px;
+}
+
+.settings-confirm-text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+  margin: 0 0 22px;
+}
+
+.settings-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.settings-confirm-actions .btn-primary {
+  flex: 1;
+}
+
+@keyframes settings-confirm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes settings-confirm-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-confirm-overlay,
+  .settings-confirm-card { animation: none; }
+}
+
+.force-reduced-motion .settings-confirm-overlay,
+.force-reduced-motion .settings-confirm-card { animation: none; }
 
 /* Security form */
 .settings-form {
@@ -4261,9 +4375,9 @@ select.card-input {
 
 /* ── Sidebar ── */
 .dash-sidebar {
-  width: 230px;
+  width: calc(230 * var(--u));
   flex-shrink: 0;
-  padding: 16px 10px 24px;
+  padding: calc(16 * var(--u)) calc(10 * var(--u)) calc(24 * var(--u));
   border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   border-radius: 18px;
   background: color-mix(in srgb, var(--bg) 62%, transparent);
@@ -4282,26 +4396,26 @@ select.card-input {
 
 .sidebar-section-label {
   font-family: var(--fantasy);
-  font-size: 10px;
+  font-size: calc(10 * var(--u));
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-muted, #888);
-  padding: 22px 12px 8px;
+  padding: calc(22 * var(--u)) calc(12 * var(--u)) calc(8 * var(--u));
   margin: 0;
 }
 
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: calc(10 * var(--u));
   width: 100%;
-  padding: 8px 10px;
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
   border-radius: 8px;
   border: none;
   background: none;
   cursor: pointer;
   color: var(--text);
-  font-size: 13.5px;
+  font-size: calc(13.5 * var(--u));
   font-weight: 500;
   font-family: var(--sans);
   text-align: left;
@@ -4335,7 +4449,7 @@ select.card-input {
 }
 
 .sidebar-item-icon {
-  font-size: 14px;
+  font-size: calc(14 * var(--u));
   opacity: 0.7;
   flex-shrink: 0;
 }
@@ -5342,7 +5456,7 @@ select.card-input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 32px;
+  gap: calc(32 * var(--u));
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.045) 0%,
@@ -5350,8 +5464,8 @@ select.card-input {
   );
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
-  padding: 40px 44px;
-  margin-bottom: 44px;
+  padding: calc(40 * var(--u)) calc(44 * var(--u));
+  margin-bottom: calc(44 * var(--u));
   position: relative;
   overflow: hidden;
 }
@@ -5530,6 +5644,9 @@ select.card-input {
 .cosmic-activity-icon--guild { color: #6fb1ff; background: rgba(111, 177, 255, 0.14); }
 /* board deletions read in a danger hue, overriding the gold board tint above */
 .cosmic-activity-icon--deleted { color: #ff7a7a; background: rgba(255, 122, 122, 0.14); }
+/* card adds vs moves each get their own hue so the action reads at a glance */
+.cosmic-activity-icon--created { color: #5fd6a2; background: rgba(95, 214, 162, 0.15); }
+.cosmic-activity-icon--moved   { color: #56c2e8; background: rgba(86, 194, 232, 0.15); }
 
 .cosmic-activity-text {
   flex: 1;
@@ -6122,7 +6239,7 @@ select.card-input {
   align-items: center;
   gap: 10px;
   font-family: var(--display);
-  font-size: 18px;
+  font-size: calc(18 * var(--u));
   font-weight: 700;
   color: var(--text-h);
   margin: 0;
@@ -6440,8 +6557,8 @@ select.card-input {
 .dash-hero-art {
   position: relative;
   flex: 0 0 auto;
-  width: 196px;
-  height: 196px;
+  width: calc(196 * var(--u));
+  height: calc(196 * var(--u));
   align-self: center;
   margin-right: -8px;
   pointer-events: none;
@@ -6902,6 +7019,9 @@ select.card-input {
 .dashboard-shell--day .cosmic-activity-icon--board { color: #6a4fd0; background: rgba(106, 79, 208, 0.15); }
 .dashboard-shell--day .cosmic-activity-icon--guild { color: #8a52c8; background: rgba(138, 82, 200, 0.15); }
 .dashboard-shell--day .cosmic-activity-icon--deleted { color: #c63838; background: rgba(198, 56, 56, 0.14); }
+/* deeper, more saturated add/move hues for legibility on the light nebula */
+.dashboard-shell--day .cosmic-activity-icon--created { color: #1f9d6b; background: rgba(31, 157, 107, 0.16); }
+.dashboard-shell--day .cosmic-activity-icon--moved   { color: #1f8fb8; background: rgba(31, 143, 184, 0.16); }
 
 /* ──────────────────────────────────────────────────────────────────────────
    AI Assistant — VSCode-style docked side panel
@@ -7156,7 +7276,7 @@ select.card-input {
 /* brand wordmark — celestial serif, matching the Settings title voice */
 .auth-brand {
   font-family: var(--fantasy);
-  font-size: 22px;
+  font-size: calc(22 * var(--u));
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--text-h);
@@ -7168,6 +7288,9 @@ select.card-input {
     0 6px 16px var(--accent-bg),
     0 0 18px -2px color-mix(in srgb, var(--star) 40%, transparent);
 }
+/* CSS overrides the svg's width/height attributes so the star scales with the
+   badge (calc()/var() can't go in the SVG presentation attributes themselves) */
+.auth-brand-mark svg { width: calc(20 * var(--u)); height: calc(20 * var(--u)); }
 
 /* eyebrow uses the silver starlight, like the dashboard hero */
 .auth-visual-brand { color: var(--star); }
@@ -7177,8 +7300,8 @@ select.card-input {
    product's features rendered as a vertical constellation of glowing nodes.
    ════════════════════════════════════════════════════════════════════ */
 .auth-eyebrow {
-  margin: 0 0 -6px;
-  font-size: 12px;
+  margin: 0 0 calc(-6 * var(--u));
+  font-size: calc(12 * var(--u));
   font-weight: 600;
   letter-spacing: 0.34em;
   text-transform: uppercase;
@@ -7197,20 +7320,20 @@ select.card-input {
 /* feature list: glowing star-nodes joined by a faint constellation chain */
 .auth-features {
   list-style: none;
-  margin: 6px 0 0;
+  margin: calc(6 * var(--u)) 0 0;
   padding: 0;
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 420px;
+  gap: calc(16 * var(--u));
+  max-width: calc(420 * var(--u));
 }
 .auth-features::before {
   content: '';
   position: absolute;
-  top: 20px;
-  bottom: 20px;
-  left: 18px; /* node centre */
+  top: calc(20 * var(--u));
+  bottom: calc(20 * var(--u));
+  left: calc(18 * var(--u)); /* node centre */
   width: 1px;
   background: linear-gradient(180deg,
     transparent,
@@ -7223,12 +7346,12 @@ select.card-input {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: calc(14 * var(--u));
 }
 .auth-feature-node {
   flex-shrink: 0;
-  width: 37px;
-  height: 37px;
+  width: calc(37 * var(--u));
+  height: calc(37 * var(--u));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7242,19 +7365,19 @@ select.card-input {
     0 0 18px -3px color-mix(in srgb, var(--accent) 60%, transparent),
     inset 0 0 9px -4px color-mix(in srgb, var(--star) 70%, transparent);
 }
-.auth-feature-node svg { width: 18px; height: 18px; }
+.auth-feature-node svg { width: calc(18 * var(--u)); height: calc(18 * var(--u)); }
 .auth-feature-title {
   display: block;
   font-family: var(--fantasy);
-  font-size: 15px;
+  font-size: calc(15 * var(--u));
   font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--text-h);
 }
 .auth-feature-desc {
   display: block;
-  margin-top: 1px;
-  font-size: 12.5px;
+  margin-top: calc(1 * var(--u));
+  font-size: calc(12.5 * var(--u));
   line-height: 1.45;
   color: var(--text);
   opacity: 0.78;
@@ -7290,9 +7413,14 @@ select.card-input {
 .auth-mockups {
   position: absolute;
   top: 50%;
-  right: 24px;
+  right: calc(24 * var(--u));
   width: 300px;
   transform: translateY(-50%);
+  /* scale the whole collage as one unit (its dozens of inner px values stay put
+     and just ride the scale); origin pinned right so it grows inward, away from
+     the form rail, and is clipped by .auth-visual's overflow if it ever exceeds */
+  scale: var(--s);
+  transform-origin: center right;
   z-index: -1; /* behind the copy, above the starfield */
   pointer-events: none;
   /* a vertical cascade: each card separated by a gap and staggered left/right
@@ -7489,7 +7617,7 @@ select.card-input {
 /* ── Form chrome: small celestial touches over the auto-themed tokens ── */
 .auth-tab {
   font-family: var(--fantasy);
-  font-size: 16px;
+  font-size: calc(16 * var(--u));
   letter-spacing: 0.03em;
 }
 .auth-tab.active {
@@ -7501,9 +7629,9 @@ select.card-input {
   align-self: flex-start;
   background: none;
   border: none;
-  padding: 2px 0;
-  margin: 2px 0 -2px;
-  font-size: 12px;
+  padding: calc(2 * var(--u)) 0;
+  margin: calc(2 * var(--u)) 0 calc(-2 * var(--u));
+  font-size: calc(12 * var(--u));
   color: var(--accent);
   cursor: pointer;
   transition: color 0.15s;
@@ -7511,10 +7639,10 @@ select.card-input {
 .auth-forgot:hover { color: var(--text-h); text-decoration: underline; }
 
 .auth-reset-success {
-  font-size: 13px;
+  font-size: calc(13 * var(--u));
   color: var(--text-h);
   line-height: 1.5;
-  margin: 0 0 4px;
+  margin: 0 0 calc(4 * var(--u));
 }
 
 /* ── Decorative layer behind the form: twinkling constellations, a corner
