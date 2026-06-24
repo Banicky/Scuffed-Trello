@@ -5644,6 +5644,9 @@ select.card-input {
 .cosmic-activity-icon--guild { color: #6fb1ff; background: rgba(111, 177, 255, 0.14); }
 /* board deletions read in a danger hue, overriding the gold board tint above */
 .cosmic-activity-icon--deleted { color: #ff7a7a; background: rgba(255, 122, 122, 0.14); }
+/* card adds vs moves each get their own hue so the action reads at a glance */
+.cosmic-activity-icon--created { color: #5fd6a2; background: rgba(95, 214, 162, 0.15); }
+.cosmic-activity-icon--moved   { color: #56c2e8; background: rgba(86, 194, 232, 0.15); }
 
 .cosmic-activity-text {
   flex: 1;
@@ -7016,6 +7019,9 @@ select.card-input {
 .dashboard-shell--day .cosmic-activity-icon--board { color: #6a4fd0; background: rgba(106, 79, 208, 0.15); }
 .dashboard-shell--day .cosmic-activity-icon--guild { color: #8a52c8; background: rgba(138, 82, 200, 0.15); }
 .dashboard-shell--day .cosmic-activity-icon--deleted { color: #c63838; background: rgba(198, 56, 56, 0.14); }
+/* deeper, more saturated add/move hues for legibility on the light nebula */
+.dashboard-shell--day .cosmic-activity-icon--created { color: #1f9d6b; background: rgba(31, 157, 107, 0.16); }
+.dashboard-shell--day .cosmic-activity-icon--moved   { color: #1f8fb8; background: rgba(31, 143, 184, 0.16); }
 
 /* ──────────────────────────────────────────────────────────────────────────
    AI Assistant — VSCode-style docked side panel

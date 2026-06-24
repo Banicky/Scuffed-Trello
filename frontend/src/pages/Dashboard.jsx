@@ -1226,7 +1226,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   // one Cosmic Activity row — shared by the 3-row preview and the "View all" panel
   const renderActivityRow = (a, i) => (
     <li key={i} className="cosmic-activity-item">
-      <span className={`cosmic-activity-icon cosmic-activity-icon--${a.kind}${a.kind === 'board' && a.action === 'deleted' ? ' cosmic-activity-icon--deleted' : ''}`}>
+      <span className={`cosmic-activity-icon cosmic-activity-icon--${a.kind}${a.kind === 'board' && a.action === 'deleted' ? ' cosmic-activity-icon--deleted' : ''}${a.kind === 'card' && (a.action === 'created' || a.action === 'moved') ? ` cosmic-activity-icon--${a.action}` : ''}`}>
         {activityIcon(a)}
       </span>
       <span className="cosmic-activity-text">{activityText(a)}</span>
