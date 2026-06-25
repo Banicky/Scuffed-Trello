@@ -472,7 +472,7 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
 
   return (
     <div
-      className="board-tile"
+      className={`board-tile${showSettings ? ' board-tile--menu-open' : ''}`}
       style={{ '--tile': color, '--stagger': stagger }}
       onClick={() => !showSettings && onOpen(board.id, color)}
       onMouseEnter={openPreview}
@@ -1196,6 +1196,9 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const milestonePct = nextMilestone ? Math.min(100, Math.round((streakNow / nextMilestone) * 100)) : 100
   const milestoneToGo = nextMilestone ? nextMilestone - streakNow : 0
   const cosmicRank =
+    bestStreak >= 365 ? 'Great One of the Universe' :
+    bestStreak >= 100 ? 'Universe Pioneer' :
+    bestStreak >= 60  ? 'Celestial Cartographer' :
     bestStreak >= 30 ? 'Galactic Voyager' :
     bestStreak >= 14 ? 'Constellation Keeper' :
     bestStreak >= 7  ? 'Starfarer' :

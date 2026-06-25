@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { gsap } from 'gsap'
 import Column from '../components/Column.jsx'
 import CardDetailModal from '../components/CardDetailModal.jsx'
 import ImageUploadField from '../components/ImageUploadField.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
 import AiAssistant from '../components/AiAssistant.jsx'
+import Starfield from '../components/Starfield.jsx'
 import { apiFetch, assetUrl, exportBoard, importBoard } from '../api.js'
 import { buildSearchRegex } from '../utils.js'
 
@@ -134,6 +136,41 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   const [aiOpen, setAiOpen] = useState(false)
   const cardRefs = useRef(new Map())
   const importInputRef = useRef(null)
+
+  // Carry the dashboard's day/night sky into the board. The choice lives in the
+  // same `dash-color-mode` key the dashboard writes, so the theme persists as
+  // the user moves between the two views.
+  const modeFxRef = useRef(null)  // full-screen veil that cross-fades the swap
+  const modeIconRef = useRef(null)
+  const [colorMode, setColorMode] = useState(() => localStorage.getItem('dash-color-mode') || 'night')
+  function applyColorMode(next) {
+    localStorage.setItem('dash-color-mode', next)
+    setColorMode(next)
+  }
+  // Mirror the dashboard's switch: a veil in the incoming sky's tone fades in, we
+  // swap the theme underneath while it's opaque, then it fades back out to reveal
+  // the new sky — so the recolor never reads as a harsh flash.
+  function toggleColorMode() {
+    const next = colorMode === 'night' ? 'day' : 'night'
+
+    // little pop on the toggle glyph
+    if (modeIconRef.current) {
+      gsap.fromTo(modeIconRef.current,
+        { rotate: -90, scale: 0.4, opacity: 0 },
+        { rotate: 0, scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(2)' })
+    }
+
+    const fx = modeFxRef.current
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!fx || reduced) { applyColorMode(next); return }
+
+    fx.style.background = next === 'day' ? '#ccd4e0' : '#06070b'
+    gsap.timeline()
+      .set(fx, { autoAlpha: 0 })
+      .to(fx, { autoAlpha: 1, duration: 0.26, ease: 'power1.inOut' })
+      .add(() => applyColorMode(next))
+      .to(fx, { autoAlpha: 0, duration: 0.34, ease: 'power1.inOut' })
+  }
 
   const isOwner = board?.owner_id === user.id
 
@@ -469,13 +506,15 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   const doneCount = doneCol?.cards.length ?? 0
 
   if (loading) return (
-    <div className="app-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
+    <div className={`app-shell board-shell${colorMode === 'day' ? ' board-shell--day' : ''}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
       Journeying…
     </div>
   )
 
   return (
-    <div className={`app-shell${aiOpen ? ' ai-open' : ''}`}>
+    <div className={`app-shell board-shell${colorMode === 'day' ? ' board-shell--day' : ''}${aiOpen ? ' ai-open' : ''}`}>
+      <Starfield mode={colorMode} randomConstellations />
+      <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
       <div className="board-stage">
       {board?.background_image && (
         <div
@@ -577,6 +616,25 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
         </div>
 
         <div className="topbar-right">
+          <button
+            className="dash-mode-toggle"
+            onClick={toggleColorMode}
+            aria-label={colorMode === 'day' ? 'Switch to night mode' : 'Switch to day mode'}
+            title={colorMode === 'day' ? 'Night mode' : 'Day mode'}
+          >
+            <span className="dash-mode-toggle-icon" ref={modeIconRef}>
+              {colorMode === 'day' ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                </svg>
+              )}
+            </span>
+          </button>
           {isOwner && (
             <button
               className={`btn-ghost members-toggle${showDesign ? ' active' : ''}`}

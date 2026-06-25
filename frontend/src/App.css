@@ -24,6 +24,139 @@
   background-repeat: no-repeat;
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   BOARD · COSMIC SKY (mirrors the dashboard)
+   The board interior wears the same sky as the dashboard. Redefining the
+   scoped theme tokens recolors the topbar, columns, cards and assistant into
+   the silver-on-void register, and the Starfield canvas drifts behind them.
+   `isolation` contains the canvas so its z-index:-1 tucks behind the content
+   yet above the shell's own gradient — no per-element lifts, so modals and the
+   docked assistant keep stacking as before. The day/night choice is shared with
+   the dashboard via the `dash-color-mode` localStorage key, so it persists
+   across the two views; the --day variant flips the whole realm to daylight.
+   ════════════════════════════════════════════════════════════════════ */
+.board-shell {
+  isolation: isolate;
+  --text: #868c9b;
+  --text-h: #e6e9f2;
+  --bg: #06070b;
+  --border: rgba(168, 178, 200, 0.10);
+  --code-bg: rgba(255, 255, 255, 0.035);
+  --accent: #828da3;
+  --accent-bg: rgba(130, 141, 163, 0.13);
+  --accent-border: rgba(130, 141, 163, 0.42);
+  --social-bg: rgba(255, 255, 255, 0.025);
+  --metal: #c7cedd;
+  --metal-deep: #8b94a3;
+  --star: #d8dde8;
+  --shadow:
+    rgba(0, 0, 0, 0.6) 0 10px 24px -6px, rgba(0, 0, 0, 0.4) 0 4px 12px -4px;
+  color: var(--text);
+  background-color: #06070b;
+  background-image:
+    radial-gradient(120% 80% at 50% -12%, #11141d 0%, transparent 58%),
+    radial-gradient(100% 70% at 84% 6%, rgba(28, 34, 48, 0.6) 0%, transparent 62%),
+    linear-gradient(180deg, #0a0c12 0%, #070809 56%, #040406 100%);
+  background-position: center;
+}
+
+/* the starfield drifts behind the columns; the shell's gradient stays beneath it */
+.board-shell > .starfield-canvas { z-index: -1; }
+
+/* the topbar dissolves into the sky like the dashboard's, so the stars carry across */
+.board-shell .topbar { background: transparent; }
+
+/* glassy mode toggle, matching the dashboard's */
+.board-shell .dash-mode-toggle {
+  background: rgba(16, 18, 26, 0.55);
+  border: 1px solid rgba(168, 178, 200, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Board in daylight (mirrors the dashboard's celestial day) ── */
+.board-shell--day {
+  --text: #4a586e;
+  --text-h: #18202e;
+  --text-dim: rgba(40, 56, 84, 0.42);
+  --bg: #eef4fb;
+  --border: rgba(74, 104, 154, 0.20);
+  --code-bg: rgba(210, 226, 244, 0.45);
+  --accent: #4f72c8;
+  --accent-bg: rgba(79, 114, 200, 0.14);
+  --accent-border: rgba(79, 114, 200, 0.5);
+  --social-bg: rgba(210, 226, 244, 0.4);
+  --metal: #9fb4d6;
+  --metal-deep: #6f88af;
+  --star: #4063a6;
+  --shadow:
+    rgba(40, 70, 120, 0.18) 0 10px 24px -6px, rgba(40, 70, 120, 0.1) 0 4px 12px -4px;
+  color: var(--text);
+  background-color: #eaf4fc;
+  background-image: url('./assets/day-sky.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.board-shell--day .dash-mode-toggle {
+  background: rgba(250, 253, 255, 0.72);
+  border: 1px solid rgba(110, 145, 200, 0.24);
+}
+
+/* ── Scrollbars: clean + translucent, tinted to the active sky ──
+   Silvered glass over the night void; cool slate over the daylight sky. Slim
+   and rounded, transparent track, a touch brighter on hover. The standard
+   scrollbar-* props cover Firefox; the -webkit-* pseudos cover Chrome/Safari. */
+.board-shell {
+  --sb-thumb: rgba(216, 221, 232, 0.18);
+  --sb-thumb-hover: rgba(216, 221, 232, 0.34);
+}
+.board-shell--day {
+  --sb-thumb: rgba(40, 56, 84, 0.22);
+  --sb-thumb-hover: rgba(40, 56, 84, 0.42);
+}
+
+.board-shell .board,
+.board-shell .column-cards,
+.board-shell .ai-panel-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-thumb) transparent;
+}
+.board-shell .board::-webkit-scrollbar,
+.board-shell .column-cards::-webkit-scrollbar,
+.board-shell .ai-panel-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.board-shell .board::-webkit-scrollbar-track,
+.board-shell .column-cards::-webkit-scrollbar-track,
+.board-shell .ai-panel-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.board-shell .board::-webkit-scrollbar-thumb,
+.board-shell .column-cards::-webkit-scrollbar-thumb,
+.board-shell .ai-panel-body::-webkit-scrollbar-thumb {
+  /* the transparent border + padding-box clip insets the thumb so it reads as a
+     slim ~4px pill floating in the track rather than a flush chunky bar */
+  background: var(--sb-thumb);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+.board-shell .board::-webkit-scrollbar-thumb:hover,
+.board-shell .column-cards::-webkit-scrollbar-thumb:hover,
+.board-shell .ai-panel-body::-webkit-scrollbar-thumb:hover {
+  background: var(--sb-thumb-hover);
+}
+/* no arrows/corner — keep it minimal */
+.board-shell .board::-webkit-scrollbar-button,
+.board-shell .column-cards::-webkit-scrollbar-button,
+.board-shell .ai-panel-body::-webkit-scrollbar-button { display: none; }
+.board-shell .board::-webkit-scrollbar-corner,
+.board-shell .column-cards::-webkit-scrollbar-corner,
+.board-shell .ai-panel-body::-webkit-scrollbar-corner { background: transparent; }
+
 /* ── Top bar ── */
 .topbar {
   display: flex;
@@ -1806,6 +1939,21 @@ select.card-input {
      so the hover transform still works once it has landed. */
   animation: tile-in 0.42s ease backwards;
   animation-delay: calc(min(var(--stagger, 0), 8) * 45ms);
+  /* Each tile's constellation runs infinite twinkle/sparkle animations with
+     drop-shadow/blur filters. Left unchecked, every tile keeps repainting those
+     filtered nodes every frame — even off-screen — so a large grid turns scroll
+     choppy. `content-visibility: auto` lets the browser skip rendering (layout,
+     paint, AND the running animations) for tiles outside the viewport; the
+     intrinsic size keeps the scroll height stable so nothing jumps. */
+  content-visibility: auto;
+  contain-intrinsic-size: calc(210 * var(--u)) calc(168 * var(--u));
+}
+
+/* content-visibility: auto implies paint containment, which would clip the
+   gear/settings popover (it overflows above the tile). Lift it for the one tile
+   whose menu is open — it's on-screen and cheap, so skipping is moot there. */
+.board-tile--menu-open {
+  content-visibility: visible;
 }
 
 @keyframes tile-in {
