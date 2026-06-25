@@ -472,7 +472,7 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
 
   return (
     <div
-      className="board-tile"
+      className={`board-tile${showSettings ? ' board-tile--menu-open' : ''}`}
       style={{ '--tile': color, '--stagger': stagger }}
       onClick={() => !showSettings && onOpen(board.id, color)}
       onMouseEnter={openPreview}
