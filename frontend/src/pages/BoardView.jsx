@@ -5,7 +5,6 @@ import CardDetailModal from '../components/CardDetailModal.jsx'
 import ImageUploadField from '../components/ImageUploadField.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
 import AiAssistant from '../components/AiAssistant.jsx'
-import Starfield from '../components/Starfield.jsx'
 import { apiFetch, assetUrl, exportBoard, importBoard } from '../api.js'
 import { buildSearchRegex } from '../utils.js'
 
@@ -513,7 +512,6 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
 
   return (
     <div className={`app-shell board-shell${colorMode === 'day' ? ' board-shell--day' : ''}${aiOpen ? ' ai-open' : ''}`}>
-      <Starfield mode={colorMode} randomConstellations />
       <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
       <div className="board-stage">
       {board?.background_image && (

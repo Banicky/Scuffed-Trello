@@ -53,15 +53,8 @@
     rgba(0, 0, 0, 0.6) 0 10px 24px -6px, rgba(0, 0, 0, 0.4) 0 4px 12px -4px;
   color: var(--text);
   background-color: #06070b;
-  background-image:
-    radial-gradient(120% 80% at 50% -12%, #11141d 0%, transparent 58%),
-    radial-gradient(100% 70% at 84% 6%, rgba(28, 34, 48, 0.6) 0%, transparent 62%),
-    linear-gradient(180deg, #0a0c12 0%, #070809 56%, #040406 100%);
-  background-position: center;
+  background-image: none;
 }
-
-/* the starfield drifts behind the columns; the shell's gradient stays beneath it */
-.board-shell > .starfield-canvas { z-index: -1; }
 
 /* the topbar dissolves into the sky like the dashboard's, so the stars carry across */
 .board-shell .topbar { background: transparent; }
@@ -92,11 +85,8 @@
   --shadow:
     rgba(40, 70, 120, 0.18) 0 10px 24px -6px, rgba(40, 70, 120, 0.1) 0 4px 12px -4px;
   color: var(--text);
-  background-color: #eaf4fc;
-  background-image: url('./assets/day-sky.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-color: #D6EAFC;
+  background-image: none;
 }
 .board-shell--day .dash-mode-toggle {
   background: rgba(250, 253, 255, 0.72);
@@ -819,6 +809,20 @@
 
 @media (prefers-reduced-motion: reduce) {
   .card-star.active .card-star-glyph { animation: none; }
+}
+
+/* Light board: dark star instead of the night-sky turquoise glow */
+.board-shell--day .card-star-glyph,
+.board-shell--day .card-star.active .card-star-glyph {
+  color: #18202e;
+  text-shadow: none;
+}
+.board-shell--day .card-star:hover .card-star-glyph,
+.board-shell--day .card-star.active:hover .card-star-glyph {
+  color: #18202e;
+  text-shadow:
+    0 0 2px rgba(24, 32, 46, 0.9),
+    0 0 4px rgba(24, 32, 46, 0.55);
 }
 
 .card-delete {
