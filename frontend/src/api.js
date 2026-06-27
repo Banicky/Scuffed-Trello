@@ -1,4 +1,6 @@
-const API = 'http://localhost:4000'
+// Empty = same-origin (prod, served behind nginx). Local dev sets
+// VITE_API_URL=http://localhost:4000 via .env.development.
+const API = import.meta.env.VITE_API_URL || ''
 
 export const API_BASE = API
 

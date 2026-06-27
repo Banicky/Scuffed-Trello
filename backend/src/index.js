@@ -151,6 +151,13 @@ function deleteSpacesImages(...urls) {
 const app = express();
 const PgSession = connectPgSimple(session);
 
+// In production we sit behind a TLS-terminating proxy (Cloudflare → nginx), so
+// trust the proxy: express then reads X-Forwarded-Proto to know the request is
+// HTTPS and will emit the `secure` session/trust cookies. Locally (no NODE_ENV)
+// we're on plain http://localhost, so secure cookies stay off and login works.
+const isProd = process.env.NODE_ENV === "production";
+app.set("trust proxy", isProd ? 1 : 0);
+
 app.use(cors({ origin: CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
@@ -160,7 +167,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || "dev-secret-change-in-prod",
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 },
+  cookie: { httpOnly: true, secure: isProd, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 },
 }));
 
 function requireAuth(req, res, next) {
@@ -211,6 +218,7 @@ async function rememberDevice(res, userId) {
   await pool.query("UPDATE users SET trusted_token = $1 WHERE id = $2", [token, userId]);
   res.cookie(TRUST_COOKIE, `${userId}.${token}`, {
     httpOnly: true,
+    secure: isProd,
     maxAge: TRUST_MAX_AGE,
     sameSite: "lax",
   });
