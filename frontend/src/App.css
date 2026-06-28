@@ -7973,3 +7973,52 @@ select.card-input {
 .auth-shell--day .asc-dot { background: rgba(60, 88, 140, 0.18); }
 .auth-shell--day .aic-bubble--ai { background: rgba(255, 255, 255, 0.7); }
 .auth-shell--day .aic-line { background: rgba(40, 56, 84, 0.2); }
+
+/* ════════════════════════════════════════════════════════════════════
+   RESPONSIVE · board view (the topbar packs ~12 controls in one row with no
+   prior small-screen handling — the main offender). The dashboard sidebar
+   (≤640), auth split (≤900) and card modal (≤720) already reflow elsewhere.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Tablet: let the board topbar wrap and drop search to its own full row. */
+@media (max-width: 768px) {
+  .board-shell .topbar {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .board-shell .topbar-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
+  .board-shell .topbar-right { gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  /* search becomes its own full-width row beneath the control groups */
+  .board-shell .topbar-search { order: 3; flex-basis: 100%; min-width: 0; }
+  .board-shell .search-input { flex: 1 1 auto; width: auto; }
+  /* keep a long board name from pushing the controls off-screen */
+  .board-shell .board-name {
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Phone: tighten everything so the wrapped rows fit a narrow screen. */
+@media (max-width: 480px) {
+  .board-shell .topbar { padding: 8px 10px; gap: 6px; }
+  .board-shell .topbar-left,
+  .board-shell .topbar-right { gap: 6px; }
+  .board-shell .board-io-btn,
+  .board-shell .members-toggle,
+  .board-shell .btn-ghost {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+  .board-shell .board-name { max-width: 50vw; }
+  .board-shell .board-meta { font-size: 11px; }
+  /* a column nearly fills the phone; the next peeks to signal horizontal scroll */
+  .board-shell .kanban-column { width: min(272px, 82vw); }
+  .board-shell .board { padding: 16px 12px; gap: 12px; }
+  /* the Members/Design popover spans the screen instead of a 280px box pinned right */
+  .board-members-panel { right: 8px; left: 8px; min-width: 0; }
+}
