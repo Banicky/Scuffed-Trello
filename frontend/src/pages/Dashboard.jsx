@@ -7,7 +7,7 @@ import UserAvatar from '../components/UserAvatar.jsx'
 import Starfield from '../components/Starfield.jsx'
 import AiAssistant from '../components/AiAssistant.jsx'
 
-const GUILD_COLORS = [
+const TEAM_COLORS = [
   { key: 'arcane',  hex: '#aa3bff' },
   { key: 'ember',   hex: '#d2461b' },
   { key: 'verdant', hex: '#22a44a' },
@@ -16,16 +16,16 @@ const GUILD_COLORS = [
   { key: 'frost',   hex: '#7dd3fc' },
 ]
 
-function guildHex(iconColor) {
-  return GUILD_COLORS.find(c => c.key === iconColor)?.hex || '#aa3bff'
+function teamHex(iconColor) {
+  return TEAM_COLORS.find(c => c.key === iconColor)?.hex || '#aa3bff'
 }
 
-function GuildIcon({ guild, className = '' }) {
-  const initial = (guild.name?.trim()[0] || '?').toUpperCase()
+function TeamIcon({ team, className = '' }) {
+  const initial = (team.name?.trim()[0] || '?').toUpperCase()
   return (
     <span
-      className={`guild-icon ${className}`}
-      style={{ '--guild-color': guildHex(guild.icon_color) }}
+      className={`team-icon ${className}`}
+      style={{ '--team-color': teamHex(team.icon_color) }}
       aria-hidden="true"
     >
       {initial}
@@ -33,7 +33,7 @@ function GuildIcon({ guild, className = '' }) {
   )
 }
 
-function CreateGuildModal({ onClose, onCreate }) {
+function CreateTeamModal({ onClose, onCreate }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState('arcane')
   const [error, setError] = useState(null)
@@ -50,12 +50,12 @@ function CreateGuildModal({ onClose, onCreate }) {
     e.preventDefault()
     if (!name.trim()) return
     setBusy(true)
-    const res = await apiFetch('/api/guilds', {
+    const res = await apiFetch('/api/teams', {
       method: 'POST',
       body: JSON.stringify({ name: name.trim(), icon_color: color }),
     })
     const data = await res.json()
-    if (!res.ok) { setError(data.error || 'Failed to create alliance'); setBusy(false); return }
+    if (!res.ok) { setError(data.error || 'Failed to create team'); setBusy(false); return }
     onCreate(data)
     onClose()
   }
@@ -66,14 +66,14 @@ function CreateGuildModal({ onClose, onCreate }) {
       ref={overlayRef}
       onClick={e => { if (e.target === overlayRef.current) onClose() }}
     >
-      <div className="card-modal guild-modal" role="dialog" aria-modal="true" aria-label="Forge an Alliance">
+      <div className="card-modal team-modal" role="dialog" aria-modal="true" aria-label="Create a Team">
         <div className="card-modal-header">
-          <h2 className="guild-modal-title">Forge an Alliance</h2>
+          <h2 className="team-modal-title">Create a Team</h2>
         </div>
         <div className="card-modal-body">
-          <form onSubmit={handleSubmit} className="guild-modal-form">
+          <form onSubmit={handleSubmit} className="team-modal-form">
             <div>
-              <label className="guild-field-label">Alliance Name</label>
+              <label className="team-field-label">Team Name</label>
               <input
                 className="card-input"
                 placeholder="e.g. Star Watchers"
@@ -84,13 +84,13 @@ function CreateGuildModal({ onClose, onCreate }) {
               />
             </div>
             <div>
-              <label className="guild-field-label">Emblem Color</label>
-              <div className="guild-color-picker">
-                {GUILD_COLORS.map(c => (
+              <label className="team-field-label">Emblem Color</label>
+              <div className="team-color-picker">
+                {TEAM_COLORS.map(c => (
                   <button
                     key={c.key}
                     type="button"
-                    className={`guild-color-swatch${color === c.key ? ' active' : ''}`}
+                    className={`team-color-swatch${color === c.key ? ' active' : ''}`}
                     style={{ '--swatch': c.hex }}
                     onClick={() => setColor(c.key)}
                     aria-label={c.key}
@@ -99,14 +99,14 @@ function CreateGuildModal({ onClose, onCreate }) {
                 ))}
               </div>
             </div>
-            <div className="guild-preview">
-              <GuildIcon guild={{ name: name || '?', icon_color: color }} className="guild-icon--lg" />
-              <span className="guild-preview-name">{name || 'Unnamed Alliance'}</span>
+            <div className="team-preview">
+              <TeamIcon team={{ name: name || '?', icon_color: color }} className="team-icon--lg" />
+              <span className="team-preview-name">{name || 'Unnamed Team'}</span>
             </div>
             {error && <p className="auth-error">{error}</p>}
-            <div className="guild-modal-actions">
+            <div className="team-modal-actions">
               <button className="btn-primary" type="submit" disabled={busy || !name.trim()}>
-                {busy ? 'Forging…' : 'Forge Alliance'}
+                {busy ? 'Creating…' : 'Create Team'}
               </button>
               <button className="btn-ghost" type="button" onClick={onClose}>Cancel</button>
             </div>
@@ -117,19 +117,19 @@ function CreateGuildModal({ onClose, onCreate }) {
   )
 }
 
-function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete, onMemberAdd, onMemberRemove }) {
+function TeamSettingsModal({ team, currentUserId, onClose, onUpdate, onDelete, onMemberAdd, onMemberRemove }) {
   const [tab, setTab] = useState('members')
-  const [members, setMembers] = useState(guild.members || [])
+  const [members, setMembers] = useState(team.members || [])
   const [addInput, setAddInput] = useState('')
   const [addError, setAddError] = useState(null)
   const [adding, setAdding] = useState(false)
-  const [renameVal, setRenameVal] = useState(guild.name)
-  const [iconColor, setIconColor] = useState(guild.icon_color)
+  const [renameVal, setRenameVal] = useState(team.name)
+  const [iconColor, setIconColor] = useState(team.icon_color)
   const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
   const overlayRef = useRef(null)
 
-  const isOwner = guild.owner_id === currentUserId
+  const isOwner = team.owner_id === currentUserId
 
   useEffect(() => {
     function handleKey(e) { if (e.key === 'Escape') onClose() }
@@ -142,7 +142,7 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
     if (!addInput.trim()) return
     setAdding(true)
     setAddError(null)
-    const res = await apiFetch(`/api/guilds/${guild.id}/members`, {
+    const res = await apiFetch(`/api/teams/${team.id}/members`, {
       method: 'POST',
       body: JSON.stringify({ username: addInput.trim() }),
     })
@@ -155,7 +155,7 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
   }
 
   async function handleRemoveMember(userId) {
-    await apiFetch(`/api/guilds/${guild.id}/members/${userId}`, { method: 'DELETE' })
+    await apiFetch(`/api/teams/${team.id}/members/${userId}`, { method: 'DELETE' })
     setMembers(m => m.filter(x => x.id !== userId))
     onMemberRemove(userId)
   }
@@ -164,7 +164,7 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
     e.preventDefault()
     if (!renameVal.trim()) return
     setSaving(true)
-    const res = await apiFetch(`/api/guilds/${guild.id}`, {
+    const res = await apiFetch(`/api/teams/${team.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ name: renameVal.trim(), icon_color: iconColor }),
     })
@@ -174,8 +174,8 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
   }
 
   async function handleDelete() {
-    await apiFetch(`/api/guilds/${guild.id}`, { method: 'DELETE' })
-    onDelete(guild.id)
+    await apiFetch(`/api/teams/${team.id}`, { method: 'DELETE' })
+    onDelete(team.id)
     onClose()
   }
 
@@ -185,28 +185,28 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
       ref={overlayRef}
       onClick={e => { if (e.target === overlayRef.current) onClose() }}
     >
-      <div className="card-modal guild-settings-modal" role="dialog" aria-modal="true" aria-label="Alliance Settings">
-        <div className="guild-settings-header">
-          <GuildIcon guild={{ name: guild.name, icon_color: iconColor }} className="guild-icon--md" />
+      <div className="card-modal team-settings-modal" role="dialog" aria-modal="true" aria-label="Team Settings">
+        <div className="team-settings-header">
+          <TeamIcon team={{ name: team.name, icon_color: iconColor }} className="team-icon--md" />
           <div>
-            <h2 className="guild-modal-title">{guild.name}</h2>
-            <p className="guild-settings-sub">
+            <h2 className="team-modal-title">{team.name}</h2>
+            <p className="team-settings-sub">
               {members.length} member{members.length !== 1 ? 's' : ''}
-              {guild.board_count != null ? ` · ${guild.board_count} board${guild.board_count !== 1 ? 's' : ''}` : ''}
+              {team.board_count != null ? ` · ${team.board_count} board${team.board_count !== 1 ? 's' : ''}` : ''}
             </p>
           </div>
         </div>
 
-        <div className="guild-settings-tabs">
+        <div className="team-settings-tabs">
           <button
-            className={`guild-settings-tab${tab === 'members' ? ' active' : ''}`}
+            className={`team-settings-tab${tab === 'members' ? ' active' : ''}`}
             onClick={() => setTab('members')}
           >
             Members
           </button>
           {isOwner && (
             <button
-              className={`guild-settings-tab${tab === 'settings' ? ' active' : ''}`}
+              className={`team-settings-tab${tab === 'settings' ? ' active' : ''}`}
               onClick={() => setTab('settings')}
             >
               Settings
@@ -214,13 +214,13 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
           )}
         </div>
 
-        <div className="guild-settings-body">
+        <div className="team-settings-body">
           {tab === 'members' && (
             <div>
               {isOwner && (
-                <form className="guild-add-form" onSubmit={handleAddMember}>
+                <form className="team-add-form" onSubmit={handleAddMember}>
                   <input
-                    className="card-input guild-add-input"
+                    className="card-input team-add-input"
                     placeholder="Add by username or email"
                     value={addInput}
                     onChange={e => setAddInput(e.target.value)}
@@ -231,15 +231,15 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
                 </form>
               )}
               {addError && <p className="auth-error" style={{ marginBottom: 8 }}>{addError}</p>}
-              <ul className="guild-member-list">
+              <ul className="team-member-list">
                 {members.map(m => (
-                  <li key={m.id} className="guild-member-item">
-                    <UserAvatar user={m} className="guild-member-avatar" />
-                    <span className="guild-member-name">{m.username}</span>
-                    {m.role === 'owner' && <span className="guild-member-role">Owner</span>}
+                  <li key={m.id} className="team-member-item">
+                    <UserAvatar user={m} className="team-member-avatar" />
+                    <span className="team-member-name">{m.username}</span>
+                    {m.role === 'owner' && <span className="team-member-role">Owner</span>}
                     {isOwner && m.id !== currentUserId && m.role !== 'owner' && (
                       <button
-                        className="guild-member-remove"
+                        className="team-member-remove"
                         onClick={() => handleRemoveMember(m.id)}
                         title={`Remove ${m.username}`}
                       >
@@ -253,9 +253,9 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
           )}
 
           {tab === 'settings' && isOwner && (
-            <form className="guild-settings-form" onSubmit={handleSaveSettings}>
+            <form className="team-settings-form" onSubmit={handleSaveSettings}>
               <div>
-                <label className="guild-field-label">Alliance Name</label>
+                <label className="team-field-label">Team Name</label>
                 <input
                   className="card-input"
                   value={renameVal}
@@ -264,13 +264,13 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
                 />
               </div>
               <div>
-                <label className="guild-field-label">Emblem Color</label>
-                <div className="guild-color-picker">
-                  {GUILD_COLORS.map(c => (
+                <label className="team-field-label">Emblem Color</label>
+                <div className="team-color-picker">
+                  {TEAM_COLORS.map(c => (
                     <button
                       key={c.key}
                       type="button"
-                      className={`guild-color-swatch${iconColor === c.key ? ' active' : ''}`}
+                      className={`team-color-swatch${iconColor === c.key ? ' active' : ''}`}
                       style={{ '--swatch': c.hex }}
                       onClick={() => setIconColor(c.key)}
                       aria-label={c.key}
@@ -282,18 +282,18 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
               <button className="btn-primary" type="submit" disabled={saving || !renameVal.trim()}>
                 {saving ? 'Saving…' : 'Save Changes'}
               </button>
-              <div className="guild-settings-divider" />
+              <div className="team-settings-divider" />
               {confirming ? (
-                <div className="guild-settings-confirm">
-                  <p>This disbands the alliance and unassigns all its boards. Continue?</p>
+                <div className="team-settings-confirm">
+                  <p>This deletes the team and unassigns all its boards. Continue?</p>
                   <div className="board-popover-confirm-actions">
-                    <button type="button" className="btn-danger-sm" onClick={handleDelete}>Disband</button>
+                    <button type="button" className="btn-danger-sm" onClick={handleDelete}>Delete</button>
                     <button type="button" className="btn-ghost-sm" onClick={() => setConfirming(false)}>Cancel</button>
                   </div>
                 </div>
               ) : (
                 <button type="button" className="board-popover-delete" onClick={() => setConfirming(true)}>
-                  Disband Alliance
+                  Delete Team
                 </button>
               )}
             </form>
@@ -541,12 +541,12 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
       <div className="board-tile-info">
         <span className="board-tile-arrow" aria-hidden="true">→</span>
         <div className="board-tile-info-text">
-          {board.guild_name && (
+          {board.team_name && (
             <span
-              className="board-tile-guild-chip"
-              style={{ '--chip-color': guildHex(board.guild_icon_color) }}
+              className="board-tile-team-chip"
+              style={{ '--chip-color': teamHex(board.team_icon_color) }}
             >
-              {board.guild_name}
+              {board.team_name}
             </span>
           )}
           <span className="board-tile-title">{board.title}</span>
@@ -594,7 +594,7 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
   )
 }
 
-function GuildInviteModal({ guild, onClose }) {
+function TeamInviteModal({ team, onClose }) {
   const [username, setUsername] = useState('')
   const [status, setStatus] = useState(null)
   const [error, setError] = useState(null)
@@ -611,7 +611,7 @@ function GuildInviteModal({ guild, onClose }) {
     if (!username.trim()) return
     setStatus('sending')
     setError(null)
-    const res = await apiFetch(`/api/guilds/${guild.id}/invites`, {
+    const res = await apiFetch(`/api/teams/${team.id}/invites`, {
       method: 'POST',
       body: JSON.stringify({ username: username.trim() }),
     })
@@ -622,25 +622,25 @@ function GuildInviteModal({ guild, onClose }) {
 
   return (
     <div className="card-modal-overlay" ref={overlayRef} onClick={e => { if (e.target === overlayRef.current) onClose() }}>
-      <div className="card-modal guild-invite-modal" role="dialog" aria-modal="true" aria-label="Summon Allies">
+      <div className="card-modal team-invite-modal" role="dialog" aria-modal="true" aria-label="Invite Members">
         <div className="card-modal-header">
-          <h2 className="guild-modal-title">Summon Allies</h2>
+          <h2 className="team-modal-title">Invite Members</h2>
         </div>
         <div className="card-modal-body">
-          <p className="guild-invite-desc">
-            Dispatch a missive to invite a warrior to <strong>{guild.name}</strong>.
+          <p className="team-invite-desc">
+            Dispatch a missive to invite someone to <strong>{team.name}</strong>.
           </p>
           {status === 'sent' ? (
-            <div className="guild-invite-sent">
-              <span className="guild-invite-sent-icon">✦</span>
-              <span className="guild-invite-sent-text">Missive Dispatched!</span>
-              <p className="guild-invite-sent-sub">They shall receive the summons shortly.</p>
+            <div className="team-invite-sent">
+              <span className="team-invite-sent-icon">✦</span>
+              <span className="team-invite-sent-text">Missive Dispatched!</span>
+              <p className="team-invite-sent-sub">They’ll receive the invitation shortly.</p>
               <button className="btn-ghost" onClick={() => { setStatus(null); setUsername('') }}>
                 Invite Another
               </button>
             </div>
           ) : (
-            <form className="guild-invite-form" onSubmit={handleSend}>
+            <form className="team-invite-form" onSubmit={handleSend}>
               <input
                 className="card-input"
                 placeholder="Username or email"
@@ -649,7 +649,7 @@ function GuildInviteModal({ guild, onClose }) {
                 autoFocus
               />
               {error && <p className="auth-error">{error}</p>}
-              <div className="guild-modal-actions">
+              <div className="team-modal-actions">
                 <button className="btn-primary" type="submit" disabled={status === 'sending' || !username.trim()}>
                   {status === 'sending' ? 'Dispatching…' : 'Send Missive'}
                 </button>
@@ -665,13 +665,13 @@ function GuildInviteModal({ guild, onClose }) {
 
 function NotificationItem({ notif, onAccept, onDecline }) {
   const d = notif.data || {}
-  if (notif.type !== 'guild_invite') return null
+  if (notif.type !== 'team_invite') return null
   return (
     <div className={`notif-item${notif.read ? ' notif-item--read' : ''}`}>
       <div className="notif-item-sigil" aria-hidden="true">⚔</div>
       <div className="notif-item-body">
         <p className="notif-item-text">
-          <strong>{d.inviter_username}</strong> summons you to join the alliance <strong>{d.guild_name}</strong>.
+          <strong>{d.inviter_username}</strong> invites you to join the team <strong>{d.team_name}</strong>.
         </p>
         <p className="notif-item-time">{relativeTime(notif.created_at) || 'just now'}</p>
         {!notif.read && (
@@ -717,7 +717,7 @@ const ACTIVITY_ICONS = {
       <circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" />
     </svg>
   ),
-  guild: (
+  team: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 3l7 3v5c0 4-3 7-7 9-4-2-7-5-7-9V6z" />
     </svg>
@@ -753,8 +753,8 @@ function activityText(a) {
     case 'board:created': return <>Charted a new galaxy, {title}</>
     case 'board:renamed': return <>Renamed the galaxy <strong>{a.context}</strong> to {title}</>
     case 'board:deleted': return <>Collapsed the galaxy {title}</>
-    case 'guild:founded': return <>Founded the alliance {title}</>
-    case 'guild:joined':  return <>Joined the alliance {title}</>
+    case 'team:founded': return <>Created the team {title}</>
+    case 'team:joined':  return <>Joined the team {title}</>
     default:              return title
   }
 }
@@ -784,14 +784,14 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const [newTitle, setNewTitle] = useState('')
   const [addingBoard, setAddingBoard] = useState(false)
 
-  // Alliance state
-  const [guilds, setGuilds] = useState([])
-  const [activeContext, setActiveContext] = useState('personal') // 'personal' | guildId (number)
-  const [guildBoards, setGuildBoards] = useState([])
-  const [guildBoardsLoading, setGuildBoardsLoading] = useState(false)
-  const [guildDetails, setGuildDetails] = useState(null)
-  const [showCreateGuild, setShowCreateGuild] = useState(false)
-  const [showGuildSettings, setShowGuildSettings] = useState(false)
+  // Team state
+  const [teams, setTeams] = useState([])
+  const [activeContext, setActiveContext] = useState('personal') // 'personal' | teamId (number)
+  const [teamBoards, setTeamBoards] = useState([])
+  const [teamBoardsLoading, setTeamBoardsLoading] = useState(false)
+  const [teamDetails, setTeamDetails] = useState(null)
+  const [showCreateTeam, setShowCreateTeam] = useState(false)
+  const [showTeamSettings, setShowTeamSettings] = useState(false)
 
   const ownedKey = `dash:${user.id}:ownedCount`
   const sharedKey = `dash:${user.id}:sharedCount`
@@ -808,8 +808,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const [activityPageOpen, setActivityPageOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
-  const [showGuildInvite, setShowGuildInvite] = useState(false)
-  const [inviteTargetGuild, setInviteTargetGuild] = useState(null)
+  const [showTeamInvite, setShowTeamInvite] = useState(false)
+  const [inviteTargetTeam, setInviteTargetTeam] = useState(null)
 
   // Day/Night dashboard mode — defaults to night (the original design).
   const [colorMode, setColorMode] = useState(() => localStorage.getItem('dash-color-mode') || 'night')
@@ -850,16 +850,16 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   }
 
   async function handleAcceptInvite(notif) {
-    const res = await apiFetch(`/api/guild-invites/${notif.data.invite_id}/accept`, { method: 'POST' })
+    const res = await apiFetch(`/api/team-invites/${notif.data.invite_id}/accept`, { method: 'POST' })
     const data = await res.json()
     if (!res.ok) return
-    setGuilds(gs => gs.find(g => g.id === data.guild.id) ? gs : [...gs, data.guild])
+    setTeams(gs => gs.find(g => g.id === data.team.id) ? gs : [...gs, data.team])
     setNotifications(ns => ns.map(n => n.id === notif.id ? { ...n, read: true } : n))
     setNotifOpen(false)
   }
 
   async function handleDeclineInvite(notif) {
-    await apiFetch(`/api/guild-invites/${notif.data.invite_id}/decline`, { method: 'POST' })
+    await apiFetch(`/api/team-invites/${notif.data.invite_id}/decline`, { method: 'POST' })
     setNotifications(ns => ns.map(n => n.id === notif.id ? { ...n, read: true } : n))
   }
 
@@ -935,9 +935,9 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   }, [])
 
   useEffect(() => {
-    apiFetch('/api/guilds')
+    apiFetch('/api/teams')
       .then(r => r.json())
-      .then(data => setGuilds(Array.isArray(data) ? data : []))
+      .then(data => setTeams(Array.isArray(data) ? data : []))
   }, [])
 
   // Cosmic Activity feed — the user's own recent deeds. Re-fetched on mount,
@@ -964,18 +964,18 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
   useEffect(() => {
     if (activeContext === 'personal') {
-      setGuildBoards([])
-      setGuildDetails(null)
+      setTeamBoards([])
+      setTeamDetails(null)
       return
     }
-    setGuildBoardsLoading(true)
+    setTeamBoardsLoading(true)
     Promise.all([
-      apiFetch(`/api/guilds/${activeContext}/boards`).then(r => r.json()),
-      apiFetch(`/api/guilds/${activeContext}`).then(r => r.json()),
+      apiFetch(`/api/teams/${activeContext}/boards`).then(r => r.json()),
+      apiFetch(`/api/teams/${activeContext}`).then(r => r.json()),
     ]).then(([boardsData, detailsData]) => {
-      setGuildBoards(Array.isArray(boardsData) ? boardsData : [])
-      setGuildDetails(detailsData?.id ? detailsData : null)
-      setGuildBoardsLoading(false)
+      setTeamBoards(Array.isArray(boardsData) ? boardsData : [])
+      setTeamDetails(detailsData?.id ? detailsData : null)
+      setTeamBoardsLoading(false)
     })
   }, [activeContext])
 
@@ -1023,7 +1023,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
   // ── GSAP reveal: board tiles rise + constellation lines stroke-draw ──
   useEffect(() => {
-    if (loading || guildBoardsLoading) return
+    if (loading || teamBoardsLoading) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const ctx = gsap.context(() => {
       gsap.from('.board-grid > *', {
@@ -1039,7 +1039,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       })
     }, rootRef)
     return () => ctx.revert()
-  }, [loading, guildBoardsLoading, boardView, activeContext])
+  }, [loading, teamBoardsLoading, boardView, activeContext])
 
   // ── GSAP: animate the Cosmic Activity page open (backdrop, panel, streak, rows) ──
   useEffect(() => {
@@ -1139,7 +1139,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     e.preventDefault()
     if (!newTitle.trim()) return
     const body = { title: newTitle.trim() }
-    if (activeContext !== 'personal') body.guild_id = activeContext
+    if (activeContext !== 'personal') body.team_id = activeContext
     const res = await apiFetch('/api/boards', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -1148,8 +1148,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     if (activeContext === 'personal') {
       setBoards(b => [...b, board])
     } else {
-      setGuildBoards(b => [...b, board])
-      setGuilds(gs => gs.map(g => g.id === activeContext ? { ...g, board_count: (g.board_count || 0) + 1 } : g))
+      setTeamBoards(b => [...b, board])
+      setTeams(gs => gs.map(g => g.id === activeContext ? { ...g, board_count: (g.board_count || 0) + 1 } : g))
     }
     setNewTitle('')
     setAddingBoard(false)
@@ -1161,10 +1161,10 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     setBoards(b => b.filter(board => board.id !== boardId))
   }
 
-  async function deleteGuildBoard(boardId) {
+  async function deleteTeamBoard(boardId) {
     await apiFetch(`/api/boards/${boardId}`, { method: 'DELETE' })
-    setGuildBoards(b => b.filter(board => board.id !== boardId))
-    setGuilds(gs => gs.map(g => g.id === activeContext ? { ...g, board_count: Math.max(0, (g.board_count || 0) - 1) } : g))
+    setTeamBoards(b => b.filter(board => board.id !== boardId))
+    setTeams(gs => gs.map(g => g.id === activeContext ? { ...g, board_count: Math.max(0, (g.board_count || 0) - 1) } : g))
   }
 
   async function renameBoard(boardId, newTitle) {
@@ -1176,13 +1176,13 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     setBoards(b => b.map(board => board.id === boardId ? { ...board, title: updated.title } : board))
   }
 
-  async function renameGuildBoard(boardId, newTitle) {
+  async function renameTeamBoard(boardId, newTitle) {
     const res = await apiFetch(`/api/boards/${boardId}`, {
       method: 'PATCH',
       body: JSON.stringify({ title: newTitle }),
     })
     const updated = await res.json()
-    setGuildBoards(b => b.map(board => board.id === boardId ? { ...board, title: updated.title } : board))
+    setTeamBoards(b => b.map(board => board.id === boardId ? { ...board, title: updated.title } : board))
   }
 
   const ownedBoards = boards.filter(b => b.role === 'owner')
@@ -1247,9 +1247,9 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
           {' · '}<em className="dash-hero-cta">choose your journey.</em>
         </>
 
-  const guildSummary = guildDetails
-    ? `${guildBoards.length} board${guildBoards.length !== 1 ? 's' : ''} · ${(guildDetails.members || []).length} member${(guildDetails.members || []).length !== 1 ? 's' : ''} · your alliance's shared quests.`
-    : 'Loading alliance…'
+  const teamSummary = teamDetails
+    ? `${teamBoards.length} board${teamBoards.length !== 1 ? 's' : ''} · ${(teamDetails.members || []).length} member${(teamDetails.members || []).length !== 1 ? 's' : ''} · your team's shared quests.`
+    : 'Loading team…'
 
   const isPersonal = activeContext === 'personal'
 
@@ -1260,8 +1260,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
       <header className="topbar">
         <div className="topbar-left">
-          <p className="topbar-breadcrumb">DASHBOARD › {isPersonal ? 'MY BOARDS' : (guildDetails?.name?.toUpperCase() || 'ALLIANCE')}</p>
-          <h1 className="topbar-page-title">{isPersonal ? 'My Universe' : (guildDetails?.name || 'Alliance')}</h1>
+          <p className="topbar-breadcrumb">DASHBOARD › {isPersonal ? 'MY BOARDS' : (teamDetails?.name?.toUpperCase() || 'TEAM')}</p>
+          <h1 className="topbar-page-title">{isPersonal ? 'My Universe' : (teamDetails?.name || 'Team')}</h1>
         </div>
         <div className="topbar-right">
           <button
@@ -1416,25 +1416,25 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             {sharedBoards.length > 0 && <span className="sidebar-item-count">{sharedBoards.length}</span>}
           </button>
 
-          {guilds.length > 0 && (
-            <p className="sidebar-section-label">Alliances</p>
+          {teams.length > 0 && (
+            <p className="sidebar-section-label">Teams</p>
           )}
 
-          {guilds.map(g => (
-            <div key={g.id} className="sidebar-guild-row">
+          {teams.map(g => (
+            <div key={g.id} className="sidebar-team-row">
               <button
-                className={`sidebar-item sidebar-item--guild${activeContext === g.id ? ' active' : ''}`}
+                className={`sidebar-item sidebar-item--team${activeContext === g.id ? ' active' : ''}`}
                 onClick={() => { setActiveContext(g.id); setAddingBoard(false) }}
               >
-                <GuildIcon guild={g} className="sidebar-guild-icon" />
+                <TeamIcon team={g} className="sidebar-team-icon" />
                 <span className="sidebar-item-name">{g.name}</span>
               </button>
               {g.role === 'owner' && (
                 <button
-                  className="sidebar-guild-invite-btn"
-                  title="Summon Allies"
+                  className="sidebar-team-invite-btn"
+                  title="Invite Members"
                   aria-label={`Invite to ${g.name}`}
-                  onClick={e => { e.stopPropagation(); setInviteTargetGuild(g); setShowGuildInvite(true) }}
+                  onClick={e => { e.stopPropagation(); setInviteTargetTeam(g); setShowTeamInvite(true) }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -1446,10 +1446,10 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               )}
               {g.role === 'owner' && (
                 <button
-                  className="sidebar-guild-manage-btn"
-                  title="Manage / Disband"
+                  className="sidebar-team-manage-btn"
+                  title="Manage / Delete"
                   aria-label={`Manage ${g.name}`}
-                  onClick={e => { e.stopPropagation(); setActiveContext(g.id); setShowGuildSettings(true) }}
+                  onClick={e => { e.stopPropagation(); setActiveContext(g.id); setShowTeamSettings(true) }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="3"/>
@@ -1462,10 +1462,10 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
           <button
             className="sidebar-create-btn"
-            onClick={() => setShowCreateGuild(true)}
+            onClick={() => setShowCreateTeam(true)}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Forge an Alliance
+            Create a Team
           </button>
 
           <div className="sidebar-footer">
@@ -1518,7 +1518,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             <div className="dash-hero-left">
               <p className="dash-hero-eyebrow">{today.toUpperCase()}</p>
               <h1 className="dash-hero-greeting">{greeting}, <em className="dash-hero-username">{user.username}</em>.</h1>
-              <p className="dash-hero-summary">{isPersonal ? personalSummary : guildSummary}</p>
+              <p className="dash-hero-summary">{isPersonal ? personalSummary : teamSummary}</p>
 
               <button
                 type="button"
@@ -1749,41 +1749,41 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               </section>
             </>
           ) : (
-            /* Alliance view */
+            /* Team view */
             <>
-              {guildDetails && (
-                <div className="guild-context-header" style={{ '--guild-color': guildHex(guildDetails.icon_color) }}>
-                  <GuildIcon guild={guildDetails} className="guild-icon--lg" />
-                  <div className="guild-context-info">
-                    <h2 className="guild-context-name">{guildDetails.name}</h2>
-                    <div className="guild-context-meta">
-                      <span>{(guildDetails.members || []).length} member{(guildDetails.members || []).length !== 1 ? 's' : ''}</span>
+              {teamDetails && (
+                <div className="team-context-header" style={{ '--team-color': teamHex(teamDetails.icon_color) }}>
+                  <TeamIcon team={teamDetails} className="team-icon--lg" />
+                  <div className="team-context-info">
+                    <h2 className="team-context-name">{teamDetails.name}</h2>
+                    <div className="team-context-meta">
+                      <span>{(teamDetails.members || []).length} member{(teamDetails.members || []).length !== 1 ? 's' : ''}</span>
                       <span aria-hidden="true">·</span>
-                      <span>{guildBoards.length} board{guildBoards.length !== 1 ? 's' : ''}</span>
+                      <span>{teamBoards.length} board{teamBoards.length !== 1 ? 's' : ''}</span>
                     </div>
                   </div>
-                  {(guildDetails.members || []).length > 0 && (
+                  {(teamDetails.members || []).length > 0 && (
                     <div
-                      className="guild-context-members"
-                      aria-label={`Members: ${(guildDetails.members || []).map(m => m.username).join(', ')}`}
+                      className="team-context-members"
+                      aria-label={`Members: ${(teamDetails.members || []).map(m => m.username).join(', ')}`}
                     >
-                      {(guildDetails.members || []).slice(0, 6).map(m => (
-                        <UserAvatar key={m.id} user={m} className="guild-context-avatar" title={m.username} />
+                      {(teamDetails.members || []).slice(0, 6).map(m => (
+                        <UserAvatar key={m.id} user={m} className="team-context-avatar" title={m.username} />
                       ))}
-                      {(guildDetails.members || []).length > 6 && (
-                        <span className="guild-context-avatar guild-context-avatar--more">
-                          +{(guildDetails.members || []).length - 6}
+                      {(teamDetails.members || []).length > 6 && (
+                        <span className="team-context-avatar team-context-avatar--more">
+                          +{(teamDetails.members || []).length - 6}
                         </span>
                       )}
                     </div>
                   )}
 
-                  <div className="guild-context-actions">
-                    {guildDetails.owner_id === user.id && (
+                  <div className="team-context-actions">
+                    {teamDetails.owner_id === user.id && (
                       <button
-                        className="guild-invite-trigger-btn"
-                        onClick={() => { setInviteTargetGuild(guildDetails); setShowGuildInvite(true) }}
-                        title="Summon Allies"
+                        className="team-invite-trigger-btn"
+                        onClick={() => { setInviteTargetTeam(teamDetails); setShowTeamInvite(true) }}
+                        title="Invite Members"
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -1791,7 +1791,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                           <line x1="19" y1="8" x2="19" y2="14"/>
                           <line x1="22" y1="11" x2="16" y2="11"/>
                         </svg>
-                        Summon Allies
+                        Invite Members
                       </button>
                     )}
                   </div>
@@ -1819,23 +1819,23 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                       <span className="board-tile-create-label">Add a Quest</span>
                     </button>
                   )}
-                  {guildBoardsLoading
+                  {teamBoardsLoading
                     ? Array.from({ length: 3 }).map((_, i) => <BoardTileSkeleton key={i} />)
-                    : guildBoards.map((b, i) => (
+                    : teamBoards.map((b, i) => (
                       <BoardCard
                         key={b.id}
                         board={b}
                         index={i}
                         stagger={i + 1}
                         onOpen={onOpenBoard}
-                        onDelete={deleteGuildBoard}
-                        onRename={renameGuildBoard}
+                        onDelete={deleteTeamBoard}
+                        onRename={renameTeamBoard}
                         isOwner={b.role === 'owner'}
                       />
                     ))}
-                  {!guildBoardsLoading && guildBoards.length === 0 && (
+                  {!teamBoardsLoading && teamBoards.length === 0 && (
                     <p className="dashboard-empty" style={{ gridColumn: '1 / -1' }}>
-                      No quest boards yet — add the first one for your guild.
+                      No quest boards yet — add the first one for your team.
                     </p>
                   )}
                 </div>
@@ -1910,8 +1910,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                         <span className="voyager-stat-label">Shared</span>
                       </div>
                       <div className="voyager-stat">
-                        <span className="voyager-stat-num">{guilds.length}</span>
-                        <span className="voyager-stat-label">Allies</span>
+                        <span className="voyager-stat-num">{teams.length}</span>
+                        <span className="voyager-stat-label">Teams</span>
                       </div>
                     </div>
                   </div>
@@ -1942,35 +1942,35 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
         </div>
       )}
 
-      {showGuildInvite && inviteTargetGuild && (
-        <GuildInviteModal
-          guild={inviteTargetGuild}
-          onClose={() => { setShowGuildInvite(false); setInviteTargetGuild(null) }}
+      {showTeamInvite && inviteTargetTeam && (
+        <TeamInviteModal
+          team={inviteTargetTeam}
+          onClose={() => { setShowTeamInvite(false); setInviteTargetTeam(null) }}
         />
       )}
 
-      {showCreateGuild && (
-        <CreateGuildModal
-          onClose={() => setShowCreateGuild(false)}
-          onCreate={guild => setGuilds(gs => [...gs, guild])}
+      {showCreateTeam && (
+        <CreateTeamModal
+          onClose={() => setShowCreateTeam(false)}
+          onCreate={team => setTeams(gs => [...gs, team])}
         />
       )}
 
-      {showGuildSettings && guildDetails && (
-        <GuildSettingsModal
-          guild={{ ...guildDetails, board_count: guildBoards.length }}
+      {showTeamSettings && teamDetails && (
+        <TeamSettingsModal
+          team={{ ...teamDetails, board_count: teamBoards.length }}
           currentUserId={user.id}
-          onClose={() => setShowGuildSettings(false)}
+          onClose={() => setShowTeamSettings(false)}
           onUpdate={updated => {
-            setGuildDetails(prev => ({ ...prev, ...updated }))
-            setGuilds(gs => gs.map(g => g.id === updated.id ? { ...g, name: updated.name, icon_color: updated.icon_color } : g))
+            setTeamDetails(prev => ({ ...prev, ...updated }))
+            setTeams(gs => gs.map(g => g.id === updated.id ? { ...g, name: updated.name, icon_color: updated.icon_color } : g))
           }}
           onDelete={id => {
-            setGuilds(gs => gs.filter(g => g.id !== id))
+            setTeams(gs => gs.filter(g => g.id !== id))
             setActiveContext('personal')
           }}
-          onMemberAdd={member => setGuildDetails(prev => ({ ...prev, members: [...(prev.members || []), member] }))}
-          onMemberRemove={userId => setGuildDetails(prev => ({ ...prev, members: (prev.members || []).filter(m => m.id !== userId) }))}
+          onMemberAdd={member => setTeamDetails(prev => ({ ...prev, members: [...(prev.members || []), member] }))}
+          onMemberRemove={userId => setTeamDetails(prev => ({ ...prev, members: (prev.members || []).filter(m => m.id !== userId) }))}
         />
       )}
 

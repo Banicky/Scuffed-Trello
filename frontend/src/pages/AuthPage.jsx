@@ -70,7 +70,7 @@ function AuthConstellation({ data }) {
 }
 
 // Product highlights for the left "landing" panel — each becomes a glowing node
-// on a vertical constellation that advertises what Scuffed Trello actually does.
+// on a vertical constellation that advertises what CosmoBoard actually does.
 const FEATURES = [
   {
     title: 'Galaxies of work',
@@ -84,7 +84,7 @@ const FEATURES = [
     ),
   },
   {
-    title: 'Forge alliances',
+    title: 'Build your team',
     desc: 'Invite your crew to shared boards and see who’s online, in real time.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -337,12 +337,12 @@ export default function AuthPage({ onLogin }) {
       <div className="auth-visual">
         <div className="auth-visual-brand">
           {brandMark}
-          <span className="auth-brand">Scuffed Trello</span>
+          <span className="auth-brand">CosmoBoard</span>
         </div>
 
         <p className="auth-eyebrow">Cosmic task management</p>
         <h1 className="auth-visual-heading">Organize anything into a <span className="auth-accent-word">universe</span> worth exploring.</h1>
-        <p className="auth-visual-sub">Boards become galaxies, your team becomes an alliance, and tasks become quests — a project tracker that actually pulls you back in.</p>
+        <p className="auth-visual-sub">Boards become galaxies, your crew becomes a team, and tasks become quests — a project tracker that actually pulls you back in.</p>
 
         <ul className="auth-features">
           {FEATURES.map(f => (
@@ -443,7 +443,7 @@ export default function AuthPage({ onLogin }) {
       <div className="auth-card">
         <div className="auth-mobile-brand">
           {brandMark}
-          <span className="auth-brand">Scuffed Trello</span>
+          <span className="auth-brand">CosmoBoard</span>
         </div>
         <div className="auth-tabs">
           <button

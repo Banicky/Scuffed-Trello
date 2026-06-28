@@ -4478,7 +4478,7 @@ select.card-input {
   color: #ef4444;
 }
 
-/* ── Guild layout: sidebar + main ── */
+/* ── Team layout: sidebar + main ── */
 .dash-layout {
   display: flex;
   flex: 1;
@@ -4622,7 +4622,7 @@ select.card-input {
   color: var(--text-h);
 }
 
-.sidebar-guild-icon {
+.sidebar-team-icon {
   flex-shrink: 0;
 }
 
@@ -4649,8 +4649,8 @@ select.card-input {
   color: var(--accent);
 }
 
-/* ── Guild Icon ── */
-.guild-icon {
+/* ── Team Icon ── */
+.team-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4659,8 +4659,8 @@ select.card-input {
   border-radius: 7px;
   background: linear-gradient(
     145deg,
-    color-mix(in srgb, var(--guild-color, var(--accent)) 68%, #fff),
-    var(--guild-color, var(--accent))
+    color-mix(in srgb, var(--team-color, var(--accent)) 68%, #fff),
+    var(--team-color, var(--accent))
   );
   color: #fff;
   font-family: var(--fantasy);
@@ -4671,43 +4671,43 @@ select.card-input {
   line-height: 1;
   user-select: none;
   box-shadow:
-    0 2px 8px -2px color-mix(in srgb, var(--guild-color, var(--accent)) 65%, transparent),
+    0 2px 8px -2px color-mix(in srgb, var(--team-color, var(--accent)) 65%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.guild-icon--md {
+.team-icon--md {
   width: 36px;
   height: 36px;
   font-size: 17px;
   border-radius: 9px;
 }
 
-.guild-icon--lg {
+.team-icon--lg {
   width: 48px;
   height: 48px;
   font-size: 22px;
   border-radius: 12px;
 }
 
-/* ── Guild context header (shown above guild boards) ── */
-.guild-context-header {
+/* ── Team context header (shown above team boards) ── */
+.team-context-header {
   display: flex;
   align-items: center;
   gap: 14px;
   margin-bottom: 24px;
   padding: 16px 18px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--guild-color, var(--accent)) 7%, var(--code-bg));
-  border: 1px solid color-mix(in srgb, var(--guild-color, var(--accent)) 22%, var(--border));
-  box-shadow: 0 4px 20px -8px color-mix(in srgb, var(--guild-color, var(--accent)) 35%, transparent);
+  background: color-mix(in srgb, var(--team-color, var(--accent)) 7%, var(--code-bg));
+  border: 1px solid color-mix(in srgb, var(--team-color, var(--accent)) 22%, var(--border));
+  box-shadow: 0 4px 20px -8px color-mix(in srgb, var(--team-color, var(--accent)) 35%, transparent);
 }
 
-.guild-context-info {
+.team-context-info {
   flex: 1;
   min-width: 0;
 }
 
-.guild-context-name {
+.team-context-name {
   font-family: var(--fantasy);
   font-size: 20px;
   font-weight: 700;
@@ -4717,7 +4717,7 @@ select.card-input {
   line-height: 1.1;
 }
 
-.guild-context-meta {
+.team-context-meta {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -4725,12 +4725,12 @@ select.card-input {
   color: var(--text);
 }
 
-.guild-context-actions {
+.team-context-actions {
   margin-left: auto;
 }
 
-/* ── Guild chip on board tiles ── */
-.board-tile-guild-chip {
+/* ── Team chip on board tiles ── */
+.board-tile-team-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -4744,7 +4744,7 @@ select.card-input {
   line-height: 1;
 }
 
-.board-tile-guild-chip::before {
+.board-tile-team-chip::before {
   content: '';
   display: inline-block;
   width: 7px;
@@ -4754,34 +4754,34 @@ select.card-input {
   flex-shrink: 0;
 }
 
-/* ── Create Alliance modal ── */
-/* ── Guild modals: compact, auto-fit, clean minimal ── */
-.guild-modal,
-.guild-settings-modal,
-.guild-invite-modal {
+/* ── Create Team modal ── */
+/* ── Team modals: compact, auto-fit, clean minimal ── */
+.team-modal,
+.team-settings-modal,
+.team-invite-modal {
   height: auto;
   max-height: calc(100vh - 80px);
   overflow-y: auto;
 }
 
-.guild-modal {
+.team-modal {
   max-width: 400px;
 }
 
-/* Stop guild forms inheriting the card-modal's row/stretch body */
-.guild-modal .card-modal-body,
-.guild-invite-modal .card-modal-body {
+/* Stop team forms inheriting the card-modal's row/stretch body */
+.team-modal .card-modal-body,
+.team-invite-modal .card-modal-body {
   display: block;
   flex: none;
   padding: 16px 24px 24px;
 }
 
-.guild-modal .card-modal-header,
-.guild-invite-modal .card-modal-header {
+.team-modal .card-modal-header,
+.team-invite-modal .card-modal-header {
   padding: 22px 24px 0;
 }
 
-.guild-modal-title {
+.team-modal-title {
   font-family: var(--sans);
   font-size: 17px;
   font-weight: 650;
@@ -4790,13 +4790,13 @@ select.card-input {
   margin: 0;
 }
 
-.guild-modal-form {
+.team-modal-form {
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
 
-.guild-field-label {
+.team-field-label {
   display: block;
   font-size: 11px;
   font-weight: 600;
@@ -4807,24 +4807,24 @@ select.card-input {
   margin-bottom: 8px;
 }
 
-.guild-modal-actions {
+.team-modal-actions {
   display: flex;
   gap: 8px;
   padding-top: 4px;
 }
 
-.guild-modal-actions .btn-primary {
+.team-modal-actions .btn-primary {
   flex: 1;
 }
 
-/* ── Guild color picker (create + settings) ── */
-.guild-color-picker {
+/* ── Team color picker (create + settings) ── */
+.team-color-picker {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.guild-color-swatch {
+.team-color-swatch {
   width: 28px;
   height: 28px;
   border-radius: 7px;
@@ -4836,18 +4836,18 @@ select.card-input {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
-.guild-color-swatch:hover {
+.team-color-swatch:hover {
   transform: scale(1.1);
 }
 
-.guild-color-swatch.active {
+.team-color-swatch.active {
   box-shadow:
     0 0 0 2px var(--bg),
     0 0 0 4px var(--swatch);
 }
 
-/* ── Guild preview chip inside create modal ── */
-.guild-preview {
+/* ── Team preview chip inside create modal ── */
+.team-preview {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -4857,7 +4857,7 @@ select.card-input {
   border: 1px solid var(--border);
 }
 
-.guild-preview-name {
+.team-preview-name {
   font-family: var(--sans);
   font-size: 14px;
   font-weight: 600;
@@ -4865,32 +4865,32 @@ select.card-input {
   color: var(--text-h);
 }
 
-/* ── Guild settings modal ── */
-.guild-settings-modal {
+/* ── Team settings modal ── */
+.team-settings-modal {
   max-width: 440px;
 }
 
-.guild-settings-header {
+.team-settings-header {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 22px 24px 0;
 }
 
-.guild-settings-sub {
+.team-settings-sub {
   font-size: 13px;
   color: var(--text);
   margin: 3px 0 0;
 }
 
-.guild-settings-tabs {
+.team-settings-tabs {
   display: flex;
   padding: 12px 24px 0;
   border-bottom: 1px solid var(--border);
   margin-top: 4px;
 }
 
-.guild-settings-tab {
+.team-settings-tab {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -4904,41 +4904,41 @@ select.card-input {
   margin-bottom: -1px;
 }
 
-.guild-settings-tab.active {
+.team-settings-tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
   font-weight: 600;
 }
 
-.guild-settings-tab:hover:not(.active) {
+.team-settings-tab:hover:not(.active) {
   color: var(--text-h);
 }
 
-.guild-settings-body {
+.team-settings-body {
   padding: 18px 24px 24px;
 }
 
-/* ── Guild add member form ── */
-.guild-add-form {
+/* ── Team add member form ── */
+.team-add-form {
   display: flex;
   gap: 6px;
   margin-bottom: 14px;
 }
 
-.guild-add-input {
+.team-add-input {
   flex: 1;
   font-size: 13px;
   padding: 7px 10px;
 }
 
-.guild-add-form .btn-primary {
+.team-add-form .btn-primary {
   padding: 7px 14px;
   font-size: 13px;
   white-space: nowrap;
 }
 
-/* ── Guild member list ── */
-.guild-member-list {
+/* ── Team member list ── */
+.team-member-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -4947,7 +4947,7 @@ select.card-input {
   gap: 2px;
 }
 
-.guild-member-item {
+.team-member-item {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4956,18 +4956,18 @@ select.card-input {
   transition: background 0.12s;
 }
 
-.guild-member-item:hover {
+.team-member-item:hover {
   background: var(--code-bg);
 }
 
-.guild-member-avatar {
+.team-member-avatar {
   width: 32px !important;
   height: 32px !important;
   font-size: 13px !important;
   flex-shrink: 0;
 }
 
-.guild-member-name {
+.team-member-name {
   flex: 1;
   font-size: 13.5px;
   color: var(--text-h);
@@ -4978,7 +4978,7 @@ select.card-input {
   white-space: nowrap;
 }
 
-.guild-member-role {
+.team-member-role {
   font-size: 10.5px;
   font-weight: 700;
   font-family: var(--fantasy);
@@ -4989,7 +4989,7 @@ select.card-input {
   border-radius: 10px;
 }
 
-.guild-member-remove {
+.team-member-remove {
   background: none;
   border: none;
   cursor: pointer;
@@ -5001,31 +5001,31 @@ select.card-input {
   transition: color 0.12s, background 0.12s;
 }
 
-.guild-member-remove:hover {
+.team-member-remove:hover {
   color: var(--ember, #e2552b);
   background: rgba(239, 68, 68, 0.08);
 }
 
-/* ── Guild settings form ── */
-.guild-settings-form {
+/* ── Team settings form ── */
+.team-settings-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.guild-settings-divider {
+.team-settings-divider {
   height: 1px;
   background: var(--border);
   margin: 2px 0;
 }
 
-.guild-settings-confirm {
+.team-settings-confirm {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.guild-settings-confirm p {
+.team-settings-confirm p {
   font-size: 13px;
   color: var(--text);
   margin: 0;
@@ -5418,19 +5418,19 @@ select.card-input {
   }
 }
 
-/* ── Sidebar guild row with invite button ── */
-.sidebar-guild-row {
+/* ── Sidebar team row with invite button ── */
+.sidebar-team-row {
   display: flex;
   align-items: center;
   gap: 2px;
 }
 
-.sidebar-guild-row .sidebar-item--guild {
+.sidebar-team-row .sidebar-item--team {
   flex: 1;
   min-width: 0;
 }
 
-.sidebar-guild-invite-btn {
+.sidebar-team-invite-btn {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
@@ -5446,16 +5446,16 @@ select.card-input {
   transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
 
-.sidebar-guild-row:hover .sidebar-guild-invite-btn {
+.sidebar-team-row:hover .sidebar-team-invite-btn {
   opacity: 1;
 }
 
-.sidebar-guild-invite-btn:hover {
+.sidebar-team-invite-btn:hover {
   background: rgba(170, 59, 255, 0.14);
   color: var(--accent);
 }
 
-.sidebar-guild-manage-btn {
+.sidebar-team-manage-btn {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
@@ -5471,17 +5471,17 @@ select.card-input {
   transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
 
-.sidebar-guild-row:hover .sidebar-guild-manage-btn {
+.sidebar-team-row:hover .sidebar-team-manage-btn {
   opacity: 1;
 }
 
-.sidebar-guild-manage-btn:hover {
+.sidebar-team-manage-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-h);
 }
 
-/* ── Guild context header invite button ── */
-.guild-context-members {
+/* ── Team context header invite button ── */
+.team-context-members {
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -5489,7 +5489,7 @@ select.card-input {
   margin-left: auto;
 }
 
-.guild-context-avatar {
+.team-context-avatar {
   width: 30px;
   height: 30px;
   margin-left: -9px;
@@ -5500,8 +5500,8 @@ select.card-input {
   font-size: 12px;
   font-weight: 700;
   color: #fff;
-  background: color-mix(in srgb, var(--guild-color, var(--accent)) 30%, #1e1b2e);
-  border: 2px solid color-mix(in srgb, var(--guild-color, var(--accent)) 20%, var(--bg));
+  background: color-mix(in srgb, var(--team-color, var(--accent)) 30%, #1e1b2e);
+  border: 2px solid color-mix(in srgb, var(--team-color, var(--accent)) 20%, var(--bg));
   box-shadow: 0 1px 4px rgba(0,0,0,0.35);
   text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   user-select: none;
@@ -5514,29 +5514,29 @@ select.card-input {
   }
 }
 
-.guild-context-avatar--more {
+.team-context-avatar--more {
   background: rgba(0, 0, 0, 0.4);
   border-color: var(--border);
   font-size: 10px;
   color: var(--text);
 }
 
-.guild-context-actions {
+.team-context-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-left: 12px;
 }
 
-.guild-invite-trigger-btn {
+.team-invite-trigger-btn {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--guild-color, var(--accent)) 40%, transparent);
-  background: color-mix(in srgb, var(--guild-color, var(--accent)) 10%, transparent);
-  color: var(--guild-color, var(--accent));
+  border: 1px solid color-mix(in srgb, var(--team-color, var(--accent)) 40%, transparent);
+  background: color-mix(in srgb, var(--team-color, var(--accent)) 10%, transparent);
+  color: var(--team-color, var(--accent));
   font-size: 12.5px;
   font-weight: 600;
   font-family: var(--sans);
@@ -5544,30 +5544,30 @@ select.card-input {
   transition: background 0.15s, border-color 0.15s;
 
   &:hover {
-    background: color-mix(in srgb, var(--guild-color, var(--accent)) 18%, transparent);
-    border-color: var(--guild-color, var(--accent));
+    background: color-mix(in srgb, var(--team-color, var(--accent)) 18%, transparent);
+    border-color: var(--team-color, var(--accent));
   }
 }
 
-/* ── Guild invite modal ── */
-.guild-invite-modal {
+/* ── Team invite modal ── */
+.team-invite-modal {
   max-width: 380px;
 }
 
-.guild-invite-desc {
+.team-invite-desc {
   font-size: 13.5px;
   color: var(--text);
   margin: 0 0 16px;
   line-height: 1.5;
 }
 
-.guild-invite-form {
+.team-invite-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.guild-invite-sent {
+.team-invite-sent {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5576,7 +5576,7 @@ select.card-input {
   text-align: center;
 }
 
-.guild-invite-sent-icon {
+.team-invite-sent-icon {
   font-size: 28px;
   color: var(--accent);
   display: block;
@@ -5588,7 +5588,7 @@ select.card-input {
   50%       { text-shadow: 0 0 20px var(--accent); opacity: 0.8; }
 }
 
-.guild-invite-sent-text {
+.team-invite-sent-text {
   font-family: var(--sans);
   font-size: 16px;
   font-weight: 650;
@@ -5596,7 +5596,7 @@ select.card-input {
   letter-spacing: -0.01em;
 }
 
-.guild-invite-sent-sub {
+.team-invite-sent-sub {
   font-size: 13px;
   color: var(--text);
   opacity: 0.65;
@@ -5793,7 +5793,7 @@ select.card-input {
 }
 .cosmic-activity-icon svg { width: 15px; height: 15px; }
 .cosmic-activity-icon--board { color: #d8b65a; background: rgba(216, 182, 90, 0.14); }
-.cosmic-activity-icon--guild { color: #6fb1ff; background: rgba(111, 177, 255, 0.14); }
+.cosmic-activity-icon--team { color: #6fb1ff; background: rgba(111, 177, 255, 0.14); }
 /* board deletions read in a danger hue, overriding the gold board tint above */
 .cosmic-activity-icon--deleted { color: #ff7a7a; background: rgba(255, 122, 122, 0.14); }
 /* card adds vs moves each get their own hue so the action reads at a glance */
@@ -7169,7 +7169,7 @@ select.card-input {
    UI around them so each entry's icon stands out and reads as a "discovery".
    Deletions keep their danger red. */
 .dashboard-shell--day .cosmic-activity-icon--board { color: #6a4fd0; background: rgba(106, 79, 208, 0.15); }
-.dashboard-shell--day .cosmic-activity-icon--guild { color: #8a52c8; background: rgba(138, 82, 200, 0.15); }
+.dashboard-shell--day .cosmic-activity-icon--team { color: #8a52c8; background: rgba(138, 82, 200, 0.15); }
 .dashboard-shell--day .cosmic-activity-icon--deleted { color: #c63838; background: rgba(198, 56, 56, 0.14); }
 /* deeper, more saturated add/move hues for legibility on the light nebula */
 .dashboard-shell--day .cosmic-activity-icon--created { color: #1f9d6b; background: rgba(31, 157, 107, 0.16); }
