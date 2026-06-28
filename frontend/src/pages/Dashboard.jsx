@@ -1412,7 +1412,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             onClick={() => { setActiveContext('personal'); setBoardView('shared'); setAddingBoard(false) }}
           >
             <span className="sidebar-item-icon" aria-hidden="true">⇄</span>
-            <span className="sidebar-item-name">Shared Universe</span>
+            <span className="sidebar-item-name">Shared Galaxies</span>
             {sharedBoards.length > 0 && <span className="sidebar-item-count">{sharedBoards.length}</span>}
           </button>
 
@@ -1661,19 +1661,19 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             <>
               <div className="board-section-header">
                 <h2 className="board-section-title">
-                  {boardView === 'owned' ? 'My Universe' : 'Shared Universe'}
+                  {boardView === 'owned' ? 'My Universe' : 'Shared Galaxies'}
                   {!loading && sharedBoards.length > 0 && (
                     <button
                       className={`board-view-toggle${viewFlipping ? ' board-view-toggle--flipping' : ''}`}
                       onClick={toggleBoardView}
-                      aria-label={boardView === 'owned' ? 'Switch to shared universe' : 'Switch to my universe'}
+                      aria-label={boardView === 'owned' ? 'Switch to shared galaxies' : 'Switch to my universe'}
                     >
                       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M1 5h10M8 2l3 3-3 3" />
                         <path d="M15 11H5M8 8l-3 3 3 3" />
                       </svg>
                       <span className="bvt-tooltip" aria-hidden="true">
-                        {boardView === 'owned' ? 'Shared Universe' : 'My Universe'}
+                        {boardView === 'owned' ? 'Shared Galaxies' : 'My Universe'}
                       </span>
                     </button>
                   )}
@@ -1729,7 +1729,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                         {loading
                           ? Array.from({ length: skeletonShared }).map((_, i) => <BoardTileSkeleton key={i} />)
                           : filteredShared.length === 0
-                            ? <p className="dashboard-empty" style={{ gridColumn: '1 / -1' }}>No shared universe matches your search.</p>
+                            ? <p className="dashboard-empty" style={{ gridColumn: '1 / -1' }}>No shared galaxies matches your search.</p>
                             : filteredShared.map((b, i) => (
                               <BoardCard
                                 key={b.id}

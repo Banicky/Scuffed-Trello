@@ -7,6 +7,7 @@ import UserAvatar from '../components/UserAvatar.jsx'
 import AiAssistant from '../components/AiAssistant.jsx'
 import { apiFetch, assetUrl, exportBoard, importBoard } from '../api.js'
 import { buildSearchRegex } from '../utils.js'
+import { ZODIAC_CONSTELLATIONS } from '../constants.js'
 
 // Stylised stroke glyphs for the topbar toggles, matching the app's celestial
 // line-icon language (currentColor stroke, rounded joins). Members = three
@@ -172,6 +173,10 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   }
 
   const isOwner = board?.owner_id === user.id
+
+  // The same zodiac sign the board's dashboard tile shows (board.id % 12), drawn
+  // small in the topbar icon so a board reads consistently across both views.
+  const zodiac = board ? ZODIAC_CONSTELLATIONS[board.id % ZODIAC_CONSTELLATIONS.length] : null
 
   const matches = useMemo(() => {
     const query = searchQuery.trim()
@@ -527,7 +532,19 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
       <header className="topbar">
         <div className="topbar-left">
           <button className="back-btn" onClick={onBack} title="Back to dashboard">←</button>
-          <div className="board-icon">{board?.title?.charAt(0)}</div>
+          <div className="board-icon board-icon--constellation" title={zodiac?.name} aria-label={zodiac ? `${zodiac.name} constellation` : undefined}>
+            {zodiac && (
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <polyline
+                  className="board-icon-zodiac-line"
+                  points={zodiac.points.map(([x, y]) => `${x},${y}`).join(' ')}
+                />
+                {zodiac.points.map(([x, y], i) => (
+                  <circle key={i} className="board-icon-zodiac-star" cx={x} cy={y} r={i % 3 === 0 ? 3 : 2} />
+                ))}
+              </svg>
+            )}
+          </div>
           <div>
             {editingTitle ? (
               <input
