@@ -1,10 +1,37 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { gsap } from 'gsap'
 import Column from '../components/Column.jsx'
 import CardDetailModal from '../components/CardDetailModal.jsx'
 import ImageUploadField from '../components/ImageUploadField.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
+import AiAssistant from '../components/AiAssistant.jsx'
 import { apiFetch, assetUrl, exportBoard, importBoard } from '../api.js'
 import { buildSearchRegex } from '../utils.js'
+import { ZODIAC_CONSTELLATIONS } from '../constants.js'
+
+// Stylised stroke glyphs for the topbar toggles, matching the app's celestial
+// line-icon language (currentColor stroke, rounded joins). Members = three
+// overlapping community rings; Design = a four-point star set in a hex frame.
+function MembersGlyph() {
+  return (
+    <svg className="btn-glyph" width="15" height="15" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8.5" r="4.4" />
+      <circle cx="8" cy="15" r="4.4" />
+      <circle cx="16" cy="15" r="4.4" />
+    </svg>
+  )
+}
+
+function DesignGlyph() {
+  return (
+    <svg className="btn-glyph" width="15" height="15" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 2.5l8.23 4.75v9.5L12 21.5l-8.23-4.75v-9.5z" />
+      <path d="M12 8l1.15 2.85L16 12l-2.85 1.15L12 16l-1.15-2.85L8 12l2.85-1.15z" />
+    </svg>
+  )
+}
 
 function MembersPanel({ boardId, isOwner, onClose }) {
   const [members, setMembers] = useState([])
@@ -12,9 +39,16 @@ function MembersPanel({ boardId, isOwner, onClose }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    apiFetch(`/api/boards/${boardId}/members`)
+    let active = true
+    const load = () => apiFetch(`/api/boards/${boardId}/members`)
       .then(r => r.json())
-      .then(setMembers)
+      .then(data => { if (active) setMembers(Array.isArray(data) ? data : []) })
+      .catch(() => {})
+    load()
+    // refresh while the panel is open so the active/inactive glow stays live as
+    // members come and go (heartbeat-driven; see is_active on the members API)
+    const id = setInterval(load, 20000)
+    return () => { active = false; clearInterval(id) }
   }, [boardId])
 
   async function handleInvite(e) {
@@ -44,9 +78,19 @@ function MembersPanel({ boardId, isOwner, onClose }) {
       <ul className="members-list">
         {members.map(u => (
           <li key={u.id} className="member-row">
-            <UserAvatar user={u} className="avatar member-avatar" />
+            <span className="member-avatar-wrap">
+              <UserAvatar user={u} className="avatar member-avatar" />
+              <span
+                className={`member-status ${u.is_active ? 'member-status--active' : 'member-status--inactive'}`}
+                title={u.is_active ? 'Active' : 'Offline'}
+                aria-label={u.is_active ? 'Active' : 'Offline'}
+              />
+            </span>
             <span className="member-name">{u.username}</span>
-            {isOwner && (
+            {u.is_owner && (
+              <span className="member-owner-crown" title="Board owner" aria-label="Board owner">👑</span>
+            )}
+            {isOwner && !u.is_owner && (
               <button className="member-remove" onClick={() => handleRemove(u.id)} title="Remove">✕</button>
             )}
           </li>
@@ -89,13 +133,66 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   const [activeMatchIndex, setActiveMatchIndex] = useState(0)
   const [ioBusy, setIoBusy] = useState(false)
   const [ioMessage, setIoMessage] = useState('')
+  const [aiOpen, setAiOpen] = useState(false)
   const cardRefs = useRef(new Map())
   const importInputRef = useRef(null)
 
+  // Carry the dashboard's day/night sky into the board. The choice lives in the
+  // same `dash-color-mode` key the dashboard writes, so the theme persists as
+  // the user moves between the two views.
+  const modeFxRef = useRef(null)  // full-screen veil that cross-fades the swap
+  const modeIconRef = useRef(null)
+  const [colorMode, setColorMode] = useState(() => localStorage.getItem('dash-color-mode') || 'night')
+  function applyColorMode(next) {
+    localStorage.setItem('dash-color-mode', next)
+    setColorMode(next)
+  }
+  // Mirror the dashboard's switch: a veil in the incoming sky's tone fades in, we
+  // swap the theme underneath while it's opaque, then it fades back out to reveal
+  // the new sky — so the recolor never reads as a harsh flash.
+  function toggleColorMode() {
+    const next = colorMode === 'night' ? 'day' : 'night'
+
+    // little pop on the toggle glyph
+    if (modeIconRef.current) {
+      gsap.fromTo(modeIconRef.current,
+        { rotate: -90, scale: 0.4, opacity: 0 },
+        { rotate: 0, scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(2)' })
+    }
+
+    const fx = modeFxRef.current
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!fx || reduced) { applyColorMode(next); return }
+
+    fx.style.background = next === 'day' ? '#ccd4e0' : '#06070b'
+    gsap.timeline()
+      .set(fx, { autoAlpha: 0 })
+      .to(fx, { autoAlpha: 1, duration: 0.26, ease: 'power1.inOut' })
+      .add(() => applyColorMode(next))
+      .to(fx, { autoAlpha: 0, duration: 0.34, ease: 'power1.inOut' })
+  }
+
   const isOwner = board?.owner_id === user.id
 
+  // The same zodiac sign the board's dashboard tile shows (board.id % 12), drawn
+  // small in the topbar icon so a board reads consistently across both views.
+  const zodiac = board ? ZODIAC_CONSTELLATIONS[board.id % ZODIAC_CONSTELLATIONS.length] : null
+
   const matches = useMemo(() => {
-    const regex = buildSearchRegex(searchQuery.trim(), { caseSensitive, wholeWord })
+    const query = searchQuery.trim()
+    // Card id search: a leading '#' followed by digits matches that card id exactly.
+    const idMatch = query.match(/^#(\d+)$/)
+    if (idMatch) {
+      const targetId = Number(idMatch[1])
+      const found = []
+      columns.forEach(col => {
+        col.cards.forEach(card => {
+          if (card.id === targetId) found.push(card.id)
+        })
+      })
+      return found
+    }
+    const regex = buildSearchRegex(query, { caseSensitive, wholeWord })
     if (!regex) return []
     const found = []
     columns.forEach(col => {
@@ -413,13 +510,15 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   const doneCount = doneCol?.cards.length ?? 0
 
   if (loading) return (
-    <div className="app-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
+    <div className={`app-shell board-shell${colorMode === 'day' ? ' board-shell--day' : ''}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)' }}>
       Journeying…
     </div>
   )
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell board-shell${colorMode === 'day' ? ' board-shell--day' : ''}${aiOpen ? ' ai-open' : ''}`}>
+      <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
+      <div className="board-stage">
       {board?.background_image && (
         <div
           className="board-bg-overlay"
@@ -433,7 +532,19 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
       <header className="topbar">
         <div className="topbar-left">
           <button className="back-btn" onClick={onBack} title="Back to dashboard">←</button>
-          <div className="board-icon">{board?.title?.charAt(0)}</div>
+          <div className="board-icon board-icon--constellation" title={zodiac?.name} aria-label={zodiac ? `${zodiac.name} constellation` : undefined}>
+            {zodiac && (
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <polyline
+                  className="board-icon-zodiac-line"
+                  points={zodiac.points.map(([x, y]) => `${x},${y}`).join(' ')}
+                />
+                {zodiac.points.map(([x, y], i) => (
+                  <circle key={i} className="board-icon-zodiac-star" cx={x} cy={y} r={i % 3 === 0 ? 3 : 2} />
+                ))}
+              </svg>
+            )}
+          </div>
           <div>
             {editingTitle ? (
               <input
@@ -488,6 +599,9 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
               placeholder="Search cards…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Escape') { setSearchQuery(''); e.currentTarget.blur() }
+              }}
             />
             {searchQuery && (
               <button className="search-clear" onClick={() => setSearchQuery('')} title="Clear search">✕</button>
@@ -517,19 +631,48 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
         </div>
 
         <div className="topbar-right">
+          <button
+            className="dash-mode-toggle"
+            onClick={toggleColorMode}
+            aria-label={colorMode === 'day' ? 'Switch to night mode' : 'Switch to day mode'}
+            title={colorMode === 'day' ? 'Night mode' : 'Day mode'}
+          >
+            <span className="dash-mode-toggle-icon" ref={modeIconRef}>
+              {colorMode === 'day' ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                </svg>
+              )}
+            </span>
+          </button>
           {isOwner && (
             <button
               className={`btn-ghost members-toggle${showDesign ? ' active' : ''}`}
               onClick={() => setShowDesign(v => !v)}
             >
-              🎨 Design
+              <DesignGlyph />
+              Design
             </button>
           )}
           <button
             className={`btn-ghost members-toggle${showMembers ? ' active' : ''}`}
             onClick={() => setShowMembers(v => !v)}
           >
-            👥 Members
+            <MembersGlyph />
+            Members
+          </button>
+          <button
+            className={`btn-ghost members-toggle ai-toggle${aiOpen ? ' active' : ''}`}
+            onClick={() => setAiOpen(v => !v)}
+            title="AI assistant"
+            aria-pressed={aiOpen}
+          >
+            ✦ Assistant
           </button>
           <button
             className="avatar avatar--btn"
@@ -660,6 +803,14 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
           </p>
         )}
       </main>
+      </div>
+
+      <AiAssistant
+        boardId={boardId}
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        onBoardChanged={loadBoard}
+      />
     </div>
   )
 }

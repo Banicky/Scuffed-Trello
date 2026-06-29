@@ -5,8 +5,9 @@ import { relativeTime } from '../utils.js'
 import { COLUMN_PALETTE, ZODIAC_CONSTELLATIONS } from '../constants.js'
 import UserAvatar from '../components/UserAvatar.jsx'
 import Starfield from '../components/Starfield.jsx'
+import AiAssistant from '../components/AiAssistant.jsx'
 
-const GUILD_COLORS = [
+const TEAM_COLORS = [
   { key: 'arcane',  hex: '#aa3bff' },
   { key: 'ember',   hex: '#d2461b' },
   { key: 'verdant', hex: '#22a44a' },
@@ -15,16 +16,16 @@ const GUILD_COLORS = [
   { key: 'frost',   hex: '#7dd3fc' },
 ]
 
-function guildHex(iconColor) {
-  return GUILD_COLORS.find(c => c.key === iconColor)?.hex || '#aa3bff'
+function teamHex(iconColor) {
+  return TEAM_COLORS.find(c => c.key === iconColor)?.hex || '#aa3bff'
 }
 
-function GuildIcon({ guild, className = '' }) {
-  const initial = (guild.name?.trim()[0] || '?').toUpperCase()
+function TeamIcon({ team, className = '' }) {
+  const initial = (team.name?.trim()[0] || '?').toUpperCase()
   return (
     <span
-      className={`guild-icon ${className}`}
-      style={{ '--guild-color': guildHex(guild.icon_color) }}
+      className={`team-icon ${className}`}
+      style={{ '--team-color': teamHex(team.icon_color) }}
       aria-hidden="true"
     >
       {initial}
@@ -32,7 +33,7 @@ function GuildIcon({ guild, className = '' }) {
   )
 }
 
-function CreateGuildModal({ onClose, onCreate }) {
+function CreateTeamModal({ onClose, onCreate }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState('arcane')
   const [error, setError] = useState(null)
@@ -49,12 +50,12 @@ function CreateGuildModal({ onClose, onCreate }) {
     e.preventDefault()
     if (!name.trim()) return
     setBusy(true)
-    const res = await apiFetch('/api/guilds', {
+    const res = await apiFetch('/api/teams', {
       method: 'POST',
       body: JSON.stringify({ name: name.trim(), icon_color: color }),
     })
     const data = await res.json()
-    if (!res.ok) { setError(data.error || 'Failed to create guild'); setBusy(false); return }
+    if (!res.ok) { setError(data.error || 'Failed to create team'); setBusy(false); return }
     onCreate(data)
     onClose()
   }
@@ -65,14 +66,14 @@ function CreateGuildModal({ onClose, onCreate }) {
       ref={overlayRef}
       onClick={e => { if (e.target === overlayRef.current) onClose() }}
     >
-      <div className="card-modal guild-modal" role="dialog" aria-modal="true" aria-label="Forge an Alliance">
+      <div className="card-modal team-modal" role="dialog" aria-modal="true" aria-label="Create a Team">
         <div className="card-modal-header">
-          <h2 className="guild-modal-title">Forge an Alliance</h2>
+          <h2 className="team-modal-title">Create a Team</h2>
         </div>
         <div className="card-modal-body">
-          <form onSubmit={handleSubmit} className="guild-modal-form">
+          <form onSubmit={handleSubmit} className="team-modal-form">
             <div>
-              <label className="guild-field-label">Alliance Name</label>
+              <label className="team-field-label">Team Name</label>
               <input
                 className="card-input"
                 placeholder="e.g. Star Watchers"
@@ -83,13 +84,13 @@ function CreateGuildModal({ onClose, onCreate }) {
               />
             </div>
             <div>
-              <label className="guild-field-label">Emblem Color</label>
-              <div className="guild-color-picker">
-                {GUILD_COLORS.map(c => (
+              <label className="team-field-label">Emblem Color</label>
+              <div className="team-color-picker">
+                {TEAM_COLORS.map(c => (
                   <button
                     key={c.key}
                     type="button"
-                    className={`guild-color-swatch${color === c.key ? ' active' : ''}`}
+                    className={`team-color-swatch${color === c.key ? ' active' : ''}`}
                     style={{ '--swatch': c.hex }}
                     onClick={() => setColor(c.key)}
                     aria-label={c.key}
@@ -98,14 +99,14 @@ function CreateGuildModal({ onClose, onCreate }) {
                 ))}
               </div>
             </div>
-            <div className="guild-preview">
-              <GuildIcon guild={{ name: name || '?', icon_color: color }} className="guild-icon--lg" />
-              <span className="guild-preview-name">{name || 'Unnamed Alliance'}</span>
+            <div className="team-preview">
+              <TeamIcon team={{ name: name || '?', icon_color: color }} className="team-icon--lg" />
+              <span className="team-preview-name">{name || 'Unnamed Team'}</span>
             </div>
             {error && <p className="auth-error">{error}</p>}
-            <div className="guild-modal-actions">
+            <div className="team-modal-actions">
               <button className="btn-primary" type="submit" disabled={busy || !name.trim()}>
-                {busy ? 'Forging…' : 'Forge Alliance'}
+                {busy ? 'Creating…' : 'Create Team'}
               </button>
               <button className="btn-ghost" type="button" onClick={onClose}>Cancel</button>
             </div>
@@ -116,19 +117,19 @@ function CreateGuildModal({ onClose, onCreate }) {
   )
 }
 
-function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete, onMemberAdd, onMemberRemove }) {
+function TeamSettingsModal({ team, currentUserId, onClose, onUpdate, onDelete, onMemberAdd, onMemberRemove }) {
   const [tab, setTab] = useState('members')
-  const [members, setMembers] = useState(guild.members || [])
+  const [members, setMembers] = useState(team.members || [])
   const [addInput, setAddInput] = useState('')
   const [addError, setAddError] = useState(null)
   const [adding, setAdding] = useState(false)
-  const [renameVal, setRenameVal] = useState(guild.name)
-  const [iconColor, setIconColor] = useState(guild.icon_color)
+  const [renameVal, setRenameVal] = useState(team.name)
+  const [iconColor, setIconColor] = useState(team.icon_color)
   const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
   const overlayRef = useRef(null)
 
-  const isOwner = guild.owner_id === currentUserId
+  const isOwner = team.owner_id === currentUserId
 
   useEffect(() => {
     function handleKey(e) { if (e.key === 'Escape') onClose() }
@@ -141,7 +142,7 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
     if (!addInput.trim()) return
     setAdding(true)
     setAddError(null)
-    const res = await apiFetch(`/api/guilds/${guild.id}/members`, {
+    const res = await apiFetch(`/api/teams/${team.id}/members`, {
       method: 'POST',
       body: JSON.stringify({ username: addInput.trim() }),
     })
@@ -154,7 +155,7 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
   }
 
   async function handleRemoveMember(userId) {
-    await apiFetch(`/api/guilds/${guild.id}/members/${userId}`, { method: 'DELETE' })
+    await apiFetch(`/api/teams/${team.id}/members/${userId}`, { method: 'DELETE' })
     setMembers(m => m.filter(x => x.id !== userId))
     onMemberRemove(userId)
   }
@@ -163,7 +164,7 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
     e.preventDefault()
     if (!renameVal.trim()) return
     setSaving(true)
-    const res = await apiFetch(`/api/guilds/${guild.id}`, {
+    const res = await apiFetch(`/api/teams/${team.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ name: renameVal.trim(), icon_color: iconColor }),
     })
@@ -173,8 +174,8 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
   }
 
   async function handleDelete() {
-    await apiFetch(`/api/guilds/${guild.id}`, { method: 'DELETE' })
-    onDelete(guild.id)
+    await apiFetch(`/api/teams/${team.id}`, { method: 'DELETE' })
+    onDelete(team.id)
     onClose()
   }
 
@@ -184,28 +185,28 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
       ref={overlayRef}
       onClick={e => { if (e.target === overlayRef.current) onClose() }}
     >
-      <div className="card-modal guild-settings-modal" role="dialog" aria-modal="true" aria-label="Guild Settings">
-        <div className="guild-settings-header">
-          <GuildIcon guild={{ name: guild.name, icon_color: iconColor }} className="guild-icon--md" />
+      <div className="card-modal team-settings-modal" role="dialog" aria-modal="true" aria-label="Team Settings">
+        <div className="team-settings-header">
+          <TeamIcon team={{ name: team.name, icon_color: iconColor }} className="team-icon--md" />
           <div>
-            <h2 className="guild-modal-title">{guild.name}</h2>
-            <p className="guild-settings-sub">
+            <h2 className="team-modal-title">{team.name}</h2>
+            <p className="team-settings-sub">
               {members.length} member{members.length !== 1 ? 's' : ''}
-              {guild.board_count != null ? ` · ${guild.board_count} board${guild.board_count !== 1 ? 's' : ''}` : ''}
+              {team.board_count != null ? ` · ${team.board_count} board${team.board_count !== 1 ? 's' : ''}` : ''}
             </p>
           </div>
         </div>
 
-        <div className="guild-settings-tabs">
+        <div className="team-settings-tabs">
           <button
-            className={`guild-settings-tab${tab === 'members' ? ' active' : ''}`}
+            className={`team-settings-tab${tab === 'members' ? ' active' : ''}`}
             onClick={() => setTab('members')}
           >
             Members
           </button>
           {isOwner && (
             <button
-              className={`guild-settings-tab${tab === 'settings' ? ' active' : ''}`}
+              className={`team-settings-tab${tab === 'settings' ? ' active' : ''}`}
               onClick={() => setTab('settings')}
             >
               Settings
@@ -213,13 +214,13 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
           )}
         </div>
 
-        <div className="guild-settings-body">
+        <div className="team-settings-body">
           {tab === 'members' && (
             <div>
               {isOwner && (
-                <form className="guild-add-form" onSubmit={handleAddMember}>
+                <form className="team-add-form" onSubmit={handleAddMember}>
                   <input
-                    className="card-input guild-add-input"
+                    className="card-input team-add-input"
                     placeholder="Add by username or email"
                     value={addInput}
                     onChange={e => setAddInput(e.target.value)}
@@ -230,15 +231,15 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
                 </form>
               )}
               {addError && <p className="auth-error" style={{ marginBottom: 8 }}>{addError}</p>}
-              <ul className="guild-member-list">
+              <ul className="team-member-list">
                 {members.map(m => (
-                  <li key={m.id} className="guild-member-item">
-                    <UserAvatar user={m} className="guild-member-avatar" />
-                    <span className="guild-member-name">{m.username}</span>
-                    {m.role === 'owner' && <span className="guild-member-role">Owner</span>}
+                  <li key={m.id} className="team-member-item">
+                    <UserAvatar user={m} className="team-member-avatar" />
+                    <span className="team-member-name">{m.username}</span>
+                    {m.role === 'owner' && <span className="team-member-role">Owner</span>}
                     {isOwner && m.id !== currentUserId && m.role !== 'owner' && (
                       <button
-                        className="guild-member-remove"
+                        className="team-member-remove"
                         onClick={() => handleRemoveMember(m.id)}
                         title={`Remove ${m.username}`}
                       >
@@ -252,9 +253,9 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
           )}
 
           {tab === 'settings' && isOwner && (
-            <form className="guild-settings-form" onSubmit={handleSaveSettings}>
+            <form className="team-settings-form" onSubmit={handleSaveSettings}>
               <div>
-                <label className="guild-field-label">Guild Name</label>
+                <label className="team-field-label">Team Name</label>
                 <input
                   className="card-input"
                   value={renameVal}
@@ -263,13 +264,13 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
                 />
               </div>
               <div>
-                <label className="guild-field-label">Emblem Color</label>
-                <div className="guild-color-picker">
-                  {GUILD_COLORS.map(c => (
+                <label className="team-field-label">Emblem Color</label>
+                <div className="team-color-picker">
+                  {TEAM_COLORS.map(c => (
                     <button
                       key={c.key}
                       type="button"
-                      className={`guild-color-swatch${iconColor === c.key ? ' active' : ''}`}
+                      className={`team-color-swatch${iconColor === c.key ? ' active' : ''}`}
                       style={{ '--swatch': c.hex }}
                       onClick={() => setIconColor(c.key)}
                       aria-label={c.key}
@@ -281,18 +282,18 @@ function GuildSettingsModal({ guild, currentUserId, onClose, onUpdate, onDelete,
               <button className="btn-primary" type="submit" disabled={saving || !renameVal.trim()}>
                 {saving ? 'Saving…' : 'Save Changes'}
               </button>
-              <div className="guild-settings-divider" />
+              <div className="team-settings-divider" />
               {confirming ? (
-                <div className="guild-settings-confirm">
-                  <p>This disbands the guild and unassigns all its boards. Continue?</p>
+                <div className="team-settings-confirm">
+                  <p>This deletes the team and unassigns all its boards. Continue?</p>
                   <div className="board-popover-confirm-actions">
-                    <button type="button" className="btn-danger-sm" onClick={handleDelete}>Disband</button>
+                    <button type="button" className="btn-danger-sm" onClick={handleDelete}>Delete</button>
                     <button type="button" className="btn-ghost-sm" onClick={() => setConfirming(false)}>Cancel</button>
                   </div>
                 </div>
               ) : (
                 <button type="button" className="board-popover-delete" onClick={() => setConfirming(true)}>
-                  Disband Guild
+                  Delete Team
                 </button>
               )}
             </form>
@@ -343,10 +344,6 @@ function UserMenu({ user, onOpenSettings, onLogout }) {
           <button className="user-menu-item" role="menuitem" onClick={() => { setOpen(false); onOpenSettings('avatar') }}>
             <span className="user-menu-item-icon" aria-hidden="true">✦</span>
             Change Avatar
-          </button>
-          <button className="user-menu-item" role="menuitem" onClick={() => { setOpen(false); onOpenSettings('customization') }}>
-            <span className="user-menu-item-icon" aria-hidden="true">⚙</span>
-            Customization
           </button>
           <button className="user-menu-item" role="menuitem" onClick={() => { setOpen(false); onOpenSettings('security') }}>
             <span className="user-menu-item-icon" aria-hidden="true">
@@ -475,7 +472,7 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
 
   return (
     <div
-      className="board-tile"
+      className={`board-tile${showSettings ? ' board-tile--menu-open' : ''}`}
       style={{ '--tile': color, '--stagger': stagger }}
       onClick={() => !showSettings && onOpen(board.id, color)}
       onMouseEnter={openPreview}
@@ -499,6 +496,17 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
             className="board-tile-zodiac-line"
             points={zodiac.points.map(([x, y]) => `${x},${y}`).join(' ')}
           />
+          {/* soft blurred halo behind each node — the luminous aura */}
+          {zodiac.points.map(([x, y], i) => (
+            <circle
+              key={`halo-${i}`}
+              className="board-tile-zodiac-halo"
+              cx={x}
+              cy={y}
+              r={i % 3 === 0 ? 5 : 4}
+              style={{ animationDelay: `${(sparkleDelays[i] % 3.2).toFixed(2)}s` }}
+            />
+          ))}
           {zodiac.points.map(([x, y], i) => (
             <circle
               key={i}
@@ -533,12 +541,12 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
       <div className="board-tile-info">
         <span className="board-tile-arrow" aria-hidden="true">→</span>
         <div className="board-tile-info-text">
-          {board.guild_name && (
+          {board.team_name && (
             <span
-              className="board-tile-guild-chip"
-              style={{ '--chip-color': guildHex(board.guild_icon_color) }}
+              className="board-tile-team-chip"
+              style={{ '--chip-color': teamHex(board.team_icon_color) }}
             >
-              {board.guild_name}
+              {board.team_name}
             </span>
           )}
           <span className="board-tile-title">{board.title}</span>
@@ -586,7 +594,7 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
   )
 }
 
-function GuildInviteModal({ guild, onClose }) {
+function TeamInviteModal({ team, onClose }) {
   const [username, setUsername] = useState('')
   const [status, setStatus] = useState(null)
   const [error, setError] = useState(null)
@@ -603,7 +611,7 @@ function GuildInviteModal({ guild, onClose }) {
     if (!username.trim()) return
     setStatus('sending')
     setError(null)
-    const res = await apiFetch(`/api/guilds/${guild.id}/invites`, {
+    const res = await apiFetch(`/api/teams/${team.id}/invites`, {
       method: 'POST',
       body: JSON.stringify({ username: username.trim() }),
     })
@@ -614,25 +622,25 @@ function GuildInviteModal({ guild, onClose }) {
 
   return (
     <div className="card-modal-overlay" ref={overlayRef} onClick={e => { if (e.target === overlayRef.current) onClose() }}>
-      <div className="card-modal guild-invite-modal" role="dialog" aria-modal="true" aria-label="Summon Allies">
+      <div className="card-modal team-invite-modal" role="dialog" aria-modal="true" aria-label="Invite Members">
         <div className="card-modal-header">
-          <h2 className="guild-modal-title">Summon Allies</h2>
+          <h2 className="team-modal-title">Invite Members</h2>
         </div>
         <div className="card-modal-body">
-          <p className="guild-invite-desc">
-            Dispatch a missive to invite a warrior to <strong>{guild.name}</strong>.
+          <p className="team-invite-desc">
+            Dispatch a missive to invite someone to <strong>{team.name}</strong>.
           </p>
           {status === 'sent' ? (
-            <div className="guild-invite-sent">
-              <span className="guild-invite-sent-icon">✦</span>
-              <span className="guild-invite-sent-text">Missive Dispatched!</span>
-              <p className="guild-invite-sent-sub">They shall receive the summons shortly.</p>
+            <div className="team-invite-sent">
+              <span className="team-invite-sent-icon">✦</span>
+              <span className="team-invite-sent-text">Missive Dispatched!</span>
+              <p className="team-invite-sent-sub">They’ll receive the invitation shortly.</p>
               <button className="btn-ghost" onClick={() => { setStatus(null); setUsername('') }}>
                 Invite Another
               </button>
             </div>
           ) : (
-            <form className="guild-invite-form" onSubmit={handleSend}>
+            <form className="team-invite-form" onSubmit={handleSend}>
               <input
                 className="card-input"
                 placeholder="Username or email"
@@ -641,7 +649,7 @@ function GuildInviteModal({ guild, onClose }) {
                 autoFocus
               />
               {error && <p className="auth-error">{error}</p>}
-              <div className="guild-modal-actions">
+              <div className="team-modal-actions">
                 <button className="btn-primary" type="submit" disabled={status === 'sending' || !username.trim()}>
                   {status === 'sending' ? 'Dispatching…' : 'Send Missive'}
                 </button>
@@ -657,13 +665,13 @@ function GuildInviteModal({ guild, onClose }) {
 
 function NotificationItem({ notif, onAccept, onDecline }) {
   const d = notif.data || {}
-  if (notif.type !== 'guild_invite') return null
+  if (notif.type !== 'team_invite') return null
   return (
     <div className={`notif-item${notif.read ? ' notif-item--read' : ''}`}>
       <div className="notif-item-sigil" aria-hidden="true">⚔</div>
       <div className="notif-item-body">
         <p className="notif-item-text">
-          <strong>{d.inviter_username}</strong> summons you to join the guild <strong>{d.guild_name}</strong>.
+          <strong>{d.inviter_username}</strong> invites you to join the team <strong>{d.team_name}</strong>.
         </p>
         <p className="notif-item-time">{relativeTime(notif.created_at) || 'just now'}</p>
         {!notif.read && (
@@ -709,7 +717,7 @@ const ACTIVITY_ICONS = {
       <circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" />
     </svg>
   ),
-  guild: (
+  team: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 3l7 3v5c0 4-3 7-7 9-4-2-7-5-7-9V6z" />
     </svg>
@@ -745,8 +753,8 @@ function activityText(a) {
     case 'board:created': return <>Charted a new galaxy, {title}</>
     case 'board:renamed': return <>Renamed the galaxy <strong>{a.context}</strong> to {title}</>
     case 'board:deleted': return <>Collapsed the galaxy {title}</>
-    case 'guild:founded': return <>Founded the guild {title}</>
-    case 'guild:joined':  return <>Joined the guild {title}</>
+    case 'team:founded': return <>Created the team {title}</>
+    case 'team:joined':  return <>Joined the team {title}</>
     default:              return title
   }
 }
@@ -762,28 +770,28 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const activityPageRef = useRef(null)
   const feedListRef = useRef(null)
   const scrollThumbRef = useRef(null)
-  // hero day/night swap (saturn ⇄ sun)
+  // hero ringed planet — rides through both skies; only the sky tone changes
   const heroPlanetRef = useRef(null)
-  const heroSunRef = useRef(null)
+  const heroGlowRef = useRef(null)  // breathing aura behind the planet
+  const heroSunRef = useRef(null)   // retired sun body, kept hidden in both modes
   const heroRaysRef = useRef(null)
   const modeIconRef = useRef(null)
-  const modeFxRef = useRef(null)    // full-screen ink-wipe overlay for mode switches
-  const sunSpinRef = useRef(null)   // the looping GSAP ray-rotation tween
-  const heroBodyInit = useRef(false) // skip the swap animation on first paint
+  const modeFxRef = useRef(null)    // full-screen wipe overlay for mode switches
+  const heroBodyInit = useRef(false) // skip the settle animation on first paint
 
   const [boards, setBoards] = useState([])
   const [loading, setLoading] = useState(true)
   const [newTitle, setNewTitle] = useState('')
   const [addingBoard, setAddingBoard] = useState(false)
 
-  // Guild state
-  const [guilds, setGuilds] = useState([])
-  const [activeContext, setActiveContext] = useState('personal') // 'personal' | guildId (number)
-  const [guildBoards, setGuildBoards] = useState([])
-  const [guildBoardsLoading, setGuildBoardsLoading] = useState(false)
-  const [guildDetails, setGuildDetails] = useState(null)
-  const [showCreateGuild, setShowCreateGuild] = useState(false)
-  const [showGuildSettings, setShowGuildSettings] = useState(false)
+  // Team state
+  const [teams, setTeams] = useState([])
+  const [activeContext, setActiveContext] = useState('personal') // 'personal' | teamId (number)
+  const [teamBoards, setTeamBoards] = useState([])
+  const [teamBoardsLoading, setTeamBoardsLoading] = useState(false)
+  const [teamDetails, setTeamDetails] = useState(null)
+  const [showCreateTeam, setShowCreateTeam] = useState(false)
+  const [showTeamSettings, setShowTeamSettings] = useState(false)
 
   const ownedKey = `dash:${user.id}:ownedCount`
   const sharedKey = `dash:${user.id}:sharedCount`
@@ -800,11 +808,12 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const [activityPageOpen, setActivityPageOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [notifOpen, setNotifOpen] = useState(false)
-  const [showGuildInvite, setShowGuildInvite] = useState(false)
-  const [inviteTargetGuild, setInviteTargetGuild] = useState(null)
+  const [showTeamInvite, setShowTeamInvite] = useState(false)
+  const [inviteTargetTeam, setInviteTargetTeam] = useState(null)
 
   // Day/Night dashboard mode — defaults to night (the original design).
   const [colorMode, setColorMode] = useState(() => localStorage.getItem('dash-color-mode') || 'night')
+  const [aiOpen, setAiOpen] = useState(false)
   function applyColorMode(next) {
     localStorage.setItem('dash-color-mode', next)
     setColorMode(next)
@@ -825,7 +834,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
     // gentle cross-fade: a veil in the incoming sky's tone fades in, we swap the
     // theme underneath while it's opaque, then it fades back out to reveal it
-    fx.style.background = next === 'day' ? '#dcc8a0' : '#06070b'
+    fx.style.background = next === 'day' ? '#ccd4e0' : '#06070b'
     gsap.timeline()
       .set(fx, { autoAlpha: 0 })
       .to(fx, { autoAlpha: 1, duration: 0.26, ease: 'power1.inOut' })
@@ -841,16 +850,16 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   }
 
   async function handleAcceptInvite(notif) {
-    const res = await apiFetch(`/api/guild-invites/${notif.data.invite_id}/accept`, { method: 'POST' })
+    const res = await apiFetch(`/api/team-invites/${notif.data.invite_id}/accept`, { method: 'POST' })
     const data = await res.json()
     if (!res.ok) return
-    setGuilds(gs => gs.find(g => g.id === data.guild.id) ? gs : [...gs, data.guild])
+    setTeams(gs => gs.find(g => g.id === data.team.id) ? gs : [...gs, data.team])
     setNotifications(ns => ns.map(n => n.id === notif.id ? { ...n, read: true } : n))
     setNotifOpen(false)
   }
 
   async function handleDeclineInvite(notif) {
-    await apiFetch(`/api/guild-invites/${notif.data.invite_id}/decline`, { method: 'POST' })
+    await apiFetch(`/api/team-invites/${notif.data.invite_id}/decline`, { method: 'POST' })
     setNotifications(ns => ns.map(n => n.id === notif.id ? { ...n, read: true } : n))
   }
 
@@ -926,9 +935,9 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   }, [])
 
   useEffect(() => {
-    apiFetch('/api/guilds')
+    apiFetch('/api/teams')
       .then(r => r.json())
-      .then(data => setGuilds(Array.isArray(data) ? data : []))
+      .then(data => setTeams(Array.isArray(data) ? data : []))
   }, [])
 
   // Cosmic Activity feed — the user's own recent deeds. Re-fetched on mount,
@@ -955,18 +964,18 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
   useEffect(() => {
     if (activeContext === 'personal') {
-      setGuildBoards([])
-      setGuildDetails(null)
+      setTeamBoards([])
+      setTeamDetails(null)
       return
     }
-    setGuildBoardsLoading(true)
+    setTeamBoardsLoading(true)
     Promise.all([
-      apiFetch(`/api/guilds/${activeContext}/boards`).then(r => r.json()),
-      apiFetch(`/api/guilds/${activeContext}`).then(r => r.json()),
+      apiFetch(`/api/teams/${activeContext}/boards`).then(r => r.json()),
+      apiFetch(`/api/teams/${activeContext}`).then(r => r.json()),
     ]).then(([boardsData, detailsData]) => {
-      setGuildBoards(Array.isArray(boardsData) ? boardsData : [])
-      setGuildDetails(detailsData?.id ? detailsData : null)
-      setGuildBoardsLoading(false)
+      setTeamBoards(Array.isArray(boardsData) ? boardsData : [])
+      setTeamDetails(detailsData?.id ? detailsData : null)
+      setTeamBoardsLoading(false)
     })
   }, [activeContext])
 
@@ -989,40 +998,32 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     return () => ctx.revert()
   }, [])
 
-  // ── GSAP: morph the hero between Saturn (night) and the Sun (day) ──
+  // ── GSAP: the ringed planet rides through both skies — only the sky tone
+  //    cross-fades between day and night (see toggleColorMode's wipe). The sun
+  //    body stays retired; on a mode switch the planet gives a soft settle. ──
   useEffect(() => {
     const planet = heroPlanetRef.current
     const sun = heroSunRef.current
     if (!planet || !sun) return
-    const day = colorMode === 'day'
+    gsap.set(sun, { autoAlpha: 0 })
 
     if (!heroBodyInit.current) {
-      // first paint — set the correct body instantly, no transition
-      gsap.set(planet, { autoAlpha: day ? 0 : 1, scale: day ? 0.4 : 1, svgOrigin: '100 100' })
-      gsap.set(sun,    { autoAlpha: day ? 1 : 0, scale: day ? 1 : 0.4, svgOrigin: '100 100' })
+      gsap.set(planet, { autoAlpha: 1, scale: 1.1, svgOrigin: '100 100' })
       heroBodyInit.current = true
-    } else {
-      // cross-fade + scale the outgoing body out and the incoming body in
-      gsap.to(planet, { autoAlpha: day ? 0 : 1, scale: day ? 0.4 : 1, svgOrigin: '100 100',
-        duration: 0.6, ease: day ? 'power2.in' : 'back.out(1.7)', overwrite: 'auto' })
-      gsap.to(sun, { autoAlpha: day ? 1 : 0, scale: day ? 1 : 0.4, svgOrigin: '100 100',
-        duration: 0.6, ease: day ? 'back.out(1.7)' : 'power2.in', overwrite: 'auto' })
+    } else if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      gsap.fromTo(planet,
+        { scale: 0.95, svgOrigin: '100 100' },
+        { scale: 1.1, autoAlpha: 1, duration: 0.6, ease: 'back.out(1.7)', overwrite: 'auto' })
     }
-
-    // the sun's rays turn slowly — only while the sun is showing
-    sunSpinRef.current?.kill()
-    sunSpinRef.current = null
-    if (day && heroRaysRef.current && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      sunSpinRef.current = gsap.to(heroRaysRef.current, {
-        rotation: 360, svgOrigin: '100 100', duration: 44, ease: 'none', repeat: -1,
-      })
-    }
-    return () => { sunSpinRef.current?.kill() }
   }, [colorMode])
+
+  // The planet's aura now breathes via a pure-CSS keyframe pulse
+  // (.hero-glow-core in App.css) rather than GSAP, so it honors
+  // prefers-reduced-motion and never touches layout.
 
   // ── GSAP reveal: board tiles rise + constellation lines stroke-draw ──
   useEffect(() => {
-    if (loading || guildBoardsLoading) return
+    if (loading || teamBoardsLoading) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const ctx = gsap.context(() => {
       gsap.from('.board-grid > *', {
@@ -1038,7 +1039,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       })
     }, rootRef)
     return () => ctx.revert()
-  }, [loading, guildBoardsLoading, boardView, activeContext])
+  }, [loading, teamBoardsLoading, boardView, activeContext])
 
   // ── GSAP: animate the Cosmic Activity page open (backdrop, panel, streak, rows) ──
   useEffect(() => {
@@ -1048,7 +1049,11 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
       if (activityPageRef.current) gsap.from(activityPageRef.current, { opacity: 0, duration: 0.25, ease: 'power1.out' })
       gsap.from('.cosmic-page', { y: 34, scale: 0.96, opacity: 0, duration: 0.5, ease: 'power3.out' })
       gsap.from('.cosmic-page .streak-flame', { scale: 0.5, opacity: 0, duration: 0.6, ease: 'back.out(1.7)', delay: 0.18 })
-      gsap.from('.cosmic-page .streak-dot', { scale: 0, opacity: 0, duration: 0.4, ease: 'back.out(2)', stagger: 0.05, delay: 0.34 })
+      // pop the dots in with a fromTo so they always settle visible — a plain
+      // from(scale:0) can leave them stuck invisible if the open tween is cut short
+      gsap.fromTo('.cosmic-page .streak-dot',
+        { scale: 0, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(2)', stagger: 0.05, delay: 0.34, clearProps: 'transform,opacity' })
       // Voyager's Log slides in, and the milestone bar grows from empty
       gsap.from('.cosmic-page .streak-extras > *', { y: 14, opacity: 0, duration: 0.5, ease: 'power2.out', stagger: 0.08, delay: 0.46 })
       gsap.from('.cosmic-page .streak-milestone-fill', { scaleX: 0, transformOrigin: 'left center', duration: 0.9, ease: 'power2.out', delay: 0.62 })
@@ -1134,7 +1139,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     e.preventDefault()
     if (!newTitle.trim()) return
     const body = { title: newTitle.trim() }
-    if (activeContext !== 'personal') body.guild_id = activeContext
+    if (activeContext !== 'personal') body.team_id = activeContext
     const res = await apiFetch('/api/boards', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -1143,8 +1148,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     if (activeContext === 'personal') {
       setBoards(b => [...b, board])
     } else {
-      setGuildBoards(b => [...b, board])
-      setGuilds(gs => gs.map(g => g.id === activeContext ? { ...g, board_count: (g.board_count || 0) + 1 } : g))
+      setTeamBoards(b => [...b, board])
+      setTeams(gs => gs.map(g => g.id === activeContext ? { ...g, board_count: (g.board_count || 0) + 1 } : g))
     }
     setNewTitle('')
     setAddingBoard(false)
@@ -1156,10 +1161,10 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     setBoards(b => b.filter(board => board.id !== boardId))
   }
 
-  async function deleteGuildBoard(boardId) {
+  async function deleteTeamBoard(boardId) {
     await apiFetch(`/api/boards/${boardId}`, { method: 'DELETE' })
-    setGuildBoards(b => b.filter(board => board.id !== boardId))
-    setGuilds(gs => gs.map(g => g.id === activeContext ? { ...g, board_count: Math.max(0, (g.board_count || 0) - 1) } : g))
+    setTeamBoards(b => b.filter(board => board.id !== boardId))
+    setTeams(gs => gs.map(g => g.id === activeContext ? { ...g, board_count: Math.max(0, (g.board_count || 0) - 1) } : g))
   }
 
   async function renameBoard(boardId, newTitle) {
@@ -1171,13 +1176,13 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     setBoards(b => b.map(board => board.id === boardId ? { ...board, title: updated.title } : board))
   }
 
-  async function renameGuildBoard(boardId, newTitle) {
+  async function renameTeamBoard(boardId, newTitle) {
     const res = await apiFetch(`/api/boards/${boardId}`, {
       method: 'PATCH',
       body: JSON.stringify({ title: newTitle }),
     })
     const updated = await res.json()
-    setGuildBoards(b => b.map(board => board.id === boardId ? { ...board, title: updated.title } : board))
+    setTeamBoards(b => b.map(board => board.id === boardId ? { ...board, title: updated.title } : board))
   }
 
   const ownedBoards = boards.filter(b => b.role === 'owner')
@@ -1191,6 +1196,9 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const milestonePct = nextMilestone ? Math.min(100, Math.round((streakNow / nextMilestone) * 100)) : 100
   const milestoneToGo = nextMilestone ? nextMilestone - streakNow : 0
   const cosmicRank =
+    bestStreak >= 365 ? 'Great One of the Universe' :
+    bestStreak >= 100 ? 'Universe Pioneer' :
+    bestStreak >= 60  ? 'Celestial Cartographer' :
     bestStreak >= 30 ? 'Galactic Voyager' :
     bestStreak >= 14 ? 'Constellation Keeper' :
     bestStreak >= 7  ? 'Starfarer' :
@@ -1211,11 +1219,17 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const today = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
+  // location derived from the browser's timezone (no stored user location), e.g.
+  // "America/New_York" → "New York"; falls back gracefully if unavailable
+  const userLocation = (() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop().replace(/_/g, ' ') }
+    catch { return 'Unknown Sector' }
+  })()
 
   // one Cosmic Activity row — shared by the 3-row preview and the "View all" panel
   const renderActivityRow = (a, i) => (
     <li key={i} className="cosmic-activity-item">
-      <span className={`cosmic-activity-icon cosmic-activity-icon--${a.kind}${a.kind === 'board' && a.action === 'deleted' ? ' cosmic-activity-icon--deleted' : ''}`}>
+      <span className={`cosmic-activity-icon cosmic-activity-icon--${a.kind}${a.kind === 'board' && a.action === 'deleted' ? ' cosmic-activity-icon--deleted' : ''}${a.kind === 'card' && (a.action === 'created' || a.action === 'moved') ? ` cosmic-activity-icon--${a.action}` : ''}`}>
         {activityIcon(a)}
       </span>
       <span className="cosmic-activity-text">{activityText(a)}</span>
@@ -1233,21 +1247,21 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
           {' · '}<em className="dash-hero-cta">choose your journey.</em>
         </>
 
-  const guildSummary = guildDetails
-    ? `${guildBoards.length} board${guildBoards.length !== 1 ? 's' : ''} · ${(guildDetails.members || []).length} member${(guildDetails.members || []).length !== 1 ? 's' : ''} · your guild's shared quests.`
-    : 'Loading guild…'
+  const teamSummary = teamDetails
+    ? `${teamBoards.length} board${teamBoards.length !== 1 ? 's' : ''} · ${(teamDetails.members || []).length} member${(teamDetails.members || []).length !== 1 ? 's' : ''} · your team's shared quests.`
+    : 'Loading team…'
 
   const isPersonal = activeContext === 'personal'
 
   return (
-    <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}`} ref={rootRef}>
-      <Starfield mode={colorMode} />
+    <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}${aiOpen ? ' ai-open' : ''}`} ref={rootRef}>
+      <Starfield mode={colorMode} randomConstellations />
       <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
 
       <header className="topbar">
         <div className="topbar-left">
-          <p className="topbar-breadcrumb">DASHBOARD › {isPersonal ? 'MY BOARDS' : (guildDetails?.name?.toUpperCase() || 'GUILD')}</p>
-          <h1 className="topbar-page-title">{isPersonal ? 'My Universe' : (guildDetails?.name || 'Guild')}</h1>
+          <p className="topbar-breadcrumb">DASHBOARD › {isPersonal ? 'MY BOARDS' : (teamDetails?.name?.toUpperCase() || 'TEAM')}</p>
+          <h1 className="topbar-page-title">{isPersonal ? 'My Universe' : (teamDetails?.name || 'Team')}</h1>
         </div>
         <div className="topbar-right">
           <button
@@ -1352,10 +1366,35 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
         {/* ── Sidebar ── */}
         <nav className="dash-sidebar" ref={sidebarRef} aria-label="Navigation">
           <div className="sidebar-profile" onClick={() => onOpenSettings('avatar')} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') onOpenSettings('avatar') }}>
-            <UserAvatar user={user} className="sidebar-profile-avatar" />
-            <div className="sidebar-profile-info">
+            <div className="sidebar-profile-top">
+              <span className="sidebar-profile-av">
+                <UserAvatar user={user} className="sidebar-profile-avatar" />
+                <span className="sidebar-profile-status" aria-hidden="true" />
+              </span>
               <span className="sidebar-profile-username">{user.username}</span>
             </div>
+            <span className="sidebar-profile-rank">
+              <svg className="sidebar-profile-spark" width="9" height="9" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 0 L13.6 10.4 L24 12 L13.6 13.6 L12 24 L10.4 13.6 L0 12 L10.4 10.4 Z" />
+              </svg>
+              {cosmicRank}
+            </span>
+            <span className="sidebar-profile-location">
+              <svg className="sidebar-profile-ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              {userLocation}
+            </span>
+            <span className="sidebar-profile-date">
+              <svg className="sidebar-profile-ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              {today}
+            </span>
           </div>
 
           <p className="sidebar-section-label">HOME SYSTEM</p>
@@ -1373,29 +1412,29 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             onClick={() => { setActiveContext('personal'); setBoardView('shared'); setAddingBoard(false) }}
           >
             <span className="sidebar-item-icon" aria-hidden="true">⇄</span>
-            <span className="sidebar-item-name">Shared Universe</span>
+            <span className="sidebar-item-name">Shared Galaxies</span>
             {sharedBoards.length > 0 && <span className="sidebar-item-count">{sharedBoards.length}</span>}
           </button>
 
-          {guilds.length > 0 && (
-            <p className="sidebar-section-label">Guilds</p>
+          {teams.length > 0 && (
+            <p className="sidebar-section-label">Teams</p>
           )}
 
-          {guilds.map(g => (
-            <div key={g.id} className="sidebar-guild-row">
+          {teams.map(g => (
+            <div key={g.id} className="sidebar-team-row">
               <button
-                className={`sidebar-item sidebar-item--guild${activeContext === g.id ? ' active' : ''}`}
+                className={`sidebar-item sidebar-item--team${activeContext === g.id ? ' active' : ''}`}
                 onClick={() => { setActiveContext(g.id); setAddingBoard(false) }}
               >
-                <GuildIcon guild={g} className="sidebar-guild-icon" />
+                <TeamIcon team={g} className="sidebar-team-icon" />
                 <span className="sidebar-item-name">{g.name}</span>
               </button>
               {g.role === 'owner' && (
                 <button
-                  className="sidebar-guild-invite-btn"
-                  title="Summon Allies"
+                  className="sidebar-team-invite-btn"
+                  title="Invite Members"
                   aria-label={`Invite to ${g.name}`}
-                  onClick={e => { e.stopPropagation(); setInviteTargetGuild(g); setShowGuildInvite(true) }}
+                  onClick={e => { e.stopPropagation(); setInviteTargetTeam(g); setShowTeamInvite(true) }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -1407,10 +1446,10 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               )}
               {g.role === 'owner' && (
                 <button
-                  className="sidebar-guild-manage-btn"
-                  title="Manage / Disband"
+                  className="sidebar-team-manage-btn"
+                  title="Manage / Delete"
                   aria-label={`Manage ${g.name}`}
-                  onClick={e => { e.stopPropagation(); setActiveContext(g.id); setShowGuildSettings(true) }}
+                  onClick={e => { e.stopPropagation(); setActiveContext(g.id); setShowTeamSettings(true) }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="3"/>
@@ -1423,14 +1462,14 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
           <button
             className="sidebar-create-btn"
-            onClick={() => setShowCreateGuild(true)}
+            onClick={() => setShowCreateTeam(true)}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Forge an Alliance
+            Create a Team
           </button>
 
           <div className="sidebar-footer">
-            <button className="sidebar-footer-item" onClick={() => onOpenSettings('customization')}>
+            <button className="sidebar-footer-item" onClick={() => onOpenSettings('avatar')}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
               Settings
             </button>
@@ -1460,10 +1499,26 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               <circle className="dhc-dot" cx="100" cy="62" r="1.4" />
               <circle className="dhc-dot" cx="50" cy="100" r="1.2" />
             </svg>
+            {/* diamond stars scattered across the banner for depth & texture */}
+            {[
+              { cls: 'hero-card-star--md', pos: { top: '62%', left: '3%' } },     // bottom-left of the summary line
+              { cls: 'hero-card-star--sm', pos: { top: '8%', left: '13%' } },     // near the top border, left side
+              { cls: 'hero-card-star--sm', pos: { top: '47%', left: '6.5%' } },   // directly below the greeting name
+              { cls: 'hero-card-star--sm', pos: { top: '85%', left: '20%' } },    // below "Cosmic Activity"
+              { cls: 'hero-card-star--md', pos: { top: '9%', right: '3%' } },     // upper-right corner
+              // cluster plastered in the open band right of the name / summary
+              { cls: 'hero-card-star--md', pos: { top: '36%', left: '57%' } },    // top (nudged right)
+              { cls: 'hero-card-star--lg', pos: { top: '86%', left: '70%' } },    // bottom-right, kept clear of the Saturn orrery
+              { cls: 'hero-card-star--md', pos: { top: '70%', left: '31%' } },    // below — next to Cosmic Activity
+            ].map((s, i) => (
+              <svg key={i} className={`hero-card-star ${s.cls}`} style={s.pos} viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 0 L13.6 10.4 L24 12 L13.6 13.6 L12 24 L10.4 13.6 L0 12 L10.4 10.4 Z" />
+              </svg>
+            ))}
             <div className="dash-hero-left">
               <p className="dash-hero-eyebrow">{today.toUpperCase()}</p>
               <h1 className="dash-hero-greeting">{greeting}, <em className="dash-hero-username">{user.username}</em>.</h1>
-              <p className="dash-hero-summary">{isPersonal ? personalSummary : guildSummary}</p>
+              <p className="dash-hero-summary">{isPersonal ? personalSummary : teamSummary}</p>
 
               <button
                 type="button"
@@ -1494,9 +1549,21 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                     <stop offset="52%" stopColor="#aab2c6" />
                     <stop offset="100%" stopColor="#363c4a" />
                   </radialGradient>
+                  {/* daylight: a deep, saturated navy sphere fading to near-black */}
+                  <radialGradient id="heroPlanetDay" cx="38%" cy="32%" r="80%">
+                    <stop offset="0%" stopColor="#46587e" />
+                    <stop offset="48%" stopColor="#222c44" />
+                    <stop offset="100%" stopColor="#0a0e1a" />
+                  </radialGradient>
                   <radialGradient id="heroGlow" cx="50%" cy="50%" r="50%">
                     <stop offset="0%" stopColor="rgba(198,208,230,0.45)" />
                     <stop offset="100%" stopColor="rgba(198,208,230,0)" />
+                  </radialGradient>
+                  {/* daylight: a soft dark-blue aura/halo so the navy planet has depth */}
+                  <radialGradient id="heroGlowDay" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="rgba(34,52,102,0.5)" />
+                    <stop offset="55%" stopColor="rgba(26,40,82,0.24)" />
+                    <stop offset="100%" stopColor="rgba(26,40,82,0)" />
                   </radialGradient>
                   <radialGradient id="heroSun" cx="42%" cy="38%" r="72%">
                     <stop offset="0%" stopColor="#fff3d0" />
@@ -1507,6 +1574,15 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                     <stop offset="0%" stopColor="rgba(255,190,90,0.55)" />
                     <stop offset="100%" stopColor="rgba(255,190,90,0)" />
                   </radialGradient>
+                  {/* surface latitude lines: light gray fading to dark gray */}
+                  <linearGradient id="heroBandLight" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#eef1f6" />
+                    <stop offset="50%" stopColor="#9aa0ad" />
+                    <stop offset="100%" stopColor="#3c414c" />
+                  </linearGradient>
+                  {/* the four-pointed compass star, normalized to the origin so it can be
+                      scattered at any size/position via <use transform> */}
+                  <path id="heroStarShape" d="M0,-13 L1.6,-1.6 L13,0 L1.6,1.6 L0,13 L-1.6,1.6 L-13,0 L-1.6,-1.6 Z" />
                 </defs>
 
                 {/* zodiac wheel */}
@@ -1521,22 +1597,23 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                   ))}
                 </g>
 
-                {/* central glow */}
-                <circle cx="100" cy="100" r="50" fill="url(#heroGlow)" />
+                {/* central glow — pulses via GSAP so the planet breathes light */}
+                <circle className="hero-glow-core" ref={heroGlowRef} cx="100" cy="100" r="50" fill="url(#heroGlow)" />
 
-                {/* night body — tilted ringed planet (saturn) */}
-                <g className="hero-planet-group" ref={heroPlanetRef} style={{ visibility: colorMode === 'day' ? 'hidden' : 'visible' }}>
+                {/* the tilted ringed planet (saturn) — shown in both day and night */}
+                <g className="hero-planet-group" ref={heroPlanetRef} style={{ visibility: 'visible' }}>
                   <g transform="rotate(-18 100 100)">
                     <ellipse className="hero-ring hero-ring--back" cx="100" cy="100" rx="42" ry="13" />
-                    <circle cx="100" cy="100" r="21" fill="url(#heroPlanet)" />
-                    <path className="hero-band" d="M82,95 q18,7 38,-2" />
-                    <path className="hero-band" d="M81,104 q19,7 39,-1" />
+                    <circle className="hero-planet-body" cx="100" cy="100" r="21" fill="url(#heroPlanet)" />
+                    {/* two latitude lines meeting the planet's edge so they read as curving over the sphere, sitting just above the front ring */}
+                    <path className="hero-band-light" d="M79,98 q21,7 42,-3" />
+                    <path className="hero-band-light" d="M80,104 q20,7 40,-3" />
                     <path className="hero-ring hero-ring--front" d="M58,100 a42,13 0 0 0 84,0" />
                   </g>
                 </g>
 
-                {/* day body — radiant sun */}
-                <g className="hero-sun-group" ref={heroSunRef} style={{ visibility: colorMode === 'day' ? 'visible' : 'hidden' }}>
+                {/* retired sun body — kept in the DOM but hidden in both modes */}
+                <g className="hero-sun-group" ref={heroSunRef} style={{ visibility: 'hidden' }}>
                   <circle className="hero-sun-glow" cx="100" cy="100" r="50" fill="url(#heroSunGlow)" />
                   <g className="hero-rays" ref={heroRaysRef}>
                     {Array.from({ length: 12 }).map((_, i) => (
@@ -1556,10 +1633,26 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                   <circle className="hero-moon hero-moon--sm" cx="100" cy="38" r="2.4" />
                 </g>
 
-                {/* sparkles */}
+                {/* ambient sparkles scattered to the corners */}
                 <path className="hero-spark hero-spark--1" d="M34,52 l1.4,4 4,1.4 -4,1.4 -1.4,4 -1.4,-4 -4,-1.4 4,-1.4 z" />
                 <path className="hero-spark hero-spark--2" d="M168,140 l1.1,3.2 3.2,1.1 -3.2,1.1 -1.1,3.2 -1.1,-3.2 -3.2,-1.1 3.2,-1.1 z" />
-                <path className="hero-spark hero-spark--3" d="M150,40 l0.9,2.6 2.6,0.9 -2.6,0.9 -0.9,2.6 -0.9,-2.6 -2.6,-0.9 2.6,-0.9 z" />
+                <path className="hero-spark hero-spark--3" d="M150,38 l0.9,2.6 2.6,0.9 -2.6,0.9 -0.9,2.6 -0.9,-2.6 -2.6,-0.9 2.6,-0.9 z" />
+                {/* two echo stars nudged outward so their centres rest on the outer orbit
+                    ring (r=80) — top-right + bottom-left */}
+                <path className="hero-star hero-star--c" transform="translate(2.5,-2)" d="M160,44 L161,51 L168,52 L161,53 L160,60 L159,53 L152,52 L159,51 Z" />
+                <path className="hero-star hero-star--d" transform="translate(-3.7,3.3)" d="M44,142 L45,149 L52,150 L45,151 L44,158 L43,151 L36,150 L43,149 Z" />
+                {/* scattered star dust — small & medium echoes of the compass star spread
+                    across the card to add depth and texture */}
+                <use href="#heroStarShape" className="hero-star hero-star--md" transform="translate(34,80) scale(0.46)" />
+                <use href="#heroStarShape" className="hero-star hero-star--md" transform="translate(168,116) scale(0.42)" />
+                <use href="#heroStarShape" className="hero-star hero-star--md" transform="translate(98,176) scale(0.4)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(22,34) scale(0.22)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(181,30) scale(0.2)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(16,126) scale(0.24)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(186,152) scale(0.2)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(118,18) scale(0.22)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(78,160) scale(0.18)" />
+                <use href="#heroStarShape" className="hero-star hero-star--sm" transform="translate(150,168) scale(0.22)" />
               </svg>
             </div>
           </section>
@@ -1568,19 +1661,19 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
             <>
               <div className="board-section-header">
                 <h2 className="board-section-title">
-                  {boardView === 'owned' ? 'My Universe' : 'Shared Universe'}
+                  {boardView === 'owned' ? 'My Universe' : 'Shared Galaxies'}
                   {!loading && sharedBoards.length > 0 && (
                     <button
                       className={`board-view-toggle${viewFlipping ? ' board-view-toggle--flipping' : ''}`}
                       onClick={toggleBoardView}
-                      aria-label={boardView === 'owned' ? 'Switch to shared universe' : 'Switch to my universe'}
+                      aria-label={boardView === 'owned' ? 'Switch to shared galaxies' : 'Switch to my universe'}
                     >
                       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M1 5h10M8 2l3 3-3 3" />
                         <path d="M15 11H5M8 8l-3 3 3 3" />
                       </svg>
                       <span className="bvt-tooltip" aria-hidden="true">
-                        {boardView === 'owned' ? 'Shared Universe' : 'My Universe'}
+                        {boardView === 'owned' ? 'Shared Galaxies' : 'My Universe'}
                       </span>
                     </button>
                   )}
@@ -1636,7 +1729,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                         {loading
                           ? Array.from({ length: skeletonShared }).map((_, i) => <BoardTileSkeleton key={i} />)
                           : filteredShared.length === 0
-                            ? <p className="dashboard-empty" style={{ gridColumn: '1 / -1' }}>No shared universe matches your search.</p>
+                            ? <p className="dashboard-empty" style={{ gridColumn: '1 / -1' }}>No shared galaxies matches your search.</p>
                             : filteredShared.map((b, i) => (
                               <BoardCard
                                 key={b.id}
@@ -1656,41 +1749,41 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               </section>
             </>
           ) : (
-            /* Guild view */
+            /* Team view */
             <>
-              {guildDetails && (
-                <div className="guild-context-header" style={{ '--guild-color': guildHex(guildDetails.icon_color) }}>
-                  <GuildIcon guild={guildDetails} className="guild-icon--lg" />
-                  <div className="guild-context-info">
-                    <h2 className="guild-context-name">{guildDetails.name}</h2>
-                    <div className="guild-context-meta">
-                      <span>{(guildDetails.members || []).length} member{(guildDetails.members || []).length !== 1 ? 's' : ''}</span>
+              {teamDetails && (
+                <div className="team-context-header" style={{ '--team-color': teamHex(teamDetails.icon_color) }}>
+                  <TeamIcon team={teamDetails} className="team-icon--lg" />
+                  <div className="team-context-info">
+                    <h2 className="team-context-name">{teamDetails.name}</h2>
+                    <div className="team-context-meta">
+                      <span>{(teamDetails.members || []).length} member{(teamDetails.members || []).length !== 1 ? 's' : ''}</span>
                       <span aria-hidden="true">·</span>
-                      <span>{guildBoards.length} board{guildBoards.length !== 1 ? 's' : ''}</span>
+                      <span>{teamBoards.length} board{teamBoards.length !== 1 ? 's' : ''}</span>
                     </div>
                   </div>
-                  {(guildDetails.members || []).length > 0 && (
+                  {(teamDetails.members || []).length > 0 && (
                     <div
-                      className="guild-context-members"
-                      aria-label={`Members: ${(guildDetails.members || []).map(m => m.username).join(', ')}`}
+                      className="team-context-members"
+                      aria-label={`Members: ${(teamDetails.members || []).map(m => m.username).join(', ')}`}
                     >
-                      {(guildDetails.members || []).slice(0, 6).map(m => (
-                        <UserAvatar key={m.id} user={m} className="guild-context-avatar" title={m.username} />
+                      {(teamDetails.members || []).slice(0, 6).map(m => (
+                        <UserAvatar key={m.id} user={m} className="team-context-avatar" title={m.username} />
                       ))}
-                      {(guildDetails.members || []).length > 6 && (
-                        <span className="guild-context-avatar guild-context-avatar--more">
-                          +{(guildDetails.members || []).length - 6}
+                      {(teamDetails.members || []).length > 6 && (
+                        <span className="team-context-avatar team-context-avatar--more">
+                          +{(teamDetails.members || []).length - 6}
                         </span>
                       )}
                     </div>
                   )}
 
-                  <div className="guild-context-actions">
-                    {guildDetails.owner_id === user.id && (
+                  <div className="team-context-actions">
+                    {teamDetails.owner_id === user.id && (
                       <button
-                        className="guild-invite-trigger-btn"
-                        onClick={() => { setInviteTargetGuild(guildDetails); setShowGuildInvite(true) }}
-                        title="Summon Allies"
+                        className="team-invite-trigger-btn"
+                        onClick={() => { setInviteTargetTeam(teamDetails); setShowTeamInvite(true) }}
+                        title="Invite Members"
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -1698,7 +1791,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                           <line x1="19" y1="8" x2="19" y2="14"/>
                           <line x1="22" y1="11" x2="16" y2="11"/>
                         </svg>
-                        Summon Allies
+                        Invite Members
                       </button>
                     )}
                   </div>
@@ -1726,23 +1819,23 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                       <span className="board-tile-create-label">Add a Quest</span>
                     </button>
                   )}
-                  {guildBoardsLoading
+                  {teamBoardsLoading
                     ? Array.from({ length: 3 }).map((_, i) => <BoardTileSkeleton key={i} />)
-                    : guildBoards.map((b, i) => (
+                    : teamBoards.map((b, i) => (
                       <BoardCard
                         key={b.id}
                         board={b}
                         index={i}
                         stagger={i + 1}
                         onOpen={onOpenBoard}
-                        onDelete={deleteGuildBoard}
-                        onRename={renameGuildBoard}
+                        onDelete={deleteTeamBoard}
+                        onRename={renameTeamBoard}
                         isOwner={b.role === 'owner'}
                       />
                     ))}
-                  {!guildBoardsLoading && guildBoards.length === 0 && (
+                  {!teamBoardsLoading && teamBoards.length === 0 && (
                     <p className="dashboard-empty" style={{ gridColumn: '1 / -1' }}>
-                      No quest boards yet — add the first one for your guild.
+                      No quest boards yet — add the first one for your team.
                     </p>
                   )}
                 </div>
@@ -1817,8 +1910,8 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                         <span className="voyager-stat-label">Shared</span>
                       </div>
                       <div className="voyager-stat">
-                        <span className="voyager-stat-num">{guilds.length}</span>
-                        <span className="voyager-stat-label">Allies</span>
+                        <span className="voyager-stat-num">{teams.length}</span>
+                        <span className="voyager-stat-label">Teams</span>
                       </div>
                     </div>
                   </div>
@@ -1849,37 +1942,39 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
         </div>
       )}
 
-      {showGuildInvite && inviteTargetGuild && (
-        <GuildInviteModal
-          guild={inviteTargetGuild}
-          onClose={() => { setShowGuildInvite(false); setInviteTargetGuild(null) }}
+      {showTeamInvite && inviteTargetTeam && (
+        <TeamInviteModal
+          team={inviteTargetTeam}
+          onClose={() => { setShowTeamInvite(false); setInviteTargetTeam(null) }}
         />
       )}
 
-      {showCreateGuild && (
-        <CreateGuildModal
-          onClose={() => setShowCreateGuild(false)}
-          onCreate={guild => setGuilds(gs => [...gs, guild])}
+      {showCreateTeam && (
+        <CreateTeamModal
+          onClose={() => setShowCreateTeam(false)}
+          onCreate={team => setTeams(gs => [...gs, team])}
         />
       )}
 
-      {showGuildSettings && guildDetails && (
-        <GuildSettingsModal
-          guild={{ ...guildDetails, board_count: guildBoards.length }}
+      {showTeamSettings && teamDetails && (
+        <TeamSettingsModal
+          team={{ ...teamDetails, board_count: teamBoards.length }}
           currentUserId={user.id}
-          onClose={() => setShowGuildSettings(false)}
+          onClose={() => setShowTeamSettings(false)}
           onUpdate={updated => {
-            setGuildDetails(prev => ({ ...prev, ...updated }))
-            setGuilds(gs => gs.map(g => g.id === updated.id ? { ...g, name: updated.name, icon_color: updated.icon_color } : g))
+            setTeamDetails(prev => ({ ...prev, ...updated }))
+            setTeams(gs => gs.map(g => g.id === updated.id ? { ...g, name: updated.name, icon_color: updated.icon_color } : g))
           }}
           onDelete={id => {
-            setGuilds(gs => gs.filter(g => g.id !== id))
+            setTeams(gs => gs.filter(g => g.id !== id))
             setActiveContext('personal')
           }}
-          onMemberAdd={member => setGuildDetails(prev => ({ ...prev, members: [...(prev.members || []), member] }))}
-          onMemberRemove={userId => setGuildDetails(prev => ({ ...prev, members: (prev.members || []).filter(m => m.id !== userId) }))}
+          onMemberAdd={member => setTeamDetails(prev => ({ ...prev, members: [...(prev.members || []), member] }))}
+          onMemberRemove={userId => setTeamDetails(prev => ({ ...prev, members: (prev.members || []).filter(m => m.id !== userId) }))}
         />
       )}
+
+      <AiAssistant open={aiOpen} onClose={() => setAiOpen(false)} />
     </div>
   )
 }

@@ -1,7 +1,11 @@
 /* ── Layout shell ── */
+/* The shell is always a row: the board area and the docked panel are real flex
+   siblings. The panel collapses to zero width when closed, so the board fills
+   the shell; opening it animates the panel's width and the board reflows into
+   the remaining space (VSCode-style). No position/direction flip on open. */
 .app-shell {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: 100svh;
   overflow: hidden;
   position: relative;
@@ -20,6 +24,129 @@
   background-repeat: no-repeat;
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   BOARD · COSMIC SKY (mirrors the dashboard)
+   The board interior wears the same sky as the dashboard. Redefining the
+   scoped theme tokens recolors the topbar, columns, cards and assistant into
+   the silver-on-void register, and the Starfield canvas drifts behind them.
+   `isolation` contains the canvas so its z-index:-1 tucks behind the content
+   yet above the shell's own gradient — no per-element lifts, so modals and the
+   docked assistant keep stacking as before. The day/night choice is shared with
+   the dashboard via the `dash-color-mode` localStorage key, so it persists
+   across the two views; the --day variant flips the whole realm to daylight.
+   ════════════════════════════════════════════════════════════════════ */
+.board-shell {
+  isolation: isolate;
+  --text: #868c9b;
+  --text-h: #e6e9f2;
+  --bg: #06070b;
+  --border: rgba(168, 178, 200, 0.10);
+  --code-bg: rgba(255, 255, 255, 0.035);
+  --accent: #828da3;
+  --accent-bg: rgba(130, 141, 163, 0.13);
+  --accent-border: rgba(130, 141, 163, 0.42);
+  --social-bg: rgba(255, 255, 255, 0.025);
+  --metal: #c7cedd;
+  --metal-deep: #8b94a3;
+  --star: #d8dde8;
+  --shadow:
+    rgba(0, 0, 0, 0.6) 0 10px 24px -6px, rgba(0, 0, 0, 0.4) 0 4px 12px -4px;
+  color: var(--text);
+  background-color: #06070b;
+  background-image: none;
+}
+
+/* the topbar dissolves into the sky like the dashboard's, so the stars carry across */
+.board-shell .topbar { background: transparent; }
+
+/* glassy mode toggle, matching the dashboard's */
+.board-shell .dash-mode-toggle {
+  background: rgba(16, 18, 26, 0.55);
+  border: 1px solid rgba(168, 178, 200, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Board in daylight (mirrors the dashboard's celestial day) ── */
+.board-shell--day {
+  --text: #4a586e;
+  --text-h: #18202e;
+  --text-dim: rgba(40, 56, 84, 0.42);
+  --bg: #eef4fb;
+  --border: rgba(74, 104, 154, 0.20);
+  --code-bg: rgba(210, 226, 244, 0.45);
+  --accent: #4f72c8;
+  --accent-bg: rgba(79, 114, 200, 0.14);
+  --accent-border: rgba(79, 114, 200, 0.5);
+  --social-bg: rgba(210, 226, 244, 0.4);
+  --metal: #9fb4d6;
+  --metal-deep: #6f88af;
+  --star: #4063a6;
+  --shadow:
+    rgba(40, 70, 120, 0.18) 0 10px 24px -6px, rgba(40, 70, 120, 0.1) 0 4px 12px -4px;
+  color: var(--text);
+  background-color: #D6EAFC;
+  background-image: none;
+}
+.board-shell--day .dash-mode-toggle {
+  background: rgba(250, 253, 255, 0.72);
+  border: 1px solid rgba(110, 145, 200, 0.24);
+}
+
+/* ── Scrollbars: clean + translucent, tinted to the active sky ──
+   Silvered glass over the night void; cool slate over the daylight sky. Slim
+   and rounded, transparent track, a touch brighter on hover. The standard
+   scrollbar-* props cover Firefox; the -webkit-* pseudos cover Chrome/Safari. */
+.board-shell {
+  --sb-thumb: rgba(216, 221, 232, 0.18);
+  --sb-thumb-hover: rgba(216, 221, 232, 0.34);
+}
+.board-shell--day {
+  --sb-thumb: rgba(40, 56, 84, 0.22);
+  --sb-thumb-hover: rgba(40, 56, 84, 0.42);
+}
+
+.board-shell .board,
+.board-shell .column-cards,
+.board-shell .ai-panel-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-thumb) transparent;
+}
+.board-shell .board::-webkit-scrollbar,
+.board-shell .column-cards::-webkit-scrollbar,
+.board-shell .ai-panel-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.board-shell .board::-webkit-scrollbar-track,
+.board-shell .column-cards::-webkit-scrollbar-track,
+.board-shell .ai-panel-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.board-shell .board::-webkit-scrollbar-thumb,
+.board-shell .column-cards::-webkit-scrollbar-thumb,
+.board-shell .ai-panel-body::-webkit-scrollbar-thumb {
+  /* the transparent border + padding-box clip insets the thumb so it reads as a
+     slim ~4px pill floating in the track rather than a flush chunky bar */
+  background: var(--sb-thumb);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+.board-shell .board::-webkit-scrollbar-thumb:hover,
+.board-shell .column-cards::-webkit-scrollbar-thumb:hover,
+.board-shell .ai-panel-body::-webkit-scrollbar-thumb:hover {
+  background: var(--sb-thumb-hover);
+}
+/* no arrows/corner — keep it minimal */
+.board-shell .board::-webkit-scrollbar-button,
+.board-shell .column-cards::-webkit-scrollbar-button,
+.board-shell .ai-panel-body::-webkit-scrollbar-button { display: none; }
+.board-shell .board::-webkit-scrollbar-corner,
+.board-shell .column-cards::-webkit-scrollbar-corner,
+.board-shell .ai-panel-body::-webkit-scrollbar-corner { background: transparent; }
+
 /* ── Top bar ── */
 .topbar {
   display: flex;
@@ -30,6 +157,11 @@
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
+  /* As a column child of .board-stage, the default min-width:auto would let the
+     topbar's intrinsic content width (search + buttons + avatar) pin the stage
+     open, so it slides under the docked panel instead of compressing. Allow it
+     to shrink; the search input flexes down below (see .search-input). */
+  min-width: 0;
 }
 
 .topbar-left {
@@ -55,6 +187,30 @@
 .board-icon--brand {
   background: linear-gradient(135deg, var(--accent), var(--accent-border));
   box-shadow: 0 6px 16px var(--accent-bg);
+}
+
+/* mini constellation icon in the board topbar — the same zodiac sign the board's
+   dashboard tile shows, drawn small on a dark celestial ground */
+.board-icon--constellation {
+  background: radial-gradient(circle at 50% 40%, #1b2336, #0a0d15);
+  overflow: hidden;
+  padding: 4px;
+}
+.board-icon--constellation svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.board-icon-zodiac-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.board-icon-zodiac-star {
+  fill: #fff;
+  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.9));
 }
 
 .board-name {
@@ -249,16 +405,22 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .search-input-wrap {
   position: relative;
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .search-input {
+  /* Prefer 220px but allow shrinking when the topbar runs out of room (e.g. the
+     assistant panel is docked), so the search doesn't pin the board stage open. */
+  flex: 0 1 220px;
   width: 220px;
+  min-width: 0;
   background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -393,6 +555,17 @@
   overflow: hidden;
 }
 
+/* Avatar used as a clickable button (e.g. board topbar → account settings). */
+.avatar--btn,
+.avatar--btn .avatar {
+  cursor: pointer;
+}
+.avatar--btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
 /* Base for the <UserAvatar> component: keeps the initial/preset glyph or image
    centered in a circle. Per-instance classes only override size/border/color. */
 .user-avatar {
@@ -417,6 +590,20 @@
   overflow-y: hidden;
   flex: 1;
   align-items: flex-start;
+  /* Without this, the default min-width:auto makes .board refuse to shrink below
+     the combined width of all columns — so when the assistant docks, the board
+     slides under the panel instead of compressing. min-width:0 lets it shrink,
+     and overflow-x:auto then scrolls the columns inside the narrower area. */
+  min-width: 0;
+}
+/* A horizontal flex scroll container collapses its trailing padding after the
+   last child in most browsers, so the "Add column" button ends up flush against
+   the container's right edge (and, with the assistant docked, right against the
+   panel). This zero-width spacer restores a real gap at the scroll end. */
+.board::after {
+  content: '';
+  flex: 0 0 8px;
+  align-self: stretch;
 }
 
 /* ── Column ── */
@@ -594,6 +781,7 @@
 }
 
 .card-star {
+  position: relative;
   background: none;
   border: none;
   cursor: pointer;
@@ -611,13 +799,54 @@
 
   &.active {
     opacity: 1;
-    color: #f59e0b;
+    /* bright turquoise pushed close to white, with a turquoise starlight glow */
+    color: #d6fff9;
+    text-shadow:
+      0 0 4px rgba(45, 212, 191, 0.9),
+      0 0 9px rgba(45, 212, 191, 0.55);
   }
 
   &:hover {
-    background: rgba(245, 158, 11, 0.12);
-    color: #f59e0b;
+    background: rgba(45, 212, 191, 0.14);
+    color: #d6fff9;
   }
+
+  /* keep the turquoise identity on hover when already starred */
+  &.active:hover {
+    background: rgba(45, 212, 191, 0.14);
+    color: #eafffb;
+  }
+}
+
+/* The glyph rolls clockwise like a star tumbling across the card. The roll lives
+   on this inner span so the button's hover background stays still. */
+.card-star-glyph {
+  display: inline-block;
+  transform-origin: 50% 50%;
+}
+.card-star.active .card-star-glyph {
+  animation: card-star-roll 1.8s linear infinite;
+}
+@keyframes card-star-roll {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-star.active .card-star-glyph { animation: none; }
+}
+
+/* Light board: dark star instead of the night-sky turquoise glow */
+.board-shell--day .card-star-glyph,
+.board-shell--day .card-star.active .card-star-glyph {
+  color: #18202e;
+  text-shadow: none;
+}
+.board-shell--day .card-star:hover .card-star-glyph,
+.board-shell--day .card-star.active:hover .card-star-glyph {
+  color: #18202e;
+  text-shadow:
+    0 0 2px rgba(24, 32, 46, 0.9),
+    0 0 4px rgba(24, 32, 46, 0.55);
 }
 
 .card-delete {
@@ -741,6 +970,12 @@
   color: var(--text-h);
   margin: 0 0 4px;
   line-height: 1.4;
+}
+
+.card-id {
+  color: var(--accent);
+  font-weight: 600;
+  opacity: 0.85;
 }
 
 .card-desc {
@@ -1035,10 +1270,40 @@ select.card-input {
   }
 }
 
-/* ── Auth page ── */
+/* ── Auth page ──
+   The login / register front door wears the dashboard's cosmic night sky: the
+   same Starfield canvas, a scoped silver-on-void palette (mirroring
+   .dashboard-shell) and smoked-glass panels floating over the stars. See the
+   "COSMIC AUTH" block near the end of this file for the theming + day mode. */
 .auth-shell {
+  --text: #868c9b;
+  --text-h: #e6e9f2;
+  --bg: #06070b;
+  --border: rgba(168, 178, 200, 0.10);
+  --code-bg: rgba(255, 255, 255, 0.035);
+  --accent: #828da3;
+  --accent-bg: rgba(130, 141, 163, 0.13);
+  --accent-border: rgba(130, 141, 163, 0.42);
+  --social-bg: rgba(255, 255, 255, 0.025);
+  --metal: #c7cedd;
+  --metal-deep: #8b94a3;
+  --star: #d8dde8;
+  color: var(--text);
+
+  position: relative;
+  overflow: hidden;
   min-height: 100svh;
   display: flex;
+
+  /* resolution scale */
+  --u: clamp(1px, 0.0625vw, 1.6px);
+  --s: tan(atan2(var(--u), 1px));
+
+  background-color: #06070b;
+  background-image:
+    radial-gradient(120% 80% at 50% -12%, #11141d 0%, transparent 58%),
+    radial-gradient(100% 70% at 84% 6%, rgba(28, 34, 48, 0.6) 0%, transparent 62%),
+    linear-gradient(180deg, #0a0c12 0%, #070809 56%, #040406 100%);
 }
 
 .auth-visual {
@@ -1046,109 +1311,81 @@ select.card-input {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 16px;
-  padding: 56px;
-  background: #0b0c10;
-  color: #f3f4f6;
+  gap: calc(14 * var(--u));
+  padding: calc(48 * var(--u)) calc(56 * var(--u));
+  color: var(--text-h);
   position: relative;
+  z-index: 1;
   overflow: hidden;
 }
 
 .auth-visual-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: calc(10 * var(--u));
+  margin-bottom: calc(6 * var(--u));
 }
 
 .auth-visual-heading {
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-family: var(--display);
+  /* keep the sub-reference vw shrink for small screens; scale up past it */
+  font-size: clamp(30px, 3.4vw, calc(40 * var(--u)));
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
   margin: 0;
-  max-width: 420px;
+  max-width: calc(430 * var(--u));
+  color: var(--text-h);
 }
 
 .auth-visual-sub {
-  font-size: 14px;
-  color: #a3a5b0;
-  max-width: 380px;
-  margin: 0 0 12px;
-  line-height: 1.5;
+  font-size: calc(14 * var(--u));
+  color: var(--text);
+  opacity: 0.82;
+  max-width: calc(390 * var(--u));
+  margin: 0;
+  line-height: 1.55;
 }
 
-.auth-mock-board {
-  display: flex;
-  gap: 14px;
-}
-
-.auth-mock-col {
-  flex: 1;
-  max-width: 150px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.auth-mock-col-title {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #8b8d98;
-}
-
-.auth-mock-card {
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 7px;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.auth-mock-card--active {
-  background: rgba(192, 132, 252, 0.16);
-  border: 1px solid rgba(192, 132, 252, 0.35);
-}
-
-.auth-mock-card--done {
-  opacity: 0.6;
-}
-
-.auth-mock-tag {
-  width: 22px;
-  height: 5px;
-  border-radius: 3px;
-  background: #c084fc;
-}
-
-.auth-mock-tag--alt {
-  background: #5eead4;
-}
-
-.auth-mock-line {
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.18);
-}
-
+/* The form is a full-height smoked-glass rail covering the right side of the
+   page — width and length — rather than a small floating card. */
 .auth-form-panel {
-  flex: 1;
+  /* the 560px cap scales with the viewport so the rail widens on big screens
+     instead of stranding the form in a fixed-width column */
+  flex: 0 0 clamp(400px, 42%, calc(560 * var(--u)));
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  background: var(--bg);
+  padding: calc(48 * var(--u));
+  position: relative;
+  z-index: 1;
+  /* translucent black glass + a slight 2px blur (matching the hero card) so the
+     background starfield + constellations read softly through the pane */
+  background: linear-gradient(180deg, rgba(16, 19, 27, 0.66) 0%, rgba(8, 10, 15, 0.54) 100%);
+  border-left: 1px solid rgba(168, 178, 200, 0.10);
+  box-shadow: -24px 0 60px -30px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(2px) saturate(115%);
+  -webkit-backdrop-filter: blur(2px) saturate(115%);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .auth-form-panel { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* the card is now just a centered content column inside the rail */
 .auth-card {
   width: 100%;
-  max-width: 380px;
+  max-width: calc(360 * var(--u));
+  box-sizing: border-box;
+}
+
+/* form inputs scale with the rail so they don't look stranded-small inside a
+   widened card on big monitors (auth-scoped so the shared .card-input used
+   elsewhere in the app is untouched) */
+.auth-card .card-input {
+  padding: calc(7 * var(--u)) calc(10 * var(--u));
+  font-size: calc(13 * var(--u));
+  border-radius: calc(6 * var(--u));
 }
 
 .auth-mobile-brand {
@@ -1163,6 +1400,13 @@ select.card-input {
     display: none;
   }
 
+  /* with the cosmic panel hidden, the form rail takes the whole screen */
+  .auth-form-panel {
+    flex: 1;
+    border-left: none;
+    box-shadow: none;
+  }
+
   .auth-mobile-brand {
     display: flex;
   }
@@ -1171,14 +1415,14 @@ select.card-input {
 .auth-tabs {
   display: flex;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 20px;
+  margin-bottom: calc(20 * var(--u));
 }
 
 .auth-tab {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  padding: 8px 16px;
+  padding: calc(8 * var(--u)) calc(16 * var(--u));
   font-size: 14px;
   font-weight: 500;
   color: var(--text);
@@ -1199,25 +1443,25 @@ select.card-input {
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: calc(8 * var(--u));
 }
 
 .auth-label {
-  font-size: 12px;
+  font-size: calc(12 * var(--u));
   font-weight: 500;
   color: var(--text);
-  margin-bottom: -2px;
+  margin-bottom: calc(-2 * var(--u));
 }
 
 .auth-submit {
-  margin-top: 8px;
+  margin-top: calc(8 * var(--u));
   width: 100%;
-  padding: 10px;
-  font-size: 14px;
+  padding: calc(10 * var(--u));
+  font-size: calc(14 * var(--u));
 }
 
 .auth-error {
-  font-size: 12px;
+  font-size: calc(12 * var(--u));
   color: #ef4444;
   margin: 0;
 }
@@ -1226,16 +1470,16 @@ select.card-input {
 .auth-oauth {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: calc(10 * var(--u));
 }
 
 .auth-divider {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 6px 0 2px;
+  gap: calc(12 * var(--u));
+  margin: calc(6 * var(--u)) 0 calc(2 * var(--u));
   color: var(--text-muted, #888);
-  font-size: 12px;
+  font-size: calc(12 * var(--u));
 }
 
 .auth-divider::before,
@@ -1250,14 +1494,14 @@ select.card-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: calc(10 * var(--u));
   width: 100%;
   /* border-box so the 1px border is counted *inside* width:100%, matching the
      inputs and the Log in button (which both use border-box) — otherwise the
      border pushes these 2px wider and they hang past the form edge */
   box-sizing: border-box;
-  padding: 10px;
-  font-size: 14px;
+  padding: calc(10 * var(--u));
+  font-size: calc(14 * var(--u));
   font-weight: 500;
   color: var(--text-h);
   background: var(--social-bg);
@@ -1413,6 +1657,12 @@ select.card-input {
   flex-direction: column;
   height: 100svh;
   overflow: hidden;
+  /* Gentle fluid scale — a lighter version of the auth page's --u. The dashboard
+     content is capped + centered (.dashboard-main), so on big monitors it would
+     otherwise sit as a narrow column with wide empty margins; this lets it grow
+     slightly to use more of the screen. Holds at 1x below ~2220px (laptops/1080p
+     unchanged) and tops out at a subtle 1.35x. Scalable sizes are calc(N*var(--u)). */
+  --u: clamp(1px, 0.045vw, 1.35px);
   /* astral atlas: a single sparse silvered star-dust layer. The pegboard grid
      was removed so the canvas starfield reads as the only texture — quieter sky */
   background-image:
@@ -1611,8 +1861,8 @@ select.card-input {
 
 .dashboard-main {
   flex: 1;
-  padding: 28px 40px 64px;
-  max-width: 1120px;
+  padding: calc(28 * var(--u)) calc(40 * var(--u)) calc(64 * var(--u));
+  max-width: calc(1120 * var(--u));
   width: 100%;
   margin: 0 auto;
 }
@@ -1625,37 +1875,39 @@ select.card-input {
 
 /* ── Hero ── */
 .dash-hero {
-  margin-bottom: 28px;
+  margin-bottom: calc(28 * var(--u));
 }
 
 .dash-hero-eyebrow {
-  font-size: 12px;
+  font-size: calc(12 * var(--u));
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
-  margin: 0 0 8px;
+  margin: 0 0 calc(8 * var(--u));
 }
 
 .dash-hero-greeting {
   font-family: var(--display);
-  font-weight: 700;
-  font-size: clamp(30px, 4.5vw, 46px);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  /* keep the small-screen vw shrink; scale the upper bound on big monitors */
+  font-size: clamp(31px, 4.7vw, calc(48 * var(--u)));
+  line-height: 1.0;
+  letter-spacing: -0.035em;
   color: var(--text-h);
-  margin: 0 0 10px;
+  margin: 0 0 calc(12 * var(--u));
 }
 
 .dash-hero-summary {
-  font-size: 15px;
+  font-size: calc(15 * var(--u));
   color: var(--text);
+  opacity: 0.74;
   margin: 0;
   max-width: 60ch;
 }
 
 .dashboard-section {
-  margin-bottom: 40px;
+  margin-bottom: calc(40 * var(--u));
 }
 
 .new-board-form {
@@ -1679,10 +1931,13 @@ select.card-input {
 
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
-  grid-auto-rows: 200px;
+  /* tiles stretch to fill each row so the grid spans the full content width
+     (matching the hero card above), while a generous min keeps each chart
+     compact and the track count responsive */
+  grid-template-columns: repeat(auto-fill, minmax(calc(210 * var(--u)), 1fr));
+  grid-auto-rows: calc(168 * var(--u));
   align-items: stretch;
-  gap: 18px;
+  gap: calc(24 * var(--u));
 }
 
 /* ── Board tile (the signature: each board as a tiny kanban) ── */
@@ -1694,7 +1949,7 @@ select.card-input {
   flex-direction: column;
   justify-content: flex-end;
   height: 100%;
-  padding: 16px;
+  padding: calc(16 * var(--u));
   border: none;
   border-radius: 16px;
   cursor: pointer;
@@ -1712,6 +1967,21 @@ select.card-input {
      so the hover transform still works once it has landed. */
   animation: tile-in 0.42s ease backwards;
   animation-delay: calc(min(var(--stagger, 0), 8) * 45ms);
+  /* Each tile's constellation runs infinite twinkle/sparkle animations with
+     drop-shadow/blur filters. Left unchecked, every tile keeps repainting those
+     filtered nodes every frame — even off-screen — so a large grid turns scroll
+     choppy. `content-visibility: auto` lets the browser skip rendering (layout,
+     paint, AND the running animations) for tiles outside the viewport; the
+     intrinsic size keeps the scroll height stable so nothing jumps. */
+  content-visibility: auto;
+  contain-intrinsic-size: calc(210 * var(--u)) calc(168 * var(--u));
+}
+
+/* content-visibility: auto implies paint containment, which would clip the
+   gear/settings popover (it overflows above the tile). Lift it for the one tile
+   whose menu is open — it's on-screen and cheap, so skipping is moot there. */
+.board-tile--menu-open {
+  content-visibility: visible;
 }
 
 @keyframes tile-in {
@@ -1769,6 +2039,21 @@ select.card-input {
     zodiac-twinkle 3.2s ease-in-out infinite,
     zodiac-sparkle 8s ease-in-out infinite;
 }
+
+/* soft blurred aura behind each node — turns the flat dots into shining stars */
+.board-tile-zodiac-halo {
+  fill: color-mix(in srgb, var(--tile) 55%, #cfe0ff);
+  opacity: 0.5;
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: blur(2.4px);
+  animation: zodiac-halo-breathe 3.2s ease-in-out infinite;
+}
+/* opacity-only so the static blur isn't re-rasterised every frame */
+@keyframes zodiac-halo-breathe {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.68; }
+}
 @keyframes zodiac-twinkle {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
@@ -1791,6 +2076,7 @@ select.card-input {
 @media (prefers-reduced-motion: reduce) {
   .board-tile-zodiac-star { animation: none; opacity: 0.8; }
   .board-tile-zodiac-line { animation: none; }
+  .board-tile-zodiac-halo { animation: none; opacity: 0.5; }
 }
 
 /* heraldic rule: a thin inset platinum frame, like the chased border of a
@@ -1934,7 +2220,7 @@ select.card-input {
 .board-tile-title {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 14px;
+  font-size: calc(14 * var(--u));
   line-height: 1.2;
   letter-spacing: -0.01em;
   color: #fff;
@@ -1993,10 +2279,16 @@ select.card-input {
   font-weight: 700;
   font-size: 24px;
   line-height: 1;
-  /* resting glow — also the value reduced-motion users keep */
+  /* pulse/colorwave tint — the accent by default; day mode recolours it */
+  --summon-glow: var(--accent);
+  /* a soft ambient light source: a glowing core inside the ring … */
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--summon-glow) 24%, transparent) 0%,
+    transparent 70%);
+  /* … and a wide breathing halo (resting value reduced-motion users keep) */
   box-shadow:
-    0 0 14px -2px color-mix(in srgb, var(--accent) 50%, transparent),
-    inset 0 0 10px -4px color-mix(in srgb, var(--accent) 38%, transparent);
+    0 0 20px 0 color-mix(in srgb, var(--summon-glow) 45%, transparent),
+    inset 0 0 12px -3px color-mix(in srgb, var(--summon-glow) 40%, transparent);
   transition: border-color 0.22s ease;
   animation: summon-pulse 3.2s ease-in-out infinite;
 }
@@ -2028,22 +2320,22 @@ select.card-input {
   0% {
     transform: translate(0, 0) rotate(0deg) scale(1);
     box-shadow:
-      0 0 13px -3px color-mix(in srgb, var(--accent) 45%, transparent),
-      inset 0 0 10px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+      0 0 18px -2px color-mix(in srgb, var(--summon-glow) 42%, transparent),
+      inset 0 0 12px -4px color-mix(in srgb, var(--summon-glow) 35%, transparent);
   }
   25% { transform: translate(-2.5px, -1.5px) rotate(-5deg) scale(1.04); }
   50% {
     transform: translate(2.5px, 1.5px) rotate(5deg) scale(1.07);
     box-shadow:
-      0 0 26px 1px color-mix(in srgb, var(--accent) 70%, transparent),
-      inset 0 0 15px -3px color-mix(in srgb, var(--accent) 55%, transparent);
+      0 0 40px 4px color-mix(in srgb, var(--summon-glow) 65%, transparent),
+      inset 0 0 16px -3px color-mix(in srgb, var(--summon-glow) 55%, transparent);
   }
   75% { transform: translate(-1.5px, 2px) rotate(-3deg) scale(1.03); }
   100% {
     transform: translate(0, 0) rotate(0deg) scale(1);
     box-shadow:
-      0 0 13px -3px color-mix(in srgb, var(--accent) 45%, transparent),
-      inset 0 0 10px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+      0 0 13px -3px color-mix(in srgb, var(--summon-glow) 45%, transparent),
+      inset 0 0 10px -4px color-mix(in srgb, var(--summon-glow) 35%, transparent);
   }
 }
 
@@ -2375,22 +2667,22 @@ select.card-input {
   color: var(--text);
 }
 
-/* ── Settings in daylight (mirrors the dashboard's solar theme) ── */
+/* ── Settings in daylight (mirrors the dashboard's celestial theme) ── */
 .settings-shell--day {
-  --text: #6f5a3a;
-  --text-h: #2b2012;
-  --border: rgba(150, 110, 50, 0.24);
-  --code-bg: rgba(255, 224, 170, 0.4);
-  --bg: #f3ead6;
-  --metal: #c69a4e;
-  --metal-deep: #9a7327;
-  --social-bg: rgba(255, 210, 140, 0.18);
-  background-color: #e6d4ac;
+  --text: #4a586e;
+  --text-h: #18202e;
+  --border: rgba(74, 104, 154, 0.24);
+  --code-bg: rgba(210, 226, 244, 0.45);
+  --bg: #eef4fb;
+  --metal: #9fb4d6;
+  --metal-deep: #6f88af;
+  --social-bg: rgba(210, 226, 244, 0.4);
+  background-color: #dbe7f5;
   color: var(--text);
 }
 .settings-shell--day .settings-section {
-  background: linear-gradient(135deg, rgba(252, 244, 226, 0.62) 0%, rgba(243, 229, 200, 0.44) 100%);
-  box-shadow: 0 8px 30px rgba(120, 88, 32, 0.16);
+  background: linear-gradient(135deg, rgba(252, 254, 255, 0.64) 0%, rgba(226, 237, 249, 0.46) 100%);
+  box-shadow: 0 8px 30px rgba(50, 84, 140, 0.16);
 }
 
 /* accent aurora glow anchored top-left, mirroring the dashboard hero */
@@ -2638,6 +2930,97 @@ select.card-input {
   color: var(--text);
   margin: 8px 0 0;
 }
+
+/* Save / discard bar for the staged avatar edits */
+.settings-avatar-savebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.settings-avatar-dirty-note {
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+/* Unsaved-changes prompt — a compact glass panel mirroring .settings-section */
+.settings-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 8, 14, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: settings-confirm-fade 0.16s ease-out;
+}
+
+.settings-confirm-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 26px 28px;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(28, 32, 42, 0.85) 0%, rgba(12, 14, 20, 0.78) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  animation: settings-confirm-pop 0.18s ease-out;
+}
+
+.settings-shell--day .settings-confirm-card {
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+  background: linear-gradient(135deg, rgba(252, 254, 255, 0.94) 0%, rgba(226, 237, 249, 0.88) 100%);
+  box-shadow: 0 20px 60px rgba(50, 84, 140, 0.28);
+}
+
+.settings-confirm-title {
+  font-family: var(--fantasy);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-h);
+  margin: 0 0 8px;
+}
+
+.settings-confirm-text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+  margin: 0 0 22px;
+}
+
+.settings-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.settings-confirm-actions .btn-primary {
+  flex: 1;
+}
+
+@keyframes settings-confirm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes settings-confirm-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-confirm-overlay,
+  .settings-confirm-card { animation: none; }
+}
+
+.force-reduced-motion .settings-confirm-overlay,
+.force-reduced-motion .settings-confirm-card { animation: none; }
 
 /* Security form */
 .settings-form {
@@ -3191,7 +3574,12 @@ select.card-input {
   position: fixed;
   inset: 0;
   z-index: 99;
+  transition: right 0.28s ease;
 }
+/* When the assistant panel is docked open, keep the Members/Design overlay (and
+   its right-pinned panel) within the board area instead of spilling under the
+   assistant. */
+.app-shell.ai-open .board-members-overlay { right: var(--ai-panel-w); }
 
 .members-panel-header {
   display: flex;
@@ -3242,16 +3630,67 @@ select.card-input {
   flex-shrink: 0;
 }
 
+/* member presence dot — anchored to the avatar's bottom-right corner, mirroring
+   the sidebar profile status. Active members glow accent + pulse; inactive ones
+   are a flat grey. is_active is heartbeat-driven (see the board members API). */
+.member-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.member-status {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--bg); /* "cut-out" ring matching the panel behind it */
+  box-sizing: border-box;
+}
+/* presence is a fixed traffic-light signal, deliberately independent of the
+   user's accent theme: green = active, grey = offline */
+.member-status--active {
+  background: #22c55e;
+  box-shadow: 0 0 6px color-mix(in srgb, #22c55e 70%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .member-status--active { animation: member-status-pulse 2.6s ease-in-out infinite; }
+}
+/* green "alive" pulse — a soft ring that expands + fades (mirrors the sidebar
+   pulse but pinned to the presence green rather than --accent) */
+@keyframes member-status-pulse {
+  0%, 100% {
+    box-shadow: 0 0 6px color-mix(in srgb, #22c55e 70%, transparent),
+                0 0 0 0 color-mix(in srgb, #22c55e 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 6px color-mix(in srgb, #22c55e 70%, transparent),
+                0 0 0 5px transparent;
+  }
+}
+.member-status--inactive {
+  background: #6b7280; /* muted grey — offline */
+}
+
 .member-name {
   font-size: 13px;
   color: var(--text-h);
-  flex: 1;
+}
+
+.member-owner-crown {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-left: -2px;
+  filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.5));
 }
 
 .member-remove {
   background: none;
   border: none;
   cursor: pointer;
+  margin-left: auto;
   color: var(--text);
   font-size: 12px;
   padding: 2px 4px;
@@ -3333,6 +3772,13 @@ select.card-input {
 .members-toggle {
   font-size: 13px;
   padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  & .btn-glyph { flex: none; opacity: 0.85; }
+  &.active .btn-glyph,
+  &:hover .btn-glyph { opacity: 1; }
 
   &.active {
     background: var(--accent-bg);
@@ -4056,7 +4502,7 @@ select.card-input {
   color: #ef4444;
 }
 
-/* ── Guild layout: sidebar + main ── */
+/* ── Team layout: sidebar + main ── */
 .dash-layout {
   display: flex;
   flex: 1;
@@ -4105,9 +4551,9 @@ select.card-input {
 
 /* ── Sidebar ── */
 .dash-sidebar {
-  width: 216px;
+  width: calc(230 * var(--u));
   flex-shrink: 0;
-  padding: 16px 10px 24px;
+  padding: calc(16 * var(--u)) calc(10 * var(--u)) calc(24 * var(--u));
   border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   border-radius: 18px;
   background: color-mix(in srgb, var(--bg) 62%, transparent);
@@ -4126,26 +4572,26 @@ select.card-input {
 
 .sidebar-section-label {
   font-family: var(--fantasy);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
+  font-size: calc(10 * var(--u));
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-muted, #888);
-  padding: 14px 10px 4px;
+  padding: calc(22 * var(--u)) calc(12 * var(--u)) calc(8 * var(--u));
   margin: 0;
 }
 
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: calc(10 * var(--u));
   width: 100%;
-  padding: 8px 10px;
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
   border-radius: 8px;
   border: none;
   background: none;
   cursor: pointer;
   color: var(--text);
-  font-size: 13.5px;
+  font-size: calc(13.5 * var(--u));
   font-weight: 500;
   font-family: var(--sans);
   text-align: left;
@@ -4179,7 +4625,7 @@ select.card-input {
 }
 
 .sidebar-item-icon {
-  font-size: 14px;
+  font-size: calc(14 * var(--u));
   opacity: 0.7;
   flex-shrink: 0;
 }
@@ -4200,7 +4646,7 @@ select.card-input {
   color: var(--text-h);
 }
 
-.sidebar-guild-icon {
+.sidebar-team-icon {
   flex-shrink: 0;
 }
 
@@ -4227,8 +4673,8 @@ select.card-input {
   color: var(--accent);
 }
 
-/* ── Guild Icon ── */
-.guild-icon {
+/* ── Team Icon ── */
+.team-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4237,8 +4683,8 @@ select.card-input {
   border-radius: 7px;
   background: linear-gradient(
     145deg,
-    color-mix(in srgb, var(--guild-color, var(--accent)) 68%, #fff),
-    var(--guild-color, var(--accent))
+    color-mix(in srgb, var(--team-color, var(--accent)) 68%, #fff),
+    var(--team-color, var(--accent))
   );
   color: #fff;
   font-family: var(--fantasy);
@@ -4249,43 +4695,43 @@ select.card-input {
   line-height: 1;
   user-select: none;
   box-shadow:
-    0 2px 8px -2px color-mix(in srgb, var(--guild-color, var(--accent)) 65%, transparent),
+    0 2px 8px -2px color-mix(in srgb, var(--team-color, var(--accent)) 65%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.guild-icon--md {
+.team-icon--md {
   width: 36px;
   height: 36px;
   font-size: 17px;
   border-radius: 9px;
 }
 
-.guild-icon--lg {
+.team-icon--lg {
   width: 48px;
   height: 48px;
   font-size: 22px;
   border-radius: 12px;
 }
 
-/* ── Guild context header (shown above guild boards) ── */
-.guild-context-header {
+/* ── Team context header (shown above team boards) ── */
+.team-context-header {
   display: flex;
   align-items: center;
   gap: 14px;
   margin-bottom: 24px;
   padding: 16px 18px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--guild-color, var(--accent)) 7%, var(--code-bg));
-  border: 1px solid color-mix(in srgb, var(--guild-color, var(--accent)) 22%, var(--border));
-  box-shadow: 0 4px 20px -8px color-mix(in srgb, var(--guild-color, var(--accent)) 35%, transparent);
+  background: color-mix(in srgb, var(--team-color, var(--accent)) 7%, var(--code-bg));
+  border: 1px solid color-mix(in srgb, var(--team-color, var(--accent)) 22%, var(--border));
+  box-shadow: 0 4px 20px -8px color-mix(in srgb, var(--team-color, var(--accent)) 35%, transparent);
 }
 
-.guild-context-info {
+.team-context-info {
   flex: 1;
   min-width: 0;
 }
 
-.guild-context-name {
+.team-context-name {
   font-family: var(--fantasy);
   font-size: 20px;
   font-weight: 700;
@@ -4295,7 +4741,7 @@ select.card-input {
   line-height: 1.1;
 }
 
-.guild-context-meta {
+.team-context-meta {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -4303,12 +4749,12 @@ select.card-input {
   color: var(--text);
 }
 
-.guild-context-actions {
+.team-context-actions {
   margin-left: auto;
 }
 
-/* ── Guild chip on board tiles ── */
-.board-tile-guild-chip {
+/* ── Team chip on board tiles ── */
+.board-tile-team-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -4322,7 +4768,7 @@ select.card-input {
   line-height: 1;
 }
 
-.board-tile-guild-chip::before {
+.board-tile-team-chip::before {
   content: '';
   display: inline-block;
   width: 7px;
@@ -4332,78 +4778,100 @@ select.card-input {
   flex-shrink: 0;
 }
 
-/* ── Create Alliance modal ── */
-.guild-modal {
-  max-width: 420px;
+/* ── Create Team modal ── */
+/* ── Team modals: compact, auto-fit, clean minimal ── */
+.team-modal,
+.team-settings-modal,
+.team-invite-modal {
+  height: auto;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
 }
 
-.guild-modal-title {
-  font-family: var(--fantasy);
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+.team-modal {
+  max-width: 400px;
+}
+
+/* Stop team forms inheriting the card-modal's row/stretch body */
+.team-modal .card-modal-body,
+.team-invite-modal .card-modal-body {
+  display: block;
+  flex: none;
+  padding: 16px 24px 24px;
+}
+
+.team-modal .card-modal-header,
+.team-invite-modal .card-modal-header {
+  padding: 22px 24px 0;
+}
+
+.team-modal-title {
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   color: var(--text-h);
   margin: 0;
 }
 
-.guild-modal-form {
+.team-modal-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
-.guild-field-label {
+.team-field-label {
   display: block;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text);
-  margin-bottom: 6px;
+  opacity: 0.7;
+  margin-bottom: 8px;
 }
 
-.guild-modal-actions {
+.team-modal-actions {
   display: flex;
   gap: 8px;
-  padding-top: 2px;
+  padding-top: 4px;
 }
 
-/* ── Guild color picker (create + settings) ── */
-.guild-color-picker {
+.team-modal-actions .btn-primary {
+  flex: 1;
+}
+
+/* ── Team color picker (create + settings) ── */
+.team-color-picker {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.guild-color-swatch {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--swatch) 68%, #fff),
-    var(--swatch)
-  );
-  border: 2px solid transparent;
+.team-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--swatch);
+  border: none;
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.12s;
   outline: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
-.guild-color-swatch:hover {
-  transform: scale(1.12);
+.team-color-swatch:hover {
+  transform: scale(1.1);
 }
 
-.guild-color-swatch.active {
+.team-color-swatch.active {
   box-shadow:
     0 0 0 2px var(--bg),
-    0 0 0 4px color-mix(in srgb, var(--swatch) 70%, var(--accent)),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    0 0 0 4px var(--swatch);
 }
 
-/* ── Guild preview chip inside create modal ── */
-.guild-preview {
+/* ── Team preview chip inside create modal ── */
+.team-preview {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -4413,40 +4881,40 @@ select.card-input {
   border: 1px solid var(--border);
 }
 
-.guild-preview-name {
-  font-family: var(--fantasy);
-  font-size: 15px;
+.team-preview-name {
+  font-family: var(--sans);
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: -0.01em;
   color: var(--text-h);
 }
 
-/* ── Guild settings modal ── */
-.guild-settings-modal {
-  max-width: 480px;
+/* ── Team settings modal ── */
+.team-settings-modal {
+  max-width: 440px;
 }
 
-.guild-settings-header {
+.team-settings-header {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 24px 24px 0;
+  padding: 22px 24px 0;
 }
 
-.guild-settings-sub {
+.team-settings-sub {
   font-size: 13px;
   color: var(--text);
   margin: 3px 0 0;
 }
 
-.guild-settings-tabs {
+.team-settings-tabs {
   display: flex;
   padding: 12px 24px 0;
   border-bottom: 1px solid var(--border);
   margin-top: 4px;
 }
 
-.guild-settings-tab {
+.team-settings-tab {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -4460,41 +4928,41 @@ select.card-input {
   margin-bottom: -1px;
 }
 
-.guild-settings-tab.active {
+.team-settings-tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
   font-weight: 600;
 }
 
-.guild-settings-tab:hover:not(.active) {
+.team-settings-tab:hover:not(.active) {
   color: var(--text-h);
 }
 
-.guild-settings-body {
+.team-settings-body {
   padding: 18px 24px 24px;
 }
 
-/* ── Guild add member form ── */
-.guild-add-form {
+/* ── Team add member form ── */
+.team-add-form {
   display: flex;
   gap: 6px;
   margin-bottom: 14px;
 }
 
-.guild-add-input {
+.team-add-input {
   flex: 1;
   font-size: 13px;
   padding: 7px 10px;
 }
 
-.guild-add-form .btn-primary {
+.team-add-form .btn-primary {
   padding: 7px 14px;
   font-size: 13px;
   white-space: nowrap;
 }
 
-/* ── Guild member list ── */
-.guild-member-list {
+/* ── Team member list ── */
+.team-member-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -4503,7 +4971,7 @@ select.card-input {
   gap: 2px;
 }
 
-.guild-member-item {
+.team-member-item {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4512,18 +4980,18 @@ select.card-input {
   transition: background 0.12s;
 }
 
-.guild-member-item:hover {
+.team-member-item:hover {
   background: var(--code-bg);
 }
 
-.guild-member-avatar {
+.team-member-avatar {
   width: 32px !important;
   height: 32px !important;
   font-size: 13px !important;
   flex-shrink: 0;
 }
 
-.guild-member-name {
+.team-member-name {
   flex: 1;
   font-size: 13.5px;
   color: var(--text-h);
@@ -4534,7 +5002,7 @@ select.card-input {
   white-space: nowrap;
 }
 
-.guild-member-role {
+.team-member-role {
   font-size: 10.5px;
   font-weight: 700;
   font-family: var(--fantasy);
@@ -4545,7 +5013,7 @@ select.card-input {
   border-radius: 10px;
 }
 
-.guild-member-remove {
+.team-member-remove {
   background: none;
   border: none;
   cursor: pointer;
@@ -4557,31 +5025,31 @@ select.card-input {
   transition: color 0.12s, background 0.12s;
 }
 
-.guild-member-remove:hover {
+.team-member-remove:hover {
   color: var(--ember, #e2552b);
   background: rgba(239, 68, 68, 0.08);
 }
 
-/* ── Guild settings form ── */
-.guild-settings-form {
+/* ── Team settings form ── */
+.team-settings-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.guild-settings-divider {
+.team-settings-divider {
   height: 1px;
   background: var(--border);
   margin: 2px 0;
 }
 
-.guild-settings-confirm {
+.team-settings-confirm {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.guild-settings-confirm p {
+.team-settings-confirm p {
   font-size: 13px;
   color: var(--text);
   margin: 0;
@@ -4974,19 +5442,19 @@ select.card-input {
   }
 }
 
-/* ── Sidebar guild row with invite button ── */
-.sidebar-guild-row {
+/* ── Sidebar team row with invite button ── */
+.sidebar-team-row {
   display: flex;
   align-items: center;
   gap: 2px;
 }
 
-.sidebar-guild-row .sidebar-item--guild {
+.sidebar-team-row .sidebar-item--team {
   flex: 1;
   min-width: 0;
 }
 
-.sidebar-guild-invite-btn {
+.sidebar-team-invite-btn {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
@@ -5002,16 +5470,16 @@ select.card-input {
   transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
 
-.sidebar-guild-row:hover .sidebar-guild-invite-btn {
+.sidebar-team-row:hover .sidebar-team-invite-btn {
   opacity: 1;
 }
 
-.sidebar-guild-invite-btn:hover {
+.sidebar-team-invite-btn:hover {
   background: rgba(170, 59, 255, 0.14);
   color: var(--accent);
 }
 
-.sidebar-guild-manage-btn {
+.sidebar-team-manage-btn {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
@@ -5027,17 +5495,17 @@ select.card-input {
   transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
 
-.sidebar-guild-row:hover .sidebar-guild-manage-btn {
+.sidebar-team-row:hover .sidebar-team-manage-btn {
   opacity: 1;
 }
 
-.sidebar-guild-manage-btn:hover {
+.sidebar-team-manage-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-h);
 }
 
-/* ── Guild context header invite button ── */
-.guild-context-members {
+/* ── Team context header invite button ── */
+.team-context-members {
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -5045,7 +5513,7 @@ select.card-input {
   margin-left: auto;
 }
 
-.guild-context-avatar {
+.team-context-avatar {
   width: 30px;
   height: 30px;
   margin-left: -9px;
@@ -5056,8 +5524,8 @@ select.card-input {
   font-size: 12px;
   font-weight: 700;
   color: #fff;
-  background: color-mix(in srgb, var(--guild-color, var(--accent)) 30%, #1e1b2e);
-  border: 2px solid color-mix(in srgb, var(--guild-color, var(--accent)) 20%, var(--bg));
+  background: color-mix(in srgb, var(--team-color, var(--accent)) 30%, #1e1b2e);
+  border: 2px solid color-mix(in srgb, var(--team-color, var(--accent)) 20%, var(--bg));
   box-shadow: 0 1px 4px rgba(0,0,0,0.35);
   text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   user-select: none;
@@ -5070,29 +5538,29 @@ select.card-input {
   }
 }
 
-.guild-context-avatar--more {
+.team-context-avatar--more {
   background: rgba(0, 0, 0, 0.4);
   border-color: var(--border);
   font-size: 10px;
   color: var(--text);
 }
 
-.guild-context-actions {
+.team-context-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-left: 12px;
 }
 
-.guild-invite-trigger-btn {
+.team-invite-trigger-btn {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--guild-color, var(--accent)) 40%, transparent);
-  background: color-mix(in srgb, var(--guild-color, var(--accent)) 10%, transparent);
-  color: var(--guild-color, var(--accent));
+  border: 1px solid color-mix(in srgb, var(--team-color, var(--accent)) 40%, transparent);
+  background: color-mix(in srgb, var(--team-color, var(--accent)) 10%, transparent);
+  color: var(--team-color, var(--accent));
   font-size: 12.5px;
   font-weight: 600;
   font-family: var(--sans);
@@ -5100,26 +5568,30 @@ select.card-input {
   transition: background 0.15s, border-color 0.15s;
 
   &:hover {
-    background: color-mix(in srgb, var(--guild-color, var(--accent)) 18%, transparent);
-    border-color: var(--guild-color, var(--accent));
+    background: color-mix(in srgb, var(--team-color, var(--accent)) 18%, transparent);
+    border-color: var(--team-color, var(--accent));
   }
 }
 
-/* ── Guild invite modal ── */
-.guild-invite-desc {
+/* ── Team invite modal ── */
+.team-invite-modal {
+  max-width: 380px;
+}
+
+.team-invite-desc {
   font-size: 13.5px;
   color: var(--text);
   margin: 0 0 16px;
   line-height: 1.5;
 }
 
-.guild-invite-form {
+.team-invite-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.guild-invite-sent {
+.team-invite-sent {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5128,7 +5600,7 @@ select.card-input {
   text-align: center;
 }
 
-.guild-invite-sent-icon {
+.team-invite-sent-icon {
   font-size: 28px;
   color: var(--accent);
   display: block;
@@ -5140,14 +5612,15 @@ select.card-input {
   50%       { text-shadow: 0 0 20px var(--accent); opacity: 0.8; }
 }
 
-.guild-invite-sent-text {
-  font-family: var(--fantasy);
-  font-size: 18px;
+.team-invite-sent-text {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 650;
   color: var(--text-h);
-  letter-spacing: 0.04em;
+  letter-spacing: -0.01em;
 }
 
-.guild-invite-sent-sub {
+.team-invite-sent-sub {
   font-size: 13px;
   color: var(--text);
   opacity: 0.65;
@@ -5159,7 +5632,7 @@ select.card-input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 32px;
+  gap: calc(32 * var(--u));
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.045) 0%,
@@ -5167,8 +5640,8 @@ select.card-input {
   );
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
-  padding: 40px 44px;
-  margin-bottom: 44px;
+  padding: calc(40 * var(--u)) calc(44 * var(--u));
+  margin-bottom: calc(44 * var(--u));
   position: relative;
   overflow: hidden;
 }
@@ -5204,43 +5677,50 @@ select.card-input {
 .dhc-star { fill: currentColor; opacity: 0.92; }
 .dhc-star--lg {
   opacity: 1;
-  filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 80%, transparent));
+  /* a constant two-layer glow; the twinkle below breathes this via opacity */
+  filter: drop-shadow(0 0 5px color-mix(in srgb, currentColor 85%, transparent))
+          drop-shadow(0 0 12px color-mix(in srgb, currentColor 42%, transparent));
 }
 
 .dhc-dot { fill: currentColor; opacity: 0.78; }
 
-@media (prefers-reduced-motion: no-preference) {
-  .dhc-star--lg { animation: dhc-twinkle 7s ease-in-out infinite; }
+/* diamond stars scattered across the hero banner (small & medium) for depth */
+.hero-card-star {
+  position: absolute;
+  color: var(--star, #d8dfe9);
+  fill: currentColor;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 1;
 }
-/* bright at rest; the glow gradually spreads out, then eases back in.
-   Every stop keeps exactly two drop-shadow() functions so the filter list
-   interpolates continuously (mismatched counts would snap instead). */
+.hero-card-star--md {
+  width: 20px;
+  height: 20px;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 65%, transparent));
+}
+.hero-card-star--lg {
+  width: 26px;
+  height: 26px;
+  opacity: 0.88;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, currentColor 65%, transparent));
+}
+.hero-card-star--sm {
+  width: 12px;
+  height: 12px;
+  opacity: 0.6;
+}
+.dashboard-shell--day .hero-card-star { color: #181c24; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .dhc-star--lg { animation: dhc-twinkle 6s ease-in-out infinite; will-change: opacity; }
+}
+/* a smooth, continuous glow breathe: the star keeps its constant drop-shadow
+   glow (above) and we pulse only its opacity — which the compositor handles, so
+   it eases in and out continuously instead of stepping through filter frames. */
 @keyframes dhc-twinkle {
-  0%, 50%, 100% {
-    opacity: 1;
-    filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 80%, transparent))
-            drop-shadow(0 0 0 transparent);
-  }
-  62% {
-    filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 88%, transparent))
-            drop-shadow(0 0 9px color-mix(in srgb, currentColor 35%, transparent));
-  }
-  72% {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 95%, transparent))
-            drop-shadow(0 0 14px color-mix(in srgb, currentColor 55%, transparent));
-  }
-  80% {
-    filter: drop-shadow(0 0 9px color-mix(in srgb, currentColor 100%, transparent))
-            drop-shadow(0 0 18px color-mix(in srgb, currentColor 70%, transparent));
-  }
-  88% {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 95%, transparent))
-            drop-shadow(0 0 14px color-mix(in srgb, currentColor 55%, transparent));
-  }
-  94% {
-    filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 88%, transparent))
-            drop-shadow(0 0 9px color-mix(in srgb, currentColor 35%, transparent));
-  }
+  0%, 100% { opacity: 0.9; }
+  50%      { opacity: 1; }
 }
 
 .dash-hero-card::before {
@@ -5337,9 +5817,12 @@ select.card-input {
 }
 .cosmic-activity-icon svg { width: 15px; height: 15px; }
 .cosmic-activity-icon--board { color: #d8b65a; background: rgba(216, 182, 90, 0.14); }
-.cosmic-activity-icon--guild { color: #6fb1ff; background: rgba(111, 177, 255, 0.14); }
+.cosmic-activity-icon--team { color: #6fb1ff; background: rgba(111, 177, 255, 0.14); }
 /* board deletions read in a danger hue, overriding the gold board tint above */
 .cosmic-activity-icon--deleted { color: #ff7a7a; background: rgba(255, 122, 122, 0.14); }
+/* card adds vs moves each get their own hue so the action reads at a glance */
+.cosmic-activity-icon--created { color: #5fd6a2; background: rgba(95, 214, 162, 0.15); }
+.cosmic-activity-icon--moved   { color: #56c2e8; background: rgba(86, 194, 232, 0.15); }
 
 .cosmic-activity-text {
   flex: 1;
@@ -5639,10 +6122,10 @@ select.card-input {
 }
 
 /* daylight tweaks for the log surfaces */
-.dashboard-shell--day .streak-milestone-bar { background: rgba(120, 80, 20, 0.14); }
+.dashboard-shell--day .streak-milestone-bar { background: rgba(50, 84, 140, 0.14); }
 .dashboard-shell--day .voyager-stat {
-  background: rgba(255, 250, 236, 0.6);
-  border: 1px solid rgba(170, 130, 60, 0.26);
+  background: rgba(250, 253, 255, 0.62);
+  border: 1px solid rgba(110, 145, 200, 0.28);
 }
 @media (prefers-reduced-motion: reduce) {
   .streak-flame svg { animation: none; }
@@ -5741,11 +6224,11 @@ select.card-input {
 .sidebar-profile {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 14px;
-  margin: 0 0 10px;
+  border-radius: 18px;
+  padding: 20px 18px;
+  margin: 4px 4px 18px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
   outline: none;
   display: flex;
   flex-direction: column;
@@ -5753,30 +6236,116 @@ select.card-input {
 
   &:hover, &:focus-visible {
     background: rgba(255, 255, 255, 0.07);
+    transform: translateY(-1px);
   }
 }
 
 .sidebar-profile-avatar {
-  width: 44px !important;
-  height: 44px !important;
-  font-size: 18px !important;
+  width: 54px !important;
+  height: 54px !important;
+  font-size: 22px !important;
   border-radius: 50% !important;
   border: 2px solid var(--accent) !important;
+  box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--accent) 55%, transparent);
   flex-shrink: 0;
 }
 
-.sidebar-profile-info {
+/* avatar + name share the top row, the name centred to the right of the orb */
+.sidebar-profile-top {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-top: 10px;
+  align-items: center;
+  gap: 12px;
+}
+
+/* avatar wrapper anchors the live status dot to the orb's bottom-right edge */
+.sidebar-profile-av {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.sidebar-profile-status {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2.5px solid var(--bg); /* "cut-out" ring matching the card behind it */
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar-profile-status { animation: profile-status-pulse 2.6s ease-in-out infinite; }
+}
+/* a soft accent ring that expands + fades out — the "alive" pulse */
+@keyframes profile-status-pulse {
+  0%, 100% {
+    box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent),
+                0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 70%, transparent),
+                0 0 0 5px transparent;
+  }
 }
 
 .sidebar-profile-username {
-  font-size: 14px;
+  font-family: var(--display); /* Bricolage Grotesque — match the Hero greeting */
+  font-size: 16px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-h);
+  min-width: 0; /* allow long names to truncate instead of overflowing the rail */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.sidebar-profile-rank {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--fantasy);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.9;
+  margin-top: 12px; /* sit just below the avatar + name row */
+}
+/* twinkling diamond leading the rank — ties it to the page's star motif */
+.sidebar-profile-spark {
+  flex-shrink: 0;
+  fill: var(--accent);
+  transform-origin: center;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 55%, transparent));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar-profile-spark { animation: profile-spark-twinkle 5s ease-in-out infinite; }
+}
+@keyframes profile-spark-twinkle {
+  0%, 100% { opacity: 0.55; transform: scale(0.82); }
+  50%      { opacity: 1;    transform: scale(1.05); }
+}
+
+/* secondary lines stacked under the rank: location, then date, each led by an
+   accent line-icon to match the rest of the sidebar's iconography */
+.sidebar-profile-location,
+.sidebar-profile-date {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+}
+.sidebar-profile-ic {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.sidebar-profile-location { margin-top: 8px; }
+.sidebar-profile-date { margin-top: 4px; }
 
 
 /* ── Sidebar footer (Settings + Log Out) ── */
@@ -5846,7 +6415,7 @@ select.card-input {
   align-items: center;
   gap: 10px;
   font-family: var(--display);
-  font-size: 18px;
+  font-size: calc(18 * var(--u));
   font-weight: 700;
   color: var(--text-h);
   margin: 0;
@@ -5982,7 +6551,8 @@ select.card-input {
 .dash-hero-cta {
   color: var(--text-h);
   font-style: italic;
-  opacity: 0.9;
+  font-weight: 600;
+  opacity: 1; /* sits at full strength against the muted summary for hierarchy */
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -6163,8 +6733,8 @@ select.card-input {
 .dash-hero-art {
   position: relative;
   flex: 0 0 auto;
-  width: 196px;
-  height: 196px;
+  width: calc(196 * var(--u));
+  height: calc(196 * var(--u));
   align-self: center;
   margin-right: -8px;
   pointer-events: none;
@@ -6205,10 +6775,10 @@ select.card-input {
   stroke-width: 1.4;
 }
 .hero-ring--back { opacity: 0.45; }
-.hero-band {
+.hero-band-light {
   fill: none;
-  stroke: rgba(54, 60, 74, 0.55);
-  stroke-width: 1;
+  stroke: url(#heroBandLight);
+  stroke-width: 1.1;
   stroke-linecap: round;
 }
 .hero-spark { fill: rgba(232, 237, 246, 0.85); }
@@ -6243,6 +6813,10 @@ select.card-input {
   .hero-spark      { animation: hero-twinkle 3.4s ease-in-out infinite; }
   .hero-spark--2   { animation-delay: 1.1s; }
   .hero-spark--3   { animation-delay: 2.2s; }
+  .hero-star       { animation: hero-star-twinkle 4.6s ease-in-out infinite; }
+  .hero-star--b    { animation-delay: 1.8s; }
+  .hero-star--c    { animation-delay: 0.9s; }
+  .hero-star--d    { animation-delay: 2.7s; }
 }
 
 @keyframes hero-spin { to { transform: rotate(360deg); } }
@@ -6251,179 +6825,1200 @@ select.card-input {
   50%      { opacity: 0.9; transform: scale(1.12); }
 }
 
+/* the planet's aura breathes via pure CSS — a slow scale + opacity pulse,
+   scaled about the circle's own centre so it never shifts layout */
+.hero-glow-core {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-glow-core { animation: hero-glow-pulse 5s ease-in-out infinite; }
+}
+@keyframes hero-glow-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.16); }
+}
+
+/* prominent compass stars flanking Saturn — the corner filigree, scaled up.
+   Silver by night, a grayish-navy ink by day so they read like the corner star */
+.hero-star {
+  fill: var(--star, #d8dfe9);
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0.92;
+}
+.dashboard-shell--day .hero-star { fill: #181c24; }
+/* scattered star dust — dimmer at smaller sizes so they recede for depth */
+.hero-star--md { opacity: 0.62; }
+.hero-star--sm { opacity: 0.42; }
+@keyframes hero-star-twinkle {
+  0%, 100% { opacity: 0.7; transform: scale(0.9); }
+  50%      { opacity: 1;   transform: scale(1.08); }
+}
+
 @media (max-width: 760px) {
   .dash-hero-art { display: none; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   DAY · SOLAR THEME
+   DAY · CELESTIAL DAYLIGHT THEME
    The dashboard's light mode. Redefining the same scoped tokens flips the
-   whole realm from a silver-on-void night sky to a warm, sunlit day, while
-   the hero swaps its ringed planet for the sun (handled in JS via GSAP).
+   whole realm from a silver-on-void night sky to a pale, cool daylight sky,
+   while the ringed planet rides through both modes (the sky cross-fades in
+   JS via GSAP) and the constellations read as dark ink on the bright cards.
    ════════════════════════════════════════════════════════════════════ */
 .dashboard-shell--day {
-  --text: #6f5a3a;            /* warm taupe body */
-  --text-h: #2b2012;          /* deep espresso headings */
-  --text-dim: rgba(90, 70, 40, 0.42);
-  --bg: #fdf4e3;              /* warm cream */
-  --border: rgba(150, 110, 50, 0.20);
-  --code-bg: rgba(255, 224, 170, 0.38);
-  --accent: #e08b1e;          /* warm amber sun — primary actions */
-  --accent-bg: rgba(224, 139, 30, 0.15);
-  --accent-border: rgba(224, 139, 30, 0.5);
-  --social-bg: rgba(255, 210, 140, 0.18);
-  --metal: #c69a4e;           /* warm brass */
-  --metal-deep: #9a7327;
-  --star: #d98e26;            /* sun-gold for filigree + accents */
+  --text: #4a586e;            /* cool slate body */
+  --text-h: #18202e;          /* deep navy-charcoal headings */
+  --text-dim: rgba(40, 56, 84, 0.42);
+  --bg: #eef4fb;              /* cool off-white */
+  --border: rgba(74, 104, 154, 0.20);
+  --code-bg: rgba(210, 226, 244, 0.45);
+  --accent: #4f72c8;          /* cool periwinkle — primary actions */
+  --accent-bg: rgba(79, 114, 200, 0.14);
+  --accent-border: rgba(79, 114, 200, 0.5);
+  --social-bg: rgba(210, 226, 244, 0.4);
+  --metal: #9fb4d6;           /* cool steel-blue */
+  --metal-deep: #6f88af;
+  --star: #4063a6;            /* cool blue for filigree + accents */
   --shadow:
-    rgba(120, 80, 20, 0.2) 0 10px 24px -6px, rgba(120, 80, 20, 0.12) 0 4px 12px -4px;
+    rgba(40, 70, 120, 0.18) 0 10px 24px -6px, rgba(40, 70, 120, 0.1) 0 4px 12px -4px;
   color: var(--text);
 
-  /* a hazy golden-hour sky — a muted dusty blue up top settling into warm
-     amber sand, dimmed so it never blows out to white and the gold stars
-     still read; a soft corona glows top-right where the hero sun sits */
-  background-color: #ddc8a1;
-  background-image:
-    radial-gradient(88% 66% at 82% -8%, rgba(244, 188, 104, 0.7) 0%, rgba(232, 196, 140, 0.28) 32%, transparent 62%),
-    radial-gradient(120% 82% at 16% 122%, rgba(206, 168, 118, 0.4) 0%, transparent 58%),
-    linear-gradient(180deg, #a9b6bb 0%, #c7bda2 38%, #d8c8a1 70%, #dfcca2 100%);
+  /* the day sky is the watercolor reference image (assets/day-sky.png): a soft
+     powder-blue field washed with warm-cream blooms. It carries the full cloud
+     texture, so NebulaVeil is disabled by day; the Starfield canvas paints the
+     stars + constellations on top. cover/center keeps it filling the fixed-
+     height shell at any aspect ratio. */
+  background-color: #eaf4fc;
+  background-image: url('./assets/day-sky.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
-/* the starfield stays lit by day too — it just repaints in warm gold (see
+/* the starfield stays lit by day too — it just repaints in cool blue (see
    Starfield.jsx), so the interstellar sky carries through both modes */
 
-/* ── Hero card: a pane of warm, sunlit glass ── */
+/* ── Hero card (day): a light pane of glass — a faint low-opacity fill + a soft
+   frosted blur keep the watercolor sky clearly readable through the card, while
+   a crisp light edge, an inset top highlight and a soft ambient shadow lift it
+   off the background so it "pops". The shared ::after pass adds the glossy
+   specular sheen (top-edge bloom + diagonal glance). ── */
 .dashboard-shell--day .dash-hero-card {
-  background: linear-gradient(135deg, rgba(252, 244, 226, 0.58) 0%, rgba(243, 229, 200, 0.4) 100%);
-  border: 1px solid rgba(180, 142, 76, 0.3);
+  /* a near-clear glass pane: no fill, only a light backdrop blur so the sky
+     behind it stays almost untouched while reading faintly as glass. A bright
+     white rim (border + inset edge highlight) plus the drop shadow define it,
+     giving the clean mirror-edge look. */
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow:
-    inset 0 1px 0 rgba(255, 250, 235, 0.5),
-    0 18px 50px -24px rgba(120, 88, 32, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 24px 52px -20px rgba(38, 64, 116, 0.5),
+    0 10px 24px -12px rgba(38, 64, 116, 0.34);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
-.dashboard-shell--day .dash-hero-card::before {
-  background: radial-gradient(70% 120% at 6% 24%, rgba(244, 190, 110, 0.22), transparent 62%);
+/* nothing should veil the sky inside the pane — kill both the accent corner-glow
+   and the glossy interior sheen so the inside is identical to the background */
+.dashboard-shell--day .dash-hero-card::before,
+.dashboard-shell--day .dash-hero-card::after {
+  display: none;
 }
 
-/* ── Sidebar / topbar: frosted parchment over the day sky ── */
+/* ── Sidebar: light, floating glass rail over the day sky. Glassmorphic — a
+   top-left specular gloss, a crisp translucent white edge, and a heavier
+   frosted blur so the nebula reads softly through the rail. ── */
 .dashboard-shell--day .dash-sidebar {
-  background: linear-gradient(180deg, rgba(248, 240, 224, 0.8) 0%, rgba(240, 228, 204, 0.68) 100%);
-  border-right: 1px solid rgba(160, 120, 50, 0.16);
+  position: relative;
+  /* soft gray rim + a very slight ~10% white overlay; light frosted blur, no
+     drop shadow. The faint wash gives the rail just enough body to read as a
+     panel against the sky. */
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(140, 150, 165, 0.55);
+  border-radius: 22px;
+  box-shadow: none;
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  margin: 0 10px 0 2px; /* float clear of both edges */
 }
+/* drop the glossy interior sheen so the inside stays clear, matching the others */
+.dashboard-shell--day .dash-sidebar::after {
+  display: none;
+}
+
+/* ── Glassy reflection (day): a static highlight pass that makes the frosted
+   panes — hero card, sidebar, board tiles — read as real glass. A bright sheen
+   pools along the top edge, a soft diagonal glance crosses the upper-left, and
+   a faint pool of refracted light gathers at the base. Non-interactive overlay,
+   no animation. The hosts clip it to their rounded rects. ── */
+.dashboard-shell--day .dash-hero-card::after,
+.dashboard-shell--day .dash-sidebar::after,
+.dashboard-shell--day .board-tile-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 3;
+  background:
+    radial-gradient(150% 56% at 50% -22%, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0) 62%),
+    linear-gradient(125deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 30%),
+    radial-gradient(120% 48% at 50% 122%, rgba(214, 233, 255, 0.16), rgba(255, 255, 255, 0) 72%);
+}
+/* the nav highlight reads as a neutral gray overlay rather than periwinkle blue */
 .dashboard-shell--day .sidebar-item.active {
-  background: linear-gradient(135deg, rgba(224, 139, 30, 0.18), rgba(224, 139, 30, 0.05));
-  box-shadow: inset 0 0 0 1px rgba(200, 150, 60, 0.3);
+  background: linear-gradient(135deg, rgba(96, 100, 110, 0.16), rgba(96, 100, 110, 0.05));
+  box-shadow: inset 0 0 0 1px rgba(100, 104, 114, 0.3);
+  color: #363b43;
 }
-/* the profile card gets a warm raised panel so it reads on the cream sidebar */
+.dashboard-shell--day .sidebar-item.active::before {
+  background: rgba(78, 82, 92, 0.95);
+  box-shadow: 0 0 10px rgba(100, 104, 114, 0.5);
+}
+.dashboard-shell--day .sidebar-item:hover {
+  background: rgba(96, 100, 110, 0.12);
+  color: var(--text-h);
+}
+/* the profile card sits light on the rail — a soft pane, not a heavy raised slab */
 .dashboard-shell--day .sidebar-profile {
-  background: rgba(255, 250, 236, 0.62);
-  border: 1px solid rgba(170, 130, 60, 0.28);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 4px 14px -10px rgba(120, 88, 32, 0.5);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.58) 0%, rgba(236, 244, 252, 0.4) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 6px 16px -12px rgba(50, 84, 140, 0.3);
 }
 .dashboard-shell--day .sidebar-profile:hover,
 .dashboard-shell--day .sidebar-profile:focus-visible {
-  background: rgba(255, 250, 236, 0.82);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.96) 0%, rgba(236, 245, 254, 0.74) 100%);
 }
-.dashboard-shell--day .sidebar-section-label { color: rgba(90, 64, 24, 0.85); }
-.dashboard-shell--day .topbar-breadcrumb { color: rgba(96, 70, 30, 0.85); opacity: 1; }
+/* avatars read as a sleek black orb by day rather than the periwinkle accent */
+.dashboard-shell--day .user-avatar {
+  background: linear-gradient(155deg, #2a2e38 0%, #121319 100%);
+  color: #eef2f8;
+}
+.dashboard-shell--day .sidebar-profile-avatar {
+  border-color: rgba(34, 38, 48, 0.92) !important;
+  box-shadow: 0 4px 14px -4px rgba(16, 18, 24, 0.5) !important;
+}
+.dashboard-shell--day .sidebar-section-label { color: rgba(58, 84, 130, 0.9); }
+.dashboard-shell--day .topbar-breadcrumb { color: rgba(62, 88, 134, 0.9); opacity: 1; }
+
+/* count badges, the date eyebrow, and the hero corner filigree shed their blue
+   for a neutral gray / grayish-black */
+.dashboard-shell--day .board-section-badge,
+.dashboard-shell--day .board-section-badge--teal { background: #646a76; }
+.dashboard-shell--day .sidebar-item-count {
+  background: rgba(96, 100, 110, 0.14);
+  color: #5b606b;
+}
+.dashboard-shell--day .dash-hero-eyebrow { color: #363b43; opacity: 0.9; }
+.dashboard-shell--day .dash-hero-corner { color: #363b43; }
 
 .dashboard-shell--day .dash-searchbar-wrap,
 .dashboard-shell--day .topbar-notif-btn,
 .dashboard-shell--day .dash-mode-toggle {
-  background: rgba(255, 250, 238, 0.7);
-  border: 1px solid rgba(160, 120, 50, 0.22);
+  background: rgba(250, 253, 255, 0.72);
+  border: 1px solid rgba(110, 145, 200, 0.24);
 }
 
-/* ── Board tiles: warm, sunlit cards ── */
+/* ── Board tiles: panes of translucent glass over the nebula, so the glowing
+   constellations read like stars behind frosted glass rather than ink on
+   paper. Crisp white edge, wide diffuse ambient shadow (no hard drop). ── */
+/* clean, bright-white cards: softer corners, a barely-there cool border, and a
+   light diffuse lift instead of a heavy drop — more air around each one */
+/* same treatment as the hero card: a near-clear pane — no fill, only a light
+   backdrop blur — so the watercolor sky reads through it, defined by a bright
+   white rim + a drop shadow that lifts it off the background */
 .dashboard-shell--day .board-tile {
-  background: linear-gradient(160deg,
-    color-mix(in srgb, var(--tile) 24%, #fffaf0) 0%,
-    color-mix(in srgb, var(--tile) 8%, #fdf3e0) 82%);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    0 1px 1px rgba(150, 110, 40, 0.12),
-    0 18px 38px -16px rgba(150, 110, 40, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 24px 52px -20px rgba(38, 64, 116, 0.5),
+    0 10px 24px -12px rgba(38, 64, 116, 0.34);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.dashboard-shell--day .board-tile,
+.dashboard-shell--day .board-tile-face { border-radius: 20px; }
+/* keep the black constellation frame inset from the edge; drop only the glossy
+   interior sheen so the inside stays clear */
+.dashboard-shell--day .board-tile-face::before {
+  inset: 6px;
+  border-radius: 14px;
+  border-color: rgba(18, 22, 34, 0.82);
+  box-shadow: none;
+}
+.dashboard-shell--day .board-tile-face::after {
+  display: none;
 }
 .dashboard-shell--day .board-tile:hover {
+  border-color: rgba(255, 255, 255, 0.85);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 0 0 1px color-mix(in srgb, var(--tile) 50%, transparent),
-    0 0 26px -6px color-mix(in srgb, var(--tile) 42%, transparent),
-    0 26px 48px -18px rgba(150, 110, 40, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 30px 60px -20px rgba(38, 64, 116, 0.58),
+    0 12px 28px -12px rgba(38, 64, 116, 0.4);
+}
+.dashboard-shell--day .board-tile:hover .board-tile-face::before {
+  border-color: rgba(8, 12, 22, 0.95);
 }
 .dashboard-shell--day .board-tile--create {
-  background: rgba(255, 248, 232, 0.5);
-  border: 1px dashed rgba(160, 120, 50, 0.42);
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.75);
 }
+/* the summoning circle's pulse/colorwave reads as a soft "light black" glow by
+   day rather than the periwinkle accent */
+.dashboard-shell--day .board-tile-plus { --summon-glow: #3d424c; }
 .dashboard-shell--day .board-tile-title {
-  color: #2b2012;
+  color: #18202e;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
 }
 .dashboard-shell--day .board-tile-meta {
-  color: rgba(70, 52, 22, 0.85);
+  color: rgba(40, 56, 84, 0.85);
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
 }
-/* the constellation reads as fine ink lines + golden stars on the light card */
+/* the constellation reads as dark ink lines + black stars haloed by a soft
+   dark-gray glow — the gentle glow is what gives the white cards their life */
+/* crisp, dark ink lines so the constellation reads cleanly on the white card */
 .dashboard-shell--day .board-tile-zodiac-line {
-  stroke: rgba(120, 80, 20, 0.5);
-  animation: none;
+  stroke: rgba(16, 24, 42, 0.8);
+  stroke-width: 0.9;
+  animation: none; /* the base shimmer cycles to white — keep the ink line solid */
 }
 .dashboard-shell--day .board-tile-zodiac-star {
-  fill: #b5791f;
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tile) 80%, #fff));
+  fill: #0e1626;
+  /* a tight white core + a soft dark-gray bloom so each node reads as a deep,
+     glowing star against the bright card */
+  filter:
+    drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.85))
+    drop-shadow(0 0 6px rgba(54, 58, 68, 0.95))
+    drop-shadow(0 0 13px rgba(58, 62, 72, 0.55));
+}
+/* the breathing dark-gray glow behind each node — a slow pulse of opacity and
+   blur. The per-node animation-delay (set inline, seeded by board id) keeps the
+   cards out of sync so they don't all pulse together */
+.dashboard-shell--day .board-tile-zodiac-halo {
+  fill: rgba(54, 58, 68, 0.92);
+  opacity: 0.5;
+  /* static blur (a touch larger than the night halo) so the day bloom keeps its
+     soft size; the breathe pulses opacity only — animating the blur radius
+     re-rasterises every node each frame and tanks scroll (see night halo above) */
+  filter: blur(3px);
+  animation: zodiac-halo-breathe-day 4.6s ease-in-out infinite;
+}
+@keyframes zodiac-halo-breathe-day {
+  0%, 100% { opacity: 0.28; }
+  50%      { opacity: 0.72; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-shell--day .board-tile-zodiac-halo { animation: none; opacity: 0.5; }
 }
 
 /* ── Hero orrery re-tinted for daylight — kept deep enough to read clearly
-   against the bright sky (sun body handled by its own gradient) ── */
-.dashboard-shell--day .hero-wheel { stroke: rgba(120, 84, 26, 0.5); }
-.dashboard-shell--day .hero-wheel-ticks line { stroke: rgba(112, 78, 22, 0.72); }
-.dashboard-shell--day .hero-orbit-path { stroke: rgba(120, 84, 26, 0.42); }
+   against the bright sky; the ringed planet's silver ring + moons are
+   darkened to cool slate so they don't vanish on the pale sky ── */
+.dashboard-shell--day .hero-wheel { stroke: rgba(70, 98, 150, 0.5); }
+.dashboard-shell--day .hero-wheel-ticks line { stroke: rgba(60, 88, 140, 0.72); }
+.dashboard-shell--day .hero-orbit-path { stroke: rgba(70, 98, 150, 0.42); }
+/* the planet body deepens to charcoal so it reads as a dark sphere by day,
+   and radiates ambient light via a layered blue drop-shadow halo */
+/* a deep navy sphere wrapped in a soft dark halo so it reads with weight and
+   depth against the bright sky rather than flat */
+.dashboard-shell--day .hero-planet-body {
+  fill: url(#heroPlanetDay);
+  filter:
+    drop-shadow(0 0 14px rgba(18, 30, 64, 0.6))
+    drop-shadow(0 0 32px rgba(30, 48, 96, 0.42))
+    /* faint white glow off the right edge, blending into the dark halo */
+    drop-shadow(7px 0 11px rgba(255, 255, 255, 0.6));
+}
+/* the breathing aura behind the planet — a dark-blue glow (pulse driven by CSS) */
+.dashboard-shell--day .hero-glow-core { fill: url(#heroGlowDay); }
+/* the rings catch the same deep light so the whole widget reads cohesive */
+.dashboard-shell--day .hero-ring {
+  stroke: rgba(74, 92, 140, 0.82);
+  filter: drop-shadow(0 0 5px rgba(40, 60, 112, 0.6));
+}
 .dashboard-shell--day .hero-moon {
-  fill: #c5760f;
-  filter: drop-shadow(0 0 3px rgba(180, 110, 20, 0.85));
+  fill: #3a5790;
+  filter: drop-shadow(0 0 3px rgba(60, 92, 150, 0.7));
 }
-.dashboard-shell--day .hero-moon--sm { fill: #b06c10; }
-.dashboard-shell--day .hero-spark { fill: rgba(150, 98, 16, 0.95); }
-.dashboard-shell--day .hero-ray {
-  stroke: #e07712;
-  filter: drop-shadow(0 0 3px rgba(224, 119, 18, 0.55));
-}
+.dashboard-shell--day .hero-moon--sm { fill: #4a6aa8; }
+.dashboard-shell--day .hero-spark { fill: rgba(56, 86, 140, 0.95); }
 
-/* the streak chip keeps a visible warm pill against the light card */
+/* hero accent text drops its blue for a neutral grayish-black by day */
+.dashboard-shell--day .dash-hero-username { color: #2b4a8c; }
+.dashboard-shell--day .hero-stat-link { color: #363b43; }
+
+/* the streak chip keeps a visible cool pill against the light card */
 .dashboard-shell--day .hero-stats-trigger {
-  background: rgba(120, 80, 20, 0.06);
-  border: 1px solid rgba(150, 110, 50, 0.24);
+  background: rgba(50, 84, 140, 0.06);
+  border: 1px solid rgba(90, 125, 185, 0.26);
 }
 .dashboard-shell--day .hero-stats-trigger:hover {
-  background: rgba(120, 80, 20, 0.1);
+  background: rgba(50, 84, 140, 0.1);
 }
 
 /* ── Cosmic Activity page in daylight ── */
 .dashboard-shell--day .cosmic-page-overlay {
-  background: rgba(232, 214, 178, 0.55);
+  background: rgba(206, 224, 246, 0.55);
 }
 .dashboard-shell--day .cosmic-page {
-  background: linear-gradient(160deg, #fbf3e2 0%, #f4e8cf 100%);
-  box-shadow: 0 30px 80px -16px rgba(120, 88, 32, 0.4);
+  background: linear-gradient(160deg, #f4f9fe 0%, #e6eff9 100%);
+  box-shadow: 0 30px 80px -16px rgba(50, 84, 140, 0.4);
 }
 .dashboard-shell--day .cosmic-page-close {
-  background: rgba(120, 80, 20, 0.07);
+  background: rgba(50, 84, 140, 0.07);
 }
 .dashboard-shell--day .cosmic-page-close:hover {
-  background: rgba(120, 80, 20, 0.14);
+  background: rgba(50, 84, 140, 0.14);
   color: var(--text-h);
 }
 .dashboard-shell--day .cosmic-activity-item {
-  border-bottom: 1px solid rgba(120, 80, 20, 0.12);
+  border-bottom: 1px solid rgba(50, 84, 140, 0.12);
 }
+/* empty days read as clear hollow circles; active days as filled blue orbs, so
+   the row plainly shows how many days the user has been active */
 .dashboard-shell--day .streak-dot {
-  background: rgba(120, 80, 20, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(120, 80, 20, 0.3);
+  background: rgba(50, 84, 140, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(50, 84, 140, 0.42);
 }
 .dashboard-shell--day .streak-dot--on {
-  background: radial-gradient(circle at 50% 32%, #ff9d3d, #e8631a);
-  box-shadow: 0 0 10px rgba(230, 99, 26, 0.55), inset 0 0 0 1px rgba(255, 210, 160, 0.7);
+  background: radial-gradient(circle at 50% 32%, #6f95e0, #3f63c0);
+  box-shadow: 0 0 10px rgba(63, 99, 192, 0.55), inset 0 0 0 1px rgba(200, 218, 255, 0.7);
 }
-/* deepen the activity row glyphs so they read against the light parchment */
-.dashboard-shell--day .cosmic-activity-icon--board { color: #a9791b; background: rgba(169, 121, 27, 0.16); }
-.dashboard-shell--day .cosmic-activity-icon--guild { color: #2f74c4; background: rgba(47, 116, 196, 0.15); }
+/* discovery glyphs take a unique cosmic violet by day — distinct from the blue
+   UI around them so each entry's icon stands out and reads as a "discovery".
+   Deletions keep their danger red. */
+.dashboard-shell--day .cosmic-activity-icon--board { color: #6a4fd0; background: rgba(106, 79, 208, 0.15); }
+.dashboard-shell--day .cosmic-activity-icon--team { color: #8a52c8; background: rgba(138, 82, 200, 0.15); }
 .dashboard-shell--day .cosmic-activity-icon--deleted { color: #c63838; background: rgba(198, 56, 56, 0.14); }
+/* deeper, more saturated add/move hues for legibility on the light nebula */
+.dashboard-shell--day .cosmic-activity-icon--created { color: #1f9d6b; background: rgba(31, 157, 107, 0.16); }
+.dashboard-shell--day .cosmic-activity-icon--moved   { color: #1f8fb8; background: rgba(31, 143, 184, 0.16); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   AI Assistant — VSCode-style docked side panel
+   The panel is fixed to the right edge and slides in. The page content shifts
+   left via padding-right on the shell (`.ai-open`) so nothing is hidden behind it.
+   ────────────────────────────────────────────────────────────────────────── */
+:root { --ai-panel-w: 380px; }
+
+/* Board view: the stage holds the original column flex layout and takes all the
+   width left beside the panel. The shell is always a row, so it simply flexes. */
+.board-stage {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  /* Clip anything that would paint past the stage's right edge — which is exactly
+     where the docked panel begins — so nothing bleeds under the assistant. */
+  overflow: hidden;
+}
+
+/* Dashboard: no inner stage wrapper, so shrink via padding-right on the shell. */
+.dashboard-shell { transition: padding-right 0.28s ease; }
+.dashboard-shell.ai-open { padding-right: var(--ai-panel-w); }
+
+/* The panel is always a flex sibling in the row. Closed, it collapses to zero
+   width (overflow hidden so its content is clipped, not wrapped); open, it grows
+   to --ai-panel-w. Only the width animates — no position-mode or direction flip —
+   so the board smoothly gives up the space with no jump-and-snap. */
+.ai-panel {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  box-shadow: -12px 0 30px -12px rgba(0, 0, 0, 0.45);
+  transition: flex-basis 0.28s ease, width 0.28s ease;
+}
+.app-shell.ai-open .ai-panel {
+  flex: 0 0 var(--ai-panel-w);
+  width: var(--ai-panel-w);
+}
+
+.ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.ai-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-h);
+  letter-spacing: 0.3px;
+}
+.ai-panel-spark { color: var(--accent); }
+.ai-panel-close {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+}
+.ai-panel-close:hover { background: var(--accent-bg); color: var(--accent); }
+
+.ai-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-panel-intro, .ai-panel-setup {
+  margin: auto 0;
+  text-align: center;
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+.ai-panel-intro-title, .ai-panel-setup-title {
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 6px;
+}
+.ai-panel-intro-text, .ai-panel-setup-text {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.ai-msg { display: flex; flex-direction: column; gap: 4px; }
+.ai-msg--user { align-items: flex-end; }
+.ai-msg--assistant { align-items: flex-start; }
+.ai-msg-bubble {
+  max-width: 88%;
+  padding: 9px 12px;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ai-msg--user .ai-msg-bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.ai-msg--assistant .ai-msg-bubble {
+  background: var(--accent-bg);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.ai-msg-actions {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  font-size: 0.74rem;
+  color: var(--accent);
+}
+.ai-msg-actions li { padding: 1px 0; }
+
+/* typing dots */
+.ai-msg-typing { display: inline-flex; gap: 4px; align-items: center; }
+.ai-msg-typing span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text);
+  opacity: 0.5;
+  animation: ai-typing 1s infinite ease-in-out;
+}
+.ai-msg-typing span:nth-child(2) { animation-delay: 0.15s; }
+.ai-msg-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ai-typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+
+.ai-panel-error {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  color: var(--ember);
+  border-top: 1px solid var(--border);
+}
+
+.ai-panel-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.ai-panel-input {
+  flex: 1;
+  resize: none;
+  max-height: 120px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.ai-panel-input:focus { outline: none; border-color: var(--accent); }
+.ai-panel-send {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.ai-panel-send:disabled { opacity: 0.4; cursor: default; }
+.ai-panel-send:not(:disabled):hover { transform: translateY(-1px); }
+
+/* Dashboard assistant toggle (mirrors the day/night toggle styling) */
+.dash-ai-toggle .dash-ai-toggle-icon { font-size: 0.95rem; color: var(--accent); }
+.dash-ai-toggle.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+/* Board topbar assistant toggle */
+.ai-toggle.active { color: var(--accent); border-color: var(--accent-border); background: var(--accent-bg); }
+
+/* Settings: AI section bits */
+.ai-key-status {
+  font-size: 0.82rem;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+.ai-key-status--on { color: var(--accent); }
+.ai-model-select { cursor: pointer; }
+
+@media (max-width: 720px) {
+  /* On small screens don't split — the panel overlays full-screen instead,
+     sliding in via transform over the board rather than squeezing it. */
+  .dashboard-shell.ai-open { padding-right: 0; }
+  .app-shell.ai-open .ai-panel,
+  .ai-panel {
+    position: fixed;
+    inset: 0 0 0 auto;
+    flex: none;
+    width: 100vw;
+    max-width: 100vw;
+    overflow: hidden;
+    transform: translateX(100%);
+    transition: transform 0.28s ease;
+    z-index: 60;
+  }
+  .app-shell.ai-open .ai-panel { transform: translateX(0); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   COSMIC AUTH · the login / register front door in the dashboard's theme
+   The base .auth-* rules (top of file) define the night palette + glass; this
+   block adds the Starfield layering, brand typography, the orrery sizing, and
+   the day-mode realm that mirrors .dashboard-shell--day.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* the canvas starfield sits behind both panes; the UI is lifted above it */
+.auth-shell > .starfield-canvas { z-index: 0; }
+
+/* day / night realm toggle, pinned to the top-left corner above everything */
+.auth-mode-toggle {
+  position: absolute;
+  bottom: 40px;
+  right: 32px;
+  z-index: 2;
+}
+
+/* brand wordmark — celestial serif, matching the Settings title voice */
+.auth-brand {
+  font-family: var(--fantasy);
+  font-size: calc(22 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-h);
+}
+
+/* the compass-star badge gets a soft starlight glow */
+.auth-brand-mark {
+  box-shadow:
+    0 6px 16px var(--accent-bg),
+    0 0 18px -2px color-mix(in srgb, var(--star) 40%, transparent);
+}
+/* CSS overrides the svg's width/height attributes so the star scales with the
+   badge (calc()/var() can't go in the SVG presentation attributes themselves) */
+.auth-brand-mark svg { width: calc(20 * var(--u)); height: calc(20 * var(--u)); }
+
+/* eyebrow uses the silver starlight, like the dashboard hero */
+.auth-visual-brand { color: var(--star); }
+
+/* ════════════════════════════════════════════════════════════════════
+   PRODUCT SHOWCASE (left panel) — an eyebrow, a shimmering headline, and the
+   product's features rendered as a vertical constellation of glowing nodes.
+   ════════════════════════════════════════════════════════════════════ */
+.auth-eyebrow {
+  margin: 0 0 calc(-6 * var(--u));
+  font-size: calc(12 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--star);
+  opacity: 0.68;
+}
+
+/* the headline keyword — a solid blue that pops against the headline in either
+   realm: a luminous cornflower on the night void, a deep blue on the day sky
+   (day value is set in the day-realm block below) */
+.auth-accent-word {
+  color: #84a4f5;
+  font-weight: 800;
+}
+
+/* feature list: glowing star-nodes joined by a faint constellation chain */
+.auth-features {
+  list-style: none;
+  margin: calc(6 * var(--u)) 0 0;
+  padding: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: calc(16 * var(--u));
+  max-width: calc(420 * var(--u));
+}
+.auth-features::before {
+  content: '';
+  position: absolute;
+  top: calc(20 * var(--u));
+  bottom: calc(20 * var(--u));
+  left: calc(18 * var(--u)); /* node centre */
+  width: 1px;
+  background: linear-gradient(180deg,
+    transparent,
+    color-mix(in srgb, var(--star) 55%, transparent) 12%,
+    color-mix(in srgb, var(--star) 55%, transparent) 88%,
+    transparent);
+  opacity: 0.55;
+}
+.auth-feature {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--u));
+}
+.auth-feature-node {
+  flex-shrink: 0;
+  width: calc(37 * var(--u));
+  height: calc(37 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--star);
+  background: radial-gradient(circle at 50% 38%,
+    color-mix(in srgb, var(--accent) 32%, transparent),
+    color-mix(in srgb, var(--bg) 80%, transparent) 76%);
+  border: 1px solid color-mix(in srgb, var(--star) 32%, transparent);
+  box-shadow:
+    0 0 18px -3px color-mix(in srgb, var(--accent) 60%, transparent),
+    inset 0 0 9px -4px color-mix(in srgb, var(--star) 70%, transparent);
+}
+.auth-feature-node svg { width: calc(18 * var(--u)); height: calc(18 * var(--u)); }
+.auth-feature-title {
+  display: block;
+  font-family: var(--fantasy);
+  font-size: calc(15 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text-h);
+}
+.auth-feature-desc {
+  display: block;
+  margin-top: calc(1 * var(--u));
+  font-size: calc(12.5 * var(--u));
+  line-height: 1.45;
+  color: var(--text);
+  opacity: 0.78;
+}
+
+/* staggered rise-in for the whole showcase on load */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-visual-brand,
+  .auth-eyebrow,
+  .auth-visual-heading,
+  .auth-visual-sub,
+  .auth-feature {
+    animation: auth-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .auth-visual-brand   { animation-delay: 0.04s; }
+  .auth-eyebrow        { animation-delay: 0.12s; }
+  .auth-visual-heading { animation-delay: 0.20s; }
+  .auth-visual-sub     { animation-delay: 0.28s; }
+  .auth-feature:nth-child(1) { animation-delay: 0.38s; }
+  .auth-feature:nth-child(2) { animation-delay: 0.46s; }
+  .auth-feature:nth-child(3) { animation-delay: 0.54s; }
+  .auth-feature:nth-child(4) { animation-delay: 0.62s; }
+}
+@keyframes auth-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Floating product collage: a tilted kanban board paired with a streak /
+   cosmic-rank card, parked in the empty right half of the landing panel and
+   kept fully inside it (clear of the form rail). Shown only ≥1440px, where
+   there's room beside the copy. ── */
+.auth-mockups {
+  position: absolute;
+  top: 50%;
+  right: calc(24 * var(--u));
+  width: 300px;
+  transform: translateY(-50%);
+  /* scale the whole collage as one unit (its dozens of inner px values stay put
+     and just ride the scale); origin pinned right so it grows inward, away from
+     the form rail, and is clipped by .auth-visual's overflow if it ever exceeds */
+  scale: var(--s);
+  transform-origin: center right;
+  z-index: -1; /* behind the copy, above the starfield */
+  pointer-events: none;
+  /* a vertical cascade: each card separated by a gap and staggered left/right
+     (via align-self) so all three read clearly instead of overlapping */
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (min-width: 1440px) {
+  .auth-mockups { display: flex; }
+}
+@media (prefers-reduced-motion: no-preference) and (min-width: 1440px) {
+  .auth-mockups { animation: auth-mock-float 7s ease-in-out infinite; }
+}
+@keyframes auth-mock-float {
+  0%, 100% { transform: translateY(-50%); }
+  50%      { transform: translateY(calc(-50% - 12px)); }
+}
+
+/* shared glass surface for the mock windows */
+.abm-glass {
+  box-sizing: border-box;
+  border-radius: 14px;
+  background: linear-gradient(155deg, rgba(26, 30, 40, 0.86), rgba(12, 14, 20, 0.82));
+  border: 1px solid rgba(184, 194, 214, 0.14);
+  box-shadow:
+    0 36px 80px -30px rgba(0, 0, 0, 0.92),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* board window — the centerpiece of the cascade */
+.abm-window {
+  order: 0;
+  align-self: center;
+  width: 240px;
+  padding: 12px;
+  transform: perspective(1500px) rotateY(-9deg) rotateX(4deg) rotate(0.5deg);
+  transform-origin: center;
+}
+
+.abm-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px 12px;
+}
+.abm-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(216, 221, 232, 0.28);
+}
+.abm-title {
+  margin-left: 8px;
+  font-family: var(--fantasy);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--star);
+  opacity: 0.82;
+}
+.abm-board { display: flex; gap: 9px; }
+.abm-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(184, 194, 214, 0.08);
+}
+.abm-col-head { display: flex; align-items: center; gap: 5px; }
+.abm-col-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.abm-col-name {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  opacity: 0.72;
+  white-space: nowrap;
+}
+.abm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.55);
+}
+.abm-card--accent {
+  background: color-mix(in srgb, var(--accent) 22%, rgba(255, 255, 255, 0.06));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 4px 10px -4px rgba(0, 0, 0, 0.6);
+}
+.abm-tag { width: 22px; height: 4px; border-radius: 3px; }
+.abm-line { height: 4px; border-radius: 3px; background: rgba(216, 221, 232, 0.22); }
+
+/* secondary mock — the streak / cosmic-rank card, at the bottom of the cascade */
+.asc-card {
+  order: 1;
+  align-self: flex-start;
+  width: 162px;
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transform: perspective(1500px) rotateY(-9deg) rotateX(4deg) rotate(-1.5deg);
+  transform-origin: center;
+}
+.asc-flame {
+  width: 26px;
+  height: 26px;
+  color: #f6a723;
+  filter: drop-shadow(0 0 7px rgba(245, 158, 11, 0.65));
+}
+.asc-flame svg { width: 100%; height: 100%; display: block; }
+/* number on top, "days active" stacked below it so the label reads clearly */
+.asc-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.asc-num {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-h);
+}
+.asc-label { font-size: 10px; color: var(--text); opacity: 0.75; }
+.asc-dots { display: flex; gap: 4px; }
+.asc-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(216, 221, 232, 0.16); }
+.asc-dot--on {
+  background: var(--star);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--star) 70%, transparent);
+}
+.asc-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--fantasy);
+  font-size: 11.5px;
+  letter-spacing: 0.03em;
+  color: var(--star);
+}
+.asc-rank-glyph { color: var(--accent); font-size: 12px; }
+
+/* third mock — the AI co-pilot chat, at the top of the cascade */
+.aic-card {
+  order: -1;
+  align-self: flex-end;
+  width: 162px;
+  padding: 12px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  transform: perspective(1500px) rotateY(-9deg) rotateX(4deg) rotate(1.5deg);
+  transform-origin: center;
+}
+.aic-head { display: flex; align-items: center; gap: 6px; }
+.aic-spark { width: 16px; height: 16px; color: var(--star); flex-shrink: 0; }
+.aic-spark svg { width: 100%; height: 100%; display: block; }
+.aic-title {
+  font-family: var(--fantasy);
+  font-size: 11.5px;
+  letter-spacing: 0.03em;
+  color: var(--star);
+  opacity: 0.9;
+}
+.aic-bubble {
+  border-radius: 9px;
+  padding: 6px 8px;
+  font-size: 9.5px;
+}
+.aic-bubble--user {
+  align-self: flex-end;
+  max-width: 90%;
+  color: var(--text-h);
+  background: color-mix(in srgb, var(--accent) 30%, rgba(255, 255, 255, 0.06));
+  border-bottom-right-radius: 3px;
+}
+.aic-bubble--ai {
+  align-self: flex-start;
+  width: 82%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-bottom-left-radius: 3px;
+}
+.aic-line { height: 4px; border-radius: 3px; background: rgba(216, 221, 232, 0.26); }
+
+/* ── Form chrome: small celestial touches over the auto-themed tokens ── */
+.auth-tab {
+  font-family: var(--fantasy);
+  font-size: calc(16 * var(--u));
+  letter-spacing: 0.03em;
+}
+.auth-tab.active {
+  text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* "Forgot your password?" / "Back to login" — a quiet inline link, not a button */
+.auth-forgot {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: calc(2 * var(--u)) 0;
+  margin: calc(2 * var(--u)) 0 calc(-2 * var(--u));
+  font-size: calc(12 * var(--u));
+  color: var(--accent);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.auth-forgot:hover { color: var(--text-h); text-decoration: underline; }
+
+.auth-reset-success {
+  font-size: calc(13 * var(--u));
+  color: var(--text-h);
+  line-height: 1.5;
+  margin: 0 0 calc(4 * var(--u));
+}
+
+/* ── Decorative layer behind the form: twinkling constellations, a corner
+   filigree and a soft accent glow give the rail depth without competing with
+   the inputs. Sits above the frosted pane but beneath the form column. ── */
+.auth-decor {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.auth-form-panel > .auth-card { position: relative; z-index: 1; }
+
+/* soft accent glow pooling at the top of the rail */
+.auth-decor-glow {
+  position: absolute;
+  top: -130px;
+  left: 50%;
+  width: 380px;
+  height: 340px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 24%, transparent), transparent 72%);
+  opacity: 0.7;
+}
+
+/* corner filigree, mirrored into the top-right corner (the hero ornament frames
+   the top-left); .dhc-* styles + dhc-twinkle are shared with the dashboard */
+.auth-decor-corner {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 116px;
+  height: 116px;
+  color: var(--star);
+  transform: scaleX(-1);
+  opacity: 0.8;
+}
+
+/* background decor layer: sits behind the form rail (below it in paint order)
+   so the rail's backdrop-filter blurs these constellations through its glass.
+   Both chains are anchored near the right edge so they fall under the rail. */
+.auth-bg-decor {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* faint twinkling zodiac chains tucked behind the form rail. Position, size,
+   tilt and opacity are randomized per page load via inline styles (see
+   buildAuthSky in AuthPage.jsx); the rotate origin is the box centre. */
+.auth-decor-constellation {
+  position: absolute;
+  overflow: visible;
+  transform-origin: center;
+}
+
+.auth-decor-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--star) 65%, transparent);
+  stroke-width: 0.6;
+  opacity: 0.7;
+}
+.auth-decor-star {
+  fill: var(--star);
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--star) 70%, #fff));
+  /* reuse the board-tile constellation keyframes for a familiar twinkle */
+  animation: zodiac-twinkle 3.2s ease-in-out infinite, zodiac-sparkle 8s ease-in-out infinite;
+}
+
+/* scattered lone stars, also randomized per load, twinkling behind the rail */
+.auth-sky-star {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--star);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--star) 70%, #fff);
+  opacity: 0.8;
+  animation: zodiac-twinkle 3.2s ease-in-out infinite, zodiac-sparkle 8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-decor-star,
+  .auth-sky-star { animation: none; opacity: 0.82; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   COSMIC AUTH · DAY REALM — mirrors .dashboard-shell--day so a user who left
+   the dashboard in daylight finds the same pale, cool sky at the door.
+   ════════════════════════════════════════════════════════════════════ */
+.auth-shell--day {
+  --text: #4a586e;
+  --text-h: #18202e;
+  --bg: #eef4fb;
+  --border: rgba(74, 104, 154, 0.20);
+  --code-bg: rgba(210, 226, 244, 0.45);
+  --accent: #4f72c8;
+  --accent-bg: rgba(79, 114, 200, 0.14);
+  --accent-border: rgba(79, 114, 200, 0.5);
+  --social-bg: rgba(210, 226, 244, 0.4);
+  --metal: #9fb4d6;
+  --metal-deep: #6f88af;
+  --star: #4063a6;
+  color: var(--text);
+
+  background-color: #eaf4fc;
+  background-image: url('./assets/day-sky.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* the right-side rail by day: a light pane of glass over the watercolor sky —
+   translucent enough that the background constellations read softly through it,
+   while the dark form text stays legible */
+.auth-shell--day .auth-form-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(236, 244, 252, 0.5) 100%);
+  border-left: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: -24px 0 60px -34px rgba(38, 64, 116, 0.4);
+}
+
+/* the brand star badge reads as a dark orb by day rather than periwinkle */
+.auth-shell--day .auth-brand-mark {
+  background: linear-gradient(155deg, #2a2e38 0%, #121319 100%);
+  box-shadow: 0 6px 16px rgba(38, 64, 116, 0.28);
+}
+
+/* the headline keyword in a deep blue by day so it pops on the bright sky */
+.auth-shell--day .auth-accent-word { color: #1e40af; }
+
+/* the mock windows as light glass by day, mirroring the day board tiles */
+.auth-shell--day .abm-glass {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.86), rgba(232, 242, 252, 0.74));
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 36px 80px -32px rgba(38, 64, 116, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.auth-shell--day .abm-dot { background: rgba(60, 88, 140, 0.3); }
+.auth-shell--day .abm-col {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(110, 145, 200, 0.2);
+}
+.auth-shell--day .abm-card {
+  background: #fff;
+  box-shadow: 0 2px 6px -2px rgba(38, 64, 116, 0.22);
+}
+.auth-shell--day .abm-line { background: rgba(40, 56, 84, 0.18); }
+.auth-shell--day .asc-dot { background: rgba(60, 88, 140, 0.18); }
+.auth-shell--day .aic-bubble--ai { background: rgba(255, 255, 255, 0.7); }
+.auth-shell--day .aic-line { background: rgba(40, 56, 84, 0.2); }
+
+/* ════════════════════════════════════════════════════════════════════
+   RESPONSIVE · board view (the topbar packs ~12 controls in one row with no
+   prior small-screen handling — the main offender). The dashboard sidebar
+   (≤640), auth split (≤900) and card modal (≤720) already reflow elsewhere.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Tablet: let the board topbar wrap and drop search to its own full row. */
+@media (max-width: 768px) {
+  .board-shell .topbar {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .board-shell .topbar-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
+  .board-shell .topbar-right { gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  /* search becomes its own full-width row beneath the control groups */
+  .board-shell .topbar-search { order: 3; flex-basis: 100%; min-width: 0; }
+  .board-shell .search-input { flex: 1 1 auto; width: auto; }
+  /* keep a long board name from pushing the controls off-screen */
+  .board-shell .board-name {
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Phone: tighten everything so the wrapped rows fit a narrow screen. */
+@media (max-width: 480px) {
+  .board-shell .topbar { padding: 8px 10px; gap: 6px; }
+  .board-shell .topbar-left,
+  .board-shell .topbar-right { gap: 6px; }
+  .board-shell .board-io-btn,
+  .board-shell .members-toggle,
+  .board-shell .btn-ghost {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+  .board-shell .board-name { max-width: 50vw; }
+  .board-shell .board-meta { font-size: 11px; }
+  /* a column nearly fills the phone; the next peeks to signal horizontal scroll */
+  .board-shell .kanban-column { width: min(272px, 82vw); }
+  .board-shell .board { padding: 16px 12px; gap: 12px; }
+  /* the Members/Design popover spans the screen instead of a 280px box pinned right */
+  .board-members-panel { right: 8px; left: 8px; min-width: 0; }
+}

@@ -1,23 +1,22 @@
-import { useState, useRef } from 'react'
-import { apiFetch, uploadImage, assetUrl } from '../api.js'
+import { useState, useRef, useEffect } from 'react'
+import { apiFetch, uploadImage, assetUrl, getAiKeyStatus, saveAiKey, listAiModels } from '../api.js'
 import TwoFactorSection from '../components/TwoFactorSection.jsx'
 import TwoFactorSetup from './TwoFactorSetup.jsx'
 import Starfield from '../components/Starfield.jsx'
-import ThemeOrrery from '../components/ThemeOrrery.jsx'
 
 const AVATAR_PRESETS = [
-  { key: '⚔', label: 'Knight' },
-  { key: '🔮', label: 'Oracle' },
-  { key: '🐉', label: 'Dragon' },
-  { key: '🏰', label: 'Warden' },
-  { key: '🧙', label: 'Mage' },
-  { key: '⚡', label: 'Stormcaller' },
-  { key: '🛡', label: 'Guardian' },
-  { key: '🌙', label: 'Moonsworn' },
-  { key: '💫', label: 'Wanderer' },
-  { key: '🌟', label: 'Starborn' },
-  { key: '🦁', label: 'Lionheart' },
-  { key: '🌿', label: 'Verdant' },
+  { key: '♈', label: 'Aries' },
+  { key: '♉', label: 'Taurus' },
+  { key: '♊', label: 'Gemini' },
+  { key: '♋', label: 'Cancer' },
+  { key: '♌', label: 'Leo' },
+  { key: '♍', label: 'Virgo' },
+  { key: '♎', label: 'Libra' },
+  { key: '♏', label: 'Scorpio' },
+  { key: '♐', label: 'Sagittarius' },
+  { key: '♑', label: 'Capricorn' },
+  { key: '♒', label: 'Aquarius' },
+  { key: '♓', label: 'Pisces' },
 ]
 
 // Three curated themes. Each renders the same GSAP cosmic-orrery format in the
@@ -36,97 +35,130 @@ export function applyAccentTheme(value) {
   root.style.setProperty('--accent-border', theme.accBorder)
 }
 
-function AvatarSection({ user, onUpdate }) {
+function AvatarSection({ user, onUpdate, guardRef }) {
+  // Avatar edits are *staged* locally and only persisted when the user clicks
+  // "Save Changes" — nothing hits the server on a mere preset click or file pick.
+  //  · draftUrl     — pending avatar_url to save ('preset:x', a server url, or null for initials)
+  //  · pendingFile  — a chosen custom image not yet uploaded
+  //  · pendingPreview — object URL for previewing that pending file
+  const [draftUrl, setDraftUrl] = useState(user.avatar_url ?? null)
+  const [pendingFile, setPendingFile] = useState(null)
+  const [pendingPreview, setPendingPreview] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef(null)
 
-  const isPreset = user.avatar_url?.startsWith('preset:')
-  const currentPresetKey = isPreset ? user.avatar_url.slice(7) : null
-  const hasCustomImage = user.avatar_url && !isPreset
+  // Re-sync the draft to the saved value whenever it changes (e.g. right after a
+  // successful save), which also clears the dirty/unsaved state.
+  useEffect(() => {
+    setDraftUrl(user.avatar_url ?? null)
+    setPendingFile(null)
+    setPendingPreview(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+  }, [user.avatar_url])
 
-  async function selectPreset(key) {
-    setSaving(true)
+  // Release the preview object URL on unmount so we don't leak it.
+  useEffect(() => () => { if (pendingPreview) URL.revokeObjectURL(pendingPreview) }, [pendingPreview])
+
+  const draftPresetKey = draftUrl?.startsWith('preset:') ? draftUrl.slice(7) : null
+  const draftCustomUrl = pendingFile
+    ? pendingPreview
+    : (draftUrl && !draftUrl.startsWith('preset:') ? assetUrl(draftUrl) : null)
+  const hasCustomDraft = draftCustomUrl != null
+  const hasAnyAvatar = hasCustomDraft || draftPresetKey != null
+  const dirty = pendingFile != null || (draftUrl ?? null) !== (user.avatar_url ?? null)
+
+  function selectPreset(key) {
     setError('')
-    try {
-      const res = await apiFetch('/api/users/me', {
-        method: 'PATCH',
-        body: JSON.stringify({ avatar_url: `preset:${key}` }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      onUpdate({ avatar_url: data.avatar_url })
-    } catch (e) {
-      setError(e.message)
-    }
-    setSaving(false)
+    setDraftUrl(`preset:${key}`)
+    setPendingFile(null)
+    setPendingPreview(prev => { if (prev) URL.revokeObjectURL(prev); return null })
   }
 
-  async function uploadCustom(e) {
+  function chooseFile(e) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    setUploading(true)
+    if (file.size > 5 * 1024 * 1024) { setError('Image must be under 5 MB.'); return }
     setError('')
-    try {
-      const { url } = await uploadImage(file, 'avatars')
-      const res = await apiFetch('/api/users/me', {
-        method: 'PATCH',
-        body: JSON.stringify({ avatar_url: url }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      onUpdate({ avatar_url: data.avatar_url })
-    } catch (e) {
-      setError(e.message)
-    }
-    setUploading(false)
+    setPendingPreview(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(file) })
+    setPendingFile(file)
+    setDraftUrl(null) // a pending custom image supersedes any chosen preset
   }
 
-  async function clearAvatar() {
+  function useInitials() {
+    setError('')
+    setDraftUrl(null)
+    setPendingFile(null)
+    setPendingPreview(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+  }
+
+  function discard() {
+    setError('')
+    setDraftUrl(user.avatar_url ?? null)
+    setPendingFile(null)
+    setPendingPreview(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+  }
+
+  // Persist the staged changes. Uploads the pending file first (if any), then
+  // PATCHes the user. Returns true on success so the exit guard can proceed.
+  async function save() {
+    if (!dirty) return true
     setSaving(true)
     setError('')
     try {
+      let avatar_url = draftUrl
+      if (pendingFile) {
+        const { url } = await uploadImage(pendingFile, 'avatars')
+        avatar_url = url
+      }
       const res = await apiFetch('/api/users/me', {
         method: 'PATCH',
-        body: JSON.stringify({ avatar_url: null }),
+        body: JSON.stringify({ avatar_url }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      onUpdate({ avatar_url: null })
+      onUpdate({ avatar_url: data.avatar_url }) // re-sync effect clears the dirty state
+      return true
     } catch (e) {
       setError(e.message)
+      return false
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
+
+  // Expose the live dirty flag + save fn to the page so it can guard navigation.
+  useEffect(() => {
+    guardRef.current = { dirty, save }
+    return () => { guardRef.current = null }
+  })
 
   return (
     <div className="settings-section">
-      <h2 className="settings-section-title">Your Sigil</h2>
-      <p className="settings-section-desc">Choose the mark that precedes your name throughout the realm.</p>
+      <h2 className="settings-section-title">Your Avatar</h2>
+      <p className="settings-section-desc">Choose the symbol precedes your name throughout the galaxy.</p>
 
       <div className="settings-avatar-hero">
-        {hasCustomImage ? (
-          <img className="settings-avatar-hero-img" src={assetUrl(user.avatar_url)} alt={user.username} />
-        ) : currentPresetKey ? (
-          <span className="settings-avatar-hero-sigil">{currentPresetKey}</span>
+        {hasCustomDraft ? (
+          <img className="settings-avatar-hero-img" src={draftCustomUrl} alt={user.username} />
+        ) : draftPresetKey ? (
+          <span className="settings-avatar-hero-sigil">{draftPresetKey}</span>
         ) : (
           <span className="settings-avatar-hero-monogram">{(user.username[0] || '?').toUpperCase()}</span>
         )}
       </div>
 
       <div className="settings-avatar-block">
-        <h3 className="settings-block-label">Arcane Sigils</h3>
+        <h3 className="settings-block-label">Zodiac Signs</h3>
         <div className="settings-avatar-presets">
           {AVATAR_PRESETS.map(p => (
             <button
               key={p.key}
-              className={`settings-avatar-preset${currentPresetKey === p.key ? ' selected' : ''}`}
+              className={`settings-avatar-preset${draftPresetKey === p.key ? ' selected' : ''}`}
               onClick={() => selectPreset(p.key)}
-              disabled={saving || uploading}
+              disabled={saving}
               title={p.label}
-              aria-label={`${p.label} sigil${currentPresetKey === p.key ? ' (active)' : ''}`}
+              aria-label={`${p.label} sign${draftPresetKey === p.key ? ' (selected)' : ''}`}
             >
               {p.key}
             </button>
@@ -137,28 +169,38 @@ function AvatarSection({ user, onUpdate }) {
       <div className="settings-avatar-block">
         <h3 className="settings-block-label">Custom Image</h3>
         <div className="settings-avatar-upload-row">
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={uploadCustom} />
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={chooseFile} />
           <button
             className="btn-ghost"
             onClick={() => fileRef.current?.click()}
-            disabled={uploading || saving}
+            disabled={saving}
           >
-            {uploading ? 'Uploading…' : hasCustomImage ? 'Replace image' : 'Upload image'}
+            {hasCustomDraft ? 'Replace image' : 'Upload image'}
           </button>
-          {user.avatar_url && (
+          {hasAnyAvatar && (
             <button
               className="btn-ghost settings-avatar-clear"
-              onClick={clearAvatar}
-              disabled={saving || uploading}
+              onClick={useInitials}
+              disabled={saving}
             >
               Use initials
             </button>
           )}
         </div>
-        <p className="settings-avatar-hint">Images only · max 5 MB</p>
+        <p className="settings-avatar-hint">Images only · max 5 MB · changes apply after you save</p>
       </div>
 
       {error && <p className="settings-error">{error}</p>}
+
+      <div className="settings-avatar-savebar">
+        <button className="btn-primary" onClick={save} disabled={!dirty || saving}>
+          {saving ? 'Saving…' : 'Save Changes'}
+        </button>
+        {dirty && (
+          <button className="btn-ghost" onClick={discard} disabled={saving}>Discard</button>
+        )}
+        {dirty && <span className="settings-avatar-dirty-note">Unsaved changes</span>}
+      </div>
     </div>
   )
 }
@@ -251,86 +293,149 @@ function SecuritySection({ user, onUpdateUser, onStartSetup }) {
   )
 }
 
-function CustomizationSection({ userId }) {
-  const [activeTheme, setActiveTheme] = useState(() => {
-    const stored = localStorage.getItem(`accent-theme-${userId}`)
-    return THEME_PRESETS.some(t => t.value === stored) ? stored : 'arcane'
-  })
-  const [reducedMotion, setReducedMotion] = useState(
-    () => localStorage.getItem('force-reduced-motion') === 'true'
-  )
+function AiSection() {
+  const [configured, setConfigured] = useState(false)
+  const [model, setModel] = useState('')
+  const [models, setModels] = useState([])
+  const [keyInput, setKeyInput] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
-  function selectTheme(value) {
-    setActiveTheme(value)
-    localStorage.setItem(`accent-theme-${userId}`, value)
-    applyAccentTheme(value)
+  // Load current key status + chosen model. If a key exists, also fetch the
+  // model list (which itself validates the key against Anthropic).
+  useEffect(() => {
+    let alive = true
+    getAiKeyStatus()
+      .then(async s => {
+        if (!alive) return
+        setConfigured(s.configured)
+        setModel(s.model)
+        if (s.configured) {
+          try {
+            const list = await listAiModels()
+            if (alive) setModels(list)
+          } catch { /* leave model list empty; the saved model still works */ }
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [])
+
+  async function saveKey(e) {
+    e.preventDefault()
+    if (!keyInput.trim()) return
+    setSaving(true); setError(''); setSuccess('')
+    try {
+      const res = await saveAiKey({ key: keyInput.trim(), model })
+      setConfigured(res.configured)
+      setKeyInput('')
+      setSuccess('API key saved.')
+      try { setModels(await listAiModels()) } catch { /* ignore */ }
+    } catch (err) {
+      setError(err.message)
+    }
+    setSaving(false)
   }
 
-  function toggleReducedMotion(e) {
-    const val = e.target.checked
-    setReducedMotion(val)
-    localStorage.setItem('force-reduced-motion', String(val))
-    if (val) {
-      document.documentElement.classList.add('force-reduced-motion')
-    } else {
-      document.documentElement.classList.remove('force-reduced-motion')
+  async function changeModel(e) {
+    const next = e.target.value
+    setModel(next)
+    setError(''); setSuccess('')
+    try {
+      await saveAiKey({ model: next })
+      setSuccess('Model updated.')
+    } catch (err) {
+      setError(err.message)
     }
   }
 
-  const active = THEME_PRESETS.find(t => t.value === activeTheme) || THEME_PRESETS[0]
+  async function clearKey() {
+    setSaving(true); setError(''); setSuccess('')
+    try {
+      await saveAiKey({ key: '' })
+      setConfigured(false)
+      setModels([])
+      setSuccess('API key removed.')
+    } catch (err) {
+      setError(err.message)
+    }
+    setSaving(false)
+  }
 
   return (
     <div className="settings-section">
-      <h2 className="settings-section-title">Customization</h2>
-      <p className="settings-section-desc">Shape how the realm looks to you. Preferences are saved to this device.</p>
+      <h2 className="settings-section-title">AI Assistant</h2>
+      <p className="settings-section-desc">
+        The assistant runs on your own Anthropic API key. It's stored encrypted and
+        only used to power your requests. Get a key at{' '}
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">console.anthropic.com</a>.
+      </p>
 
-      <div className="settings-avatar-block">
-        <h3 className="settings-block-label">Theme</h3>
-        <div className="settings-theme-grid">
-          {THEME_PRESETS.map(t => (
-            <button
-              key={t.value}
-              type="button"
-              className={`theme-card${activeTheme === t.value ? ' selected' : ''}`}
-              style={{ '--card-accent': t.accent }}
-              onClick={() => selectTheme(t.value)}
-              aria-pressed={activeTheme === t.value}
-              aria-label={`${t.label} theme${activeTheme === t.value ? ' (active)' : ''}`}
-            >
-              <span className="theme-card-art">
-                <ThemeOrrery variant={t.variant} accent={t.accent} idKey={t.value} />
-              </span>
-              <span className="theme-card-meta">
-                <span className="theme-card-name">{t.label}</span>
-                <span className="theme-card-tag">{t.tagline}</span>
-              </span>
-              <span className="theme-card-check" aria-hidden="true">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 8.5l3.5 3.5L13 4.5" />
-                </svg>
-              </span>
-            </button>
-          ))}
-        </div>
-        <p className="settings-avatar-hint">{active.label} · applies to buttons, links, and highlights</p>
-      </div>
+      {loading ? (
+        <p className="settings-section-desc">Loading…</p>
+      ) : (
+        <>
+          <div className="settings-avatar-block">
+            <h3 className="settings-block-label">Anthropic API Key</h3>
+            <div className={`ai-key-status${configured ? ' ai-key-status--on' : ''}`}>
+              {configured ? '✓ A key is configured.' : 'No key configured yet.'}
+            </div>
+            <form className="settings-form" onSubmit={saveKey}>
+              <label className="settings-field">
+                <span className="settings-field-label">{configured ? 'Replace key' : 'API key'}</span>
+                <input
+                  className="card-input"
+                  type="password"
+                  placeholder="sk-ant-…"
+                  value={keyInput}
+                  onChange={e => setKeyInput(e.target.value)}
+                  autoComplete="off"
+                />
+              </label>
+              <div className="settings-avatar-upload-row">
+                <button className="btn-primary" type="submit" disabled={saving || !keyInput.trim()}>
+                  {saving ? 'Saving…' : 'Save key'}
+                </button>
+                {configured && (
+                  <button type="button" className="btn-ghost settings-avatar-clear" onClick={clearKey} disabled={saving}>
+                    Remove key
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
 
-      <div className="settings-avatar-block">
-        <h3 className="settings-block-label">Motion</h3>
-        <label className="settings-toggle-row">
-          <span className="settings-toggle-label">
-            <strong>Reduce motion</strong>
-            <span className="settings-toggle-sub">Turns off portal particles, the sky comet, and tile entrance animations</span>
-          </span>
-          <input
-            type="checkbox"
-            className="settings-toggle"
-            checked={reducedMotion}
-            onChange={toggleReducedMotion}
-          />
-        </label>
-      </div>
+          {configured && (
+            <div className="settings-avatar-block">
+              <h3 className="settings-block-label">Model</h3>
+              <select className="card-input ai-model-select" value={model} onChange={changeModel}>
+                {/* Always include the saved model even if the list didn't load. */}
+                {!models.some(m => m.id === model) && <option value={model}>{model}</option>}
+                {models.map(m => (
+                  <option key={m.id} value={m.id}>{m.display_name || m.id}</option>
+                ))}
+              </select>
+              <p className="settings-avatar-hint">Faster, cheaper models suit quick card edits; stronger models plan better.</p>
+            </div>
+          )}
+
+          {error && <p className="settings-error">{error}</p>}
+          {success && <p className="settings-success">{success}</p>}
+        </>
+      )}
     </div>
+  )
+}
+
+function IconAi() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z" />
+      <path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9z" />
+    </svg>
   )
 }
 
@@ -339,19 +444,6 @@ function IconAvatar() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-    </svg>
-  )
-}
-
-function IconCustomization() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="4" y1="6" x2="20" y2="6" />
-      <circle cx="8" cy="6" r="2" fill="var(--bg)" />
-      <line x1="4" y1="12" x2="20" y2="12" />
-      <circle cx="16" cy="12" r="2" fill="var(--bg)" />
-      <line x1="4" y1="18" x2="20" y2="18" />
-      <circle cx="10" cy="18" r="2" fill="var(--bg)" />
     </svg>
   )
 }
@@ -367,7 +459,7 @@ function IconSecurity() {
 
 const NAV_ITEMS = [
   { key: 'avatar',         label: 'Change Avatar',  Icon: IconAvatar },
-  { key: 'customization',  label: 'Customization',   Icon: IconCustomization },
+  { key: 'ai',             label: 'AI Assistant',    Icon: IconAi },
   { key: 'security',       label: 'Security',        Icon: IconSecurity },
 ]
 
@@ -375,6 +467,41 @@ export default function SettingsPage({ user, section, onSection, onBack, onUpdat
   const [settingUp2fa, setSettingUp2fa] = useState(false)
   // mirror the dashboard's day/night choice so Settings matches the realm
   const colorMode = localStorage.getItem('dash-color-mode') || 'night'
+
+  // The active editing pane (currently the avatar) registers its unsaved-changes
+  // state here. `pendingExit` holds the navigation to run once the user resolves
+  // the "save or leave" prompt; `savingExit` reflects an in-flight save from it.
+  const guardRef = useRef(null)
+  const [pendingExit, setPendingExit] = useState(null)
+  const [savingExit, setSavingExit] = useState(false)
+
+  // Run `action`, but if there are unsaved changes first pop the guard prompt.
+  function guardedExit(action) {
+    if (guardRef.current?.dirty) setPendingExit({ run: action })
+    else action()
+  }
+
+  async function saveAndExit() {
+    setSavingExit(true)
+    const ok = await guardRef.current?.save?.()
+    setSavingExit(false)
+    if (ok) { const a = pendingExit; setPendingExit(null); a?.run() }
+    // on failure the prompt stays open; the pane shows its own error
+  }
+
+  function exitWithoutSaving() {
+    const a = pendingExit
+    setPendingExit(null)
+    a?.run()
+  }
+
+  // Let Escape dismiss the prompt (but not while a save is in flight).
+  useEffect(() => {
+    if (!pendingExit) return
+    function onKey(e) { if (e.key === 'Escape' && !savingExit) setPendingExit(null) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [pendingExit, savingExit])
 
   // 2FA enrolment is its own full-screen flow, so it replaces the whole
   // settings shell rather than rendering inside a pane.
@@ -392,9 +519,9 @@ export default function SettingsPage({ user, section, onSection, onBack, onUpdat
       <Starfield mode={colorMode} />
 
       <header className="settings-topbar">
-        <button className="back-btn" onClick={onBack} title="Back to dashboard">←</button>
+        <button className="back-btn" onClick={() => guardedExit(onBack)} title="Back to dashboard">←</button>
         <span className="settings-topbar-title">Settings</span>
-        <button className="btn-ghost logout-btn" onClick={onLogout}>Log out</button>
+        <button className="btn-ghost logout-btn" onClick={() => guardedExit(onLogout)}>Log out</button>
       </header>
 
       <div className="settings-layout">
@@ -403,7 +530,7 @@ export default function SettingsPage({ user, section, onSection, onBack, onUpdat
             <button
               key={item.key}
               className={`settings-nav-item${section === item.key ? ' active' : ''}`}
-              onClick={() => onSection(item.key)}
+              onClick={() => { if (item.key !== section) guardedExit(() => onSection(item.key)) }}
               aria-current={section === item.key ? 'page' : undefined}
             >
               <span className="settings-nav-glyph"><item.Icon /></span>
@@ -413,11 +540,39 @@ export default function SettingsPage({ user, section, onSection, onBack, onUpdat
         </nav>
 
         <main className="settings-pane">
-          {section === 'avatar'        && <AvatarSection       user={user} onUpdate={onUpdateUser} />}
+          {section === 'avatar'        && <AvatarSection       user={user} onUpdate={onUpdateUser} guardRef={guardRef} />}
           {section === 'security'      && <SecuritySection user={user} onUpdateUser={onUpdateUser} onStartSetup={() => setSettingUp2fa(true)} />}
-          {section === 'customization' && <CustomizationSection userId={user.id} />}
+          {section === 'ai'            && <AiSection />}
         </main>
       </div>
+
+      {pendingExit && (
+        <div
+          className="settings-confirm-overlay"
+          onClick={() => { if (!savingExit) setPendingExit(null) }}
+        >
+          <div
+            className="settings-confirm-card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Unsaved changes"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="settings-confirm-title">Unsaved changes</h2>
+            <p className="settings-confirm-text">
+              You have unsaved changes. Save them before leaving, or exit and discard them?
+            </p>
+            <div className="settings-confirm-actions">
+              <button className="btn-primary" onClick={saveAndExit} disabled={savingExit}>
+                {savingExit ? 'Saving…' : 'Save & exit'}
+              </button>
+              <button className="btn-ghost" onClick={exitWithoutSaving} disabled={savingExit}>
+                Exit without saving
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

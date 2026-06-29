@@ -76,6 +76,10 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
     )
   }
 
+  // When the search query is an id query (e.g. "#71"), highlight this card's id badge if it matches.
+  const idQuery = searchQuery?.match(/^#(\d+)$/)
+  const idMatched = idQuery ? Number(idQuery[1]) === card.id : false
+
   return (
     <div
       ref={node => cardRef?.(card.id, node)}
@@ -86,6 +90,7 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
     >
       <div className="card-header">
         <p className="card-title card-title--clickable" onClick={onOpenDetail}>
+          <span className={`card-id${idMatched ? ' search-highlight' : ''}${idMatched && isActiveMatch ? ' active' : ''}`}>#{card.id}.</span>{' '}
           {highlightMatches(card.title, searchQuery, caseSensitive, wholeWord, isActiveMatch)}
         </p>
         <div className="card-actions">
@@ -94,7 +99,7 @@ export default function Card({ card, onDelete, onToggleStar, onEdit, onDragStart
             onClick={() => onToggleStar(card.id, card.starred)}
             title={card.starred ? 'Unstar' : 'Star'}
           >
-            {card.starred ? '★' : '☆'}
+            <span className="card-star-glyph">{card.starred ? '★' : '☆'}</span>
           </button>
           <button className="card-delete" onClick={() => onDelete(card.id)} title="Remove card">
             ✕

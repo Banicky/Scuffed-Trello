@@ -19,10 +19,53 @@ import QRCode from "qrcode";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import Anthropic from "@anthropic-ai/sdk";
 import pool from "./database.js";
 
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 const SERVER_URL = process.env.SERVER_URL || "http://localhost:4000";
+
+// ── AI assistant (BYOK) ───────────────────────────────────────────────────────
+// Each user supplies their OWN Anthropic API key, stored encrypted at rest. The
+// server never holds a global key — every Claude call runs under the requesting
+// user's key, so the assistant can only ever do what that user could do.
+// AI_KEY_SECRET backs the AES-256-GCM envelope around the stored key. A random
+// dev default keeps local dev working, but set a real 64-hex-char secret in prod
+// (a rotated secret makes already-stored keys undecryptable — users re-enter).
+const AI_KEY_SECRET = crypto
+  .createHash("sha256")
+  .update(process.env.AI_KEY_SECRET || process.env.SESSION_SECRET || "scuffed-trello-dev-ai-secret")
+  .digest(); // 32 bytes for AES-256
+
+// The only models the assistant offers. Haiku is the fast/cheap default; Sonnet
+// is the stronger option. The model picker and chat both validate against this
+// list, so a stored or requested model outside it falls back to the default.
+const AI_MODELS = [
+  { id: "claude-haiku-4-5", display_name: "Haiku 4.5" },
+  { id: "claude-sonnet-4-6", display_name: "Sonnet 4.6" },
+];
+const AI_DEFAULT_MODEL = "claude-haiku-4-5";
+const isAllowedModel = m => AI_MODELS.some(x => x.id === m);
+
+function encryptKey(plain) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", AI_KEY_SECRET, iv);
+  const enc = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  // store as iv:tag:ciphertext, all hex
+  return `${iv.toString("hex")}:${tag.toString("hex")}:${enc.toString("hex")}`;
+}
+
+function decryptKey(blob) {
+  try {
+    const [ivHex, tagHex, dataHex] = String(blob).split(":");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", AI_KEY_SECRET, Buffer.from(ivHex, "hex"));
+    decipher.setAuthTag(Buffer.from(tagHex, "hex"));
+    return Buffer.concat([decipher.update(Buffer.from(dataHex, "hex")), decipher.final()]).toString("utf8");
+  } catch {
+    return null; // wrong secret / corrupt blob → treat as "no key"
+  }
+}
 
 // Tolerate ±1 time-step (±30s) of clock drift between the user's device and the
 // server when checking TOTP codes.
@@ -108,6 +151,13 @@ function deleteSpacesImages(...urls) {
 const app = express();
 const PgSession = connectPgSimple(session);
 
+// In production we sit behind a TLS-terminating proxy (Cloudflare → nginx), so
+// trust the proxy: express then reads X-Forwarded-Proto to know the request is
+// HTTPS and will emit the `secure` session/trust cookies. Locally (no NODE_ENV)
+// we're on plain http://localhost, so secure cookies stay off and login works.
+const isProd = process.env.NODE_ENV === "production";
+app.set("trust proxy", isProd ? 1 : 0);
+
 app.use(cors({ origin: CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
@@ -117,7 +167,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || "dev-secret-change-in-prod",
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 },
+  cookie: { httpOnly: true, secure: isProd, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 },
 }));
 
 function requireAuth(req, res, next) {
@@ -168,6 +218,7 @@ async function rememberDevice(res, userId) {
   await pool.query("UPDATE users SET trusted_token = $1 WHERE id = $2", [token, userId]);
   res.cookie(TRUST_COOKIE, `${userId}.${token}`, {
     httpOnly: true,
+    secure: isProd,
     maxAge: TRUST_MAX_AGE,
     sameSite: "lax",
   });
@@ -264,7 +315,7 @@ if (githubConfigured) {
   }));
 }
 
-// helper: check if user owns, is a direct member, or is a guild member of the board
+// helper: check if user owns, is a direct member, or is a team member of the board
 async function canAccessBoard(userId, boardId) {
   const result = await pool.query(
     `SELECT 1 FROM boards WHERE id = $1 AND owner_id = $2
@@ -272,10 +323,10 @@ async function canAccessBoard(userId, boardId) {
      SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2
      UNION
      SELECT 1 FROM boards b
-       JOIN guilds g ON g.id = b.guild_id
+       JOIN teams g ON g.id = b.team_id
        WHERE b.id = $1
          AND (g.owner_id = $2 OR EXISTS (
-           SELECT 1 FROM guild_members WHERE guild_id = g.id AND user_id = $2
+           SELECT 1 FROM team_members WHERE team_id = g.id AND user_id = $2
          ))`,
     [boardId, userId]
   );
@@ -615,7 +666,7 @@ app.get("/api/auth/me", async (req, res) => {
 });
 
 // GET /api/me/activity — "Cosmic Activity": the signed-in user's own recent
-// deeds across boards, guilds and cards, merged into one reverse-chronological
+// deeds across boards, teams and cards, merged into one reverse-chronological
 // feed. Each row is { created_at, kind, action, title, context, board_id }.
 app.get("/api/me/activity", requireAuth, async (req, res) => {
   const uid = req.session.userId;
@@ -638,14 +689,14 @@ app.get("/api/me/activity", requireAuth, async (req, res) => {
        FROM board_activity ba WHERE ba.user_id = $1
 
        UNION ALL
-       -- guilds this user founded
-       SELECT g.created_at, 'guild', 'founded', g.name, NULL, NULL
-       FROM guilds g WHERE g.owner_id = $1
+       -- teams this user founded
+       SELECT g.created_at, 'team', 'founded', g.name, NULL, NULL
+       FROM teams g WHERE g.owner_id = $1
 
        UNION ALL
-       -- guilds this user joined (but does not own)
-       SELECT gm.joined_at, 'guild', 'joined', g.name, NULL, NULL
-       FROM guild_members gm JOIN guilds g ON g.id = gm.guild_id
+       -- teams this user joined (but does not own)
+       SELECT gm.joined_at, 'team', 'joined', g.name, NULL, NULL
+       FROM team_members gm JOIN teams g ON g.id = gm.team_id
        WHERE gm.user_id = $1 AND g.owner_id <> $1
      ) feed
      WHERE created_at IS NOT NULL
@@ -802,20 +853,20 @@ app.post("/api/auth/2fa/disable", requireAuth, async (req, res) => {
 app.get("/api/boards", requireAuth, async (req, res) => {
   const result = await pool.query(
     `SELECT b.*, 'owner' AS role, ba.accessed_at AS last_accessed_at,
-            g.name AS guild_name, g.icon_color AS guild_icon_color,
+            g.name AS team_name, g.icon_color AS team_icon_color,
             ${COLUMN_COUNTS_SQL} AS column_counts, ${BOARD_MEMBERS_SQL} AS members
        FROM boards b
        LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $1
-       LEFT JOIN guilds g ON g.id = b.guild_id
+       LEFT JOIN teams g ON g.id = b.team_id
        WHERE b.owner_id = $1
      UNION
      SELECT b.*, 'member' AS role, ba.accessed_at AS last_accessed_at,
-            g.name AS guild_name, g.icon_color AS guild_icon_color,
+            g.name AS team_name, g.icon_color AS team_icon_color,
             ${COLUMN_COUNTS_SQL} AS column_counts, ${BOARD_MEMBERS_SQL} AS members
        FROM boards b
        JOIN board_members bm ON bm.board_id = b.id
        LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $1
-       LEFT JOIN guilds g ON g.id = b.guild_id
+       LEFT JOIN teams g ON g.id = b.team_id
        WHERE bm.user_id = $1
      ORDER BY id`,
     [req.session.userId]
@@ -824,19 +875,19 @@ app.get("/api/boards", requireAuth, async (req, res) => {
 });
 
 app.post("/api/boards", requireAuth, async (req, res) => {
-  const { title, guild_id } = req.body;
+  const { title, team_id } = req.body;
   if (tooLong(title, 255)) return res.status(400).json({ error: "Title must be 255 characters or fewer" });
-  if (guild_id) {
+  if (team_id) {
     const access = await pool.query(
-      `SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2
-       UNION SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2`,
-      [guild_id, req.session.userId]
+      `SELECT 1 FROM teams WHERE id = $1 AND owner_id = $2
+       UNION SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2`,
+      [team_id, req.session.userId]
     );
-    if (!access.rowCount) return res.status(403).json({ error: "Not a guild member" });
+    if (!access.rowCount) return res.status(403).json({ error: "Not a team member" });
   }
   const result = await pool.query(
-    "INSERT INTO boards (title, owner_id, guild_id) VALUES ($1, $2, $3) RETURNING *",
-    [title, req.session.userId, guild_id || null]
+    "INSERT INTO boards (title, owner_id, team_id) VALUES ($1, $2, $3) RETURNING *",
+    [title, req.session.userId, team_id || null]
   );
   res.json({ ...result.rows[0], role: "owner" });
 });
@@ -1110,14 +1161,32 @@ app.post("/api/boards/:id/import", requireAuth, async (req, res) => {
 
 // ── Board members ─────────────────────────────────────────────────────────────
 
+// Presence heartbeat — the client pings this on an interval (~30s) while the app
+// is open; we stamp last_seen so member lists can flag who is currently active.
+app.post("/api/heartbeat", requireAuth, async (req, res) => {
+  await pool.query("UPDATE users SET last_seen = NOW() WHERE id = $1", [req.session.userId]);
+  res.json({ ok: true });
+});
+
 app.get("/api/boards/:boardId/members", requireAuth, async (req, res) => {
   if (!await canAccessBoard(req.session.userId, req.params.boardId)) {
     return res.status(403).json({ error: "Forbidden" });
   }
+  // The owner is not stored in board_members, so include them explicitly and
+  // flag them so the UI can mark ownership. Owner first, then members A→Z.
+  // is_active is computed server-side (server NOW() vs server last_seen) to avoid
+  // client clock skew — a member counts as active for 75s after their last ping
+  // (2.5× the 30s heartbeat, so a single dropped beat doesn't flicker them off).
   const result = await pool.query(
-    `SELECT u.id, u.username, u.email, u.avatar_url FROM users u
-     JOIN board_members bm ON bm.user_id = u.id
-     WHERE bm.board_id = $1`,
+    `SELECT u.id, u.username, u.email, u.avatar_url, u.last_seen,
+            (u.id = b.owner_id) AS is_owner,
+            (u.last_seen IS NOT NULL AND u.last_seen > NOW() - INTERVAL '75 seconds') AS is_active
+     FROM boards b
+     JOIN users u
+       ON u.id = b.owner_id
+       OR u.id IN (SELECT user_id FROM board_members WHERE board_id = b.id)
+     WHERE b.id = $1
+     ORDER BY (u.id <> b.owner_id), u.username`,
     [req.params.boardId]
   );
   res.json(result.rows);
@@ -1157,87 +1226,87 @@ app.delete("/api/boards/:boardId/members/:userId", requireAuth, async (req, res)
   res.json({ success: true });
 });
 
-// ── Guilds ────────────────────────────────────────────────────────────────────
+// ── Teams ────────────────────────────────────────────────────────────────────
 
-async function canAccessGuild(userId, guildId) {
+async function canAccessTeam(userId, teamId) {
   const result = await pool.query(
-    `SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2
-     UNION SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2`,
-    [guildId, userId]
+    `SELECT 1 FROM teams WHERE id = $1 AND owner_id = $2
+     UNION SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2`,
+    [teamId, userId]
   );
   return result.rowCount > 0;
 }
 
-app.get("/api/guilds", requireAuth, async (req, res) => {
+app.get("/api/teams", requireAuth, async (req, res) => {
   const result = await pool.query(
     `SELECT g.id, g.name, g.icon_color, g.owner_id, g.created_at,
-       (SELECT COUNT(*)::int FROM guild_members WHERE guild_id = g.id) + 1 AS member_count,
-       (SELECT COUNT(*)::int FROM boards WHERE guild_id = g.id) AS board_count,
+       (SELECT COUNT(*)::int FROM team_members WHERE team_id = g.id) + 1 AS member_count,
+       (SELECT COUNT(*)::int FROM boards WHERE team_id = g.id) AS board_count,
        CASE WHEN g.owner_id = $1 THEN 'owner' ELSE 'member' END AS role
-     FROM guilds g
+     FROM teams g
      WHERE g.owner_id = $1
-        OR g.id IN (SELECT guild_id FROM guild_members WHERE user_id = $1)
+        OR g.id IN (SELECT team_id FROM team_members WHERE user_id = $1)
      ORDER BY g.created_at`,
     [req.session.userId]
   );
   res.json(result.rows);
 });
 
-app.post("/api/guilds", requireAuth, async (req, res) => {
+app.post("/api/teams", requireAuth, async (req, res) => {
   const { name, icon_color } = req.body;
-  if (!name?.trim()) return res.status(400).json({ error: "Guild name is required" });
+  if (!name?.trim()) return res.status(400).json({ error: "Team name is required" });
   const result = await pool.query(
-    "INSERT INTO guilds (name, owner_id, icon_color) VALUES ($1, $2, $3) RETURNING *",
+    "INSERT INTO teams (name, owner_id, icon_color) VALUES ($1, $2, $3) RETURNING *",
     [name.trim(), req.session.userId, icon_color || "arcane"]
   );
   res.status(201).json({ ...result.rows[0], member_count: 1, board_count: 0, role: "owner" });
 });
 
-app.get("/api/guilds/:id", requireAuth, async (req, res) => {
-  if (!await canAccessGuild(req.session.userId, req.params.id)) {
+app.get("/api/teams/:id", requireAuth, async (req, res) => {
+  if (!await canAccessTeam(req.session.userId, req.params.id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
-  const guildResult = await pool.query("SELECT * FROM guilds WHERE id = $1", [req.params.id]);
-  if (!guildResult.rows[0]) return res.status(404).json({ error: "Not found" });
+  const teamResult = await pool.query("SELECT * FROM teams WHERE id = $1", [req.params.id]);
+  if (!teamResult.rows[0]) return res.status(404).json({ error: "Not found" });
   const membersResult = await pool.query(
     `SELECT u.id, u.username, u.avatar_url,
        CASE WHEN g.owner_id = u.id THEN 'owner' ELSE 'member' END AS role
-     FROM guilds g
+     FROM teams g
      CROSS JOIN users u
      WHERE g.id = $1
-       AND (u.id = g.owner_id OR u.id IN (SELECT user_id FROM guild_members WHERE guild_id = g.id))
+       AND (u.id = g.owner_id OR u.id IN (SELECT user_id FROM team_members WHERE team_id = g.id))
      ORDER BY (g.owner_id = u.id) DESC, u.username`,
     [req.params.id]
   );
-  res.json({ ...guildResult.rows[0], members: membersResult.rows });
+  res.json({ ...teamResult.rows[0], members: membersResult.rows });
 });
 
-app.patch("/api/guilds/:id", requireAuth, async (req, res) => {
-  const g = await pool.query("SELECT owner_id FROM guilds WHERE id = $1", [req.params.id]);
+app.patch("/api/teams/:id", requireAuth, async (req, res) => {
+  const g = await pool.query("SELECT owner_id FROM teams WHERE id = $1", [req.params.id]);
   if (!g.rows[0]) return res.status(404).json({ error: "Not found" });
-  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the guild owner can edit it" });
+  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the team owner can edit it" });
   const { name, icon_color } = req.body;
   const sets = []; const vals = []; let i = 1;
   if (name !== undefined) { sets.push(`name = $${i++}`); vals.push(name.trim()); }
   if (icon_color !== undefined) { sets.push(`icon_color = $${i++}`); vals.push(icon_color); }
   if (!sets.length) return res.json(g.rows[0]);
   vals.push(req.params.id);
-  const result = await pool.query(`UPDATE guilds SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
+  const result = await pool.query(`UPDATE teams SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
   res.json(result.rows[0]);
 });
 
-app.delete("/api/guilds/:id", requireAuth, async (req, res) => {
-  const g = await pool.query("SELECT owner_id FROM guilds WHERE id = $1", [req.params.id]);
+app.delete("/api/teams/:id", requireAuth, async (req, res) => {
+  const g = await pool.query("SELECT owner_id FROM teams WHERE id = $1", [req.params.id]);
   if (!g.rows[0]) return res.status(404).json({ error: "Not found" });
-  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the guild owner can delete it" });
-  await pool.query("DELETE FROM guilds WHERE id = $1", [req.params.id]);
+  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the team owner can delete it" });
+  await pool.query("DELETE FROM teams WHERE id = $1", [req.params.id]);
   res.json({ success: true });
 });
 
-app.post("/api/guilds/:id/members", requireAuth, async (req, res) => {
-  const g = await pool.query("SELECT owner_id FROM guilds WHERE id = $1", [req.params.id]);
+app.post("/api/teams/:id/members", requireAuth, async (req, res) => {
+  const g = await pool.query("SELECT owner_id FROM teams WHERE id = $1", [req.params.id]);
   if (!g.rows[0]) return res.status(404).json({ error: "Not found" });
-  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the guild owner can add members" });
+  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the team owner can add members" });
   const { username } = req.body;
   const userResult = await pool.query(
     "SELECT id, username, avatar_url FROM users WHERE username = $1 OR email = $1",
@@ -1245,30 +1314,30 @@ app.post("/api/guilds/:id/members", requireAuth, async (req, res) => {
   );
   if (!userResult.rows[0]) return res.status(404).json({ error: "User not found" });
   const invitee = userResult.rows[0];
-  if (invitee.id === req.session.userId) return res.status(400).json({ error: "You already own this guild" });
+  if (invitee.id === req.session.userId) return res.status(400).json({ error: "You already own this team" });
   await pool.query(
-    "INSERT INTO guild_members (guild_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    "INSERT INTO team_members (team_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
     [req.params.id, invitee.id]
   );
   res.json({ ...invitee, role: "member" });
 });
 
-app.delete("/api/guilds/:id/members/:userId", requireAuth, async (req, res) => {
-  const g = await pool.query("SELECT owner_id FROM guilds WHERE id = $1", [req.params.id]);
+app.delete("/api/teams/:id/members/:userId", requireAuth, async (req, res) => {
+  const g = await pool.query("SELECT owner_id FROM teams WHERE id = $1", [req.params.id]);
   if (!g.rows[0]) return res.status(404).json({ error: "Not found" });
-  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the guild owner can remove members" });
+  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the team owner can remove members" });
   await pool.query(
-    "DELETE FROM guild_members WHERE guild_id = $1 AND user_id = $2",
+    "DELETE FROM team_members WHERE team_id = $1 AND user_id = $2",
     [req.params.id, req.params.userId]
   );
   res.json({ success: true });
 });
 
-// POST /api/guilds/:id/invites — dispatch a guild summons (owner only)
-app.post("/api/guilds/:id/invites", requireAuth, async (req, res) => {
-  const g = await pool.query("SELECT * FROM guilds WHERE id = $1", [req.params.id]);
-  if (!g.rows[0]) return res.status(404).json({ error: "Guild not found" });
-  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the guild owner can send invites" });
+// POST /api/teams/:id/invites — send a team invite (owner only)
+app.post("/api/teams/:id/invites", requireAuth, async (req, res) => {
+  const g = await pool.query("SELECT * FROM teams WHERE id = $1", [req.params.id]);
+  if (!g.rows[0]) return res.status(404).json({ error: "Team not found" });
+  if (g.rows[0].owner_id !== req.session.userId) return res.status(403).json({ error: "Only the team owner can send invites" });
 
   const { username } = req.body;
   const userResult = await pool.query(
@@ -1278,31 +1347,31 @@ app.post("/api/guilds/:id/invites", requireAuth, async (req, res) => {
   if (!userResult.rows[0]) return res.status(404).json({ error: "User not found" });
   const invitee = userResult.rows[0];
 
-  if (invitee.id === req.session.userId) return res.status(400).json({ error: "You already own this guild" });
+  if (invitee.id === req.session.userId) return res.status(400).json({ error: "You already own this team" });
 
   const already = await pool.query(
-    `SELECT 1 FROM guilds WHERE id = $1 AND owner_id = $2
-     UNION SELECT 1 FROM guild_members WHERE guild_id = $1 AND user_id = $2`,
+    `SELECT 1 FROM teams WHERE id = $1 AND owner_id = $2
+     UNION SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2`,
     [req.params.id, invitee.id]
   );
-  if (already.rowCount > 0) return res.status(400).json({ error: "That warrior is already in the guild" });
+  if (already.rowCount > 0) return res.status(400).json({ error: "That warrior is already in the team" });
 
   const invite = await pool.query(
-    `INSERT INTO guild_invites (guild_id, inviter_id, invitee_id, status)
+    `INSERT INTO team_invites (team_id, inviter_id, invitee_id, status)
      VALUES ($1, $2, $3, 'pending')
-     ON CONFLICT (guild_id, invitee_id) DO UPDATE SET status = 'pending', created_at = NOW()
+     ON CONFLICT (team_id, invitee_id) DO UPDATE SET status = 'pending', created_at = NOW()
      RETURNING *`,
     [req.params.id, req.session.userId, invitee.id]
   );
 
   const inviter = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
   await pool.query(
-    `INSERT INTO notifications (user_id, type, data) VALUES ($1, 'guild_invite', $2)`,
+    `INSERT INTO notifications (user_id, type, data) VALUES ($1, 'team_invite', $2)`,
     [invitee.id, JSON.stringify({
       invite_id: invite.rows[0].id,
-      guild_id: parseInt(req.params.id),
-      guild_name: g.rows[0].name,
-      guild_icon_color: g.rows[0].icon_color,
+      team_id: parseInt(req.params.id),
+      team_name: g.rows[0].name,
+      team_icon_color: g.rows[0].icon_color,
       inviter_username: inviter.rows[0].username,
     })]
   );
@@ -1334,52 +1403,52 @@ app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-// POST /api/guild-invites/:id/accept
-app.post("/api/guild-invites/:id/accept", requireAuth, async (req, res) => {
-  const invite = await pool.query("SELECT * FROM guild_invites WHERE id = $1", [req.params.id]);
+// POST /api/team-invites/:id/accept
+app.post("/api/team-invites/:id/accept", requireAuth, async (req, res) => {
+  const invite = await pool.query("SELECT * FROM team_invites WHERE id = $1", [req.params.id]);
   if (!invite.rows[0]) return res.status(404).json({ error: "Invite not found" });
-  if (invite.rows[0].invitee_id !== req.session.userId) return res.status(403).json({ error: "This summons is not for you" });
-  if (invite.rows[0].status !== "pending") return res.status(400).json({ error: "Summons is no longer pending" });
+  if (invite.rows[0].invitee_id !== req.session.userId) return res.status(403).json({ error: "This invitation is not for you" });
+  if (invite.rows[0].status !== "pending") return res.status(400).json({ error: "Invitation is no longer pending" });
 
   await pool.query(
-    "INSERT INTO guild_members (guild_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-    [invite.rows[0].guild_id, req.session.userId]
+    "INSERT INTO team_members (team_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [invite.rows[0].team_id, req.session.userId]
   );
-  await pool.query("UPDATE guild_invites SET status = 'accepted' WHERE id = $1", [req.params.id]);
+  await pool.query("UPDATE team_invites SET status = 'accepted' WHERE id = $1", [req.params.id]);
   await pool.query(
     `UPDATE notifications SET read = true
-     WHERE user_id = $1 AND type = 'guild_invite' AND (data->>'invite_id')::int = $2`,
+     WHERE user_id = $1 AND type = 'team_invite' AND (data->>'invite_id')::int = $2`,
     [req.session.userId, parseInt(req.params.id)]
   );
 
-  const guild = await pool.query(
+  const team = await pool.query(
     `SELECT g.id, g.name, g.icon_color, g.owner_id, g.created_at,
-       (SELECT COUNT(*)::int FROM guild_members WHERE guild_id = g.id) + 1 AS member_count,
-       (SELECT COUNT(*)::int FROM boards WHERE guild_id = g.id) AS board_count,
+       (SELECT COUNT(*)::int FROM team_members WHERE team_id = g.id) + 1 AS member_count,
+       (SELECT COUNT(*)::int FROM boards WHERE team_id = g.id) AS board_count,
        'member' AS role
-     FROM guilds g WHERE g.id = $1`,
-    [invite.rows[0].guild_id]
+     FROM teams g WHERE g.id = $1`,
+    [invite.rows[0].team_id]
   );
-  res.json({ success: true, guild: guild.rows[0] });
+  res.json({ success: true, team: team.rows[0] });
 });
 
-// POST /api/guild-invites/:id/decline
-app.post("/api/guild-invites/:id/decline", requireAuth, async (req, res) => {
-  const invite = await pool.query("SELECT * FROM guild_invites WHERE id = $1", [req.params.id]);
+// POST /api/team-invites/:id/decline
+app.post("/api/team-invites/:id/decline", requireAuth, async (req, res) => {
+  const invite = await pool.query("SELECT * FROM team_invites WHERE id = $1", [req.params.id]);
   if (!invite.rows[0]) return res.status(404).json({ error: "Invite not found" });
-  if (invite.rows[0].invitee_id !== req.session.userId) return res.status(403).json({ error: "This summons is not for you" });
+  if (invite.rows[0].invitee_id !== req.session.userId) return res.status(403).json({ error: "This invitation is not for you" });
 
-  await pool.query("UPDATE guild_invites SET status = 'declined' WHERE id = $1", [req.params.id]);
+  await pool.query("UPDATE team_invites SET status = 'declined' WHERE id = $1", [req.params.id]);
   await pool.query(
     `UPDATE notifications SET read = true
-     WHERE user_id = $1 AND type = 'guild_invite' AND (data->>'invite_id')::int = $2`,
+     WHERE user_id = $1 AND type = 'team_invite' AND (data->>'invite_id')::int = $2`,
     [req.session.userId, parseInt(req.params.id)]
   );
   res.json({ success: true });
 });
 
-app.get("/api/guilds/:id/boards", requireAuth, async (req, res) => {
-  if (!await canAccessGuild(req.session.userId, req.params.id)) {
+app.get("/api/teams/:id/boards", requireAuth, async (req, res) => {
+  if (!await canAccessTeam(req.session.userId, req.params.id)) {
     return res.status(403).json({ error: "Forbidden" });
   }
   const result = await pool.query(
@@ -1390,7 +1459,7 @@ app.get("/api/guilds/:id/boards", requireAuth, async (req, res) => {
        ${BOARD_MEMBERS_SQL} AS members
      FROM boards b
      LEFT JOIN board_access ba ON ba.board_id = b.id AND ba.user_id = $2
-     WHERE b.guild_id = $1
+     WHERE b.team_id = $1
      ORDER BY b.id`,
     [req.params.id, req.session.userId]
   );
@@ -1879,6 +1948,326 @@ app.delete("/api/comments/:id", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── AI assistant (BYOK) ───────────────────────────────────────────────────────
+// The assistant runs a manual tool-calling loop against the SAME data-layer
+// helpers the HTTP routes below use, all gated by canAccessBoard(userId, …).
+// Every action it can take is therefore exactly an action the requesting user
+// could perform by hand — there is no privileged path.
+
+// Shared card/column actions. These mirror the validation + history logging the
+// REST handlers do, so the assistant and a human produce identical side effects.
+async function aiCreateColumn({ boardId, title, position }) {
+  const count = await pool.query("SELECT COUNT(*) FROM columns WHERE board_id = $1", [boardId]);
+  if (parseInt(count.rows[0].count) >= 10) throw new Error("Column limit reached (max 10)");
+  if (tooLong(title, 255)) throw new Error("Column title must be 255 characters or fewer");
+  const pos = position ?? parseInt(count.rows[0].count);
+  const r = await pool.query(
+    "INSERT INTO columns (board_id, title, position) VALUES ($1, $2, $3) RETURNING *",
+    [boardId, title, pos]
+  );
+  return r.rows[0];
+}
+
+async function aiCreateCard({ boardId, userId, columnId, title, description }) {
+  const col = await pool.query("SELECT id FROM columns WHERE id = $1 AND board_id = $2", [columnId, boardId]);
+  if (!col.rows[0]) throw new Error("That column is not on this board");
+  if (tooLong(title, 255)) throw new Error("Card title must be 255 characters or fewer");
+  if (tooLong(description, 3000)) throw new Error("Card description must be 3000 characters or fewer");
+  const posRow = await pool.query("SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM cards WHERE column_id = $1", [columnId]);
+  const r = await pool.query(
+    "INSERT INTO cards (column_id, title, description, position, created_by, updated_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *",
+    [columnId, title, description || null, posRow.rows[0].pos, userId]
+  );
+  const card = r.rows[0];
+  await logActivity({ boardId, cardId: card.id, userId, action: "created", cardTitle: card.title });
+  await logCardHistory({ cardId: card.id, userId, action: "created", cardTitle: card.title });
+  return card;
+}
+
+async function aiUpdateCard({ boardId, userId, cardId, title, description }) {
+  const before = (await pool.query(
+    "SELECT cards.title, cards.description FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1 AND columns.board_id = $2",
+    [cardId, boardId]
+  )).rows[0];
+  if (!before) throw new Error("Card not found on this board");
+  const newTitle = title ?? before.title;
+  const newDesc = description ?? before.description;
+  if (tooLong(newTitle, 255)) throw new Error("Card title must be 255 characters or fewer");
+  if (tooLong(newDesc, 3000)) throw new Error("Card description must be 3000 characters or fewer");
+  const r = await pool.query(
+    "UPDATE cards SET title = $1, description = $2, last_edited_by = $3, updated_at = NOW() WHERE id = $4 RETURNING *",
+    [newTitle, newDesc || null, userId, cardId]
+  );
+  await logActivity({ boardId, cardId, userId, action: "edited", cardTitle: newTitle });
+  const changed = [];
+  if (before.title !== newTitle) changed.push("[Title]");
+  if ((before.description || null) !== (newDesc || null)) changed.push("[Description]");
+  if (changed.length) await logCardHistory({ cardId, userId, action: "edited", cardTitle: newTitle, detail: changed.join(", ") });
+  return r.rows[0];
+}
+
+async function aiMoveCard({ boardId, userId, cardId, columnId }) {
+  const before = (await pool.query(
+    "SELECT cards.column_id, cards.title FROM cards JOIN columns ON columns.id = cards.column_id WHERE cards.id = $1 AND columns.board_id = $2",
+    [cardId, boardId]
+  )).rows[0];
+  if (!before) throw new Error("Card not found on this board");
+  const dest = (await pool.query("SELECT id FROM columns WHERE id = $1 AND board_id = $2", [columnId, boardId])).rows[0];
+  if (!dest) throw new Error("Destination column is not on this board");
+  const posRow = await pool.query("SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM cards WHERE column_id = $1", [columnId]);
+  const r = await pool.query(
+    "UPDATE cards SET column_id = $1, position = $2, last_edited_by = $3, updated_at = NOW() WHERE id = $4 RETURNING *",
+    [columnId, posRow.rows[0].pos, userId, cardId]
+  );
+  if (String(before.column_id) !== String(columnId)) {
+    await logActivity({ boardId, cardId, userId, action: "moved", cardTitle: before.title });
+    const cols = await pool.query("SELECT id, title FROM columns WHERE id = ANY($1)", [[before.column_id, columnId]]);
+    const nameOf = id => `[${cols.rows.find(c => String(c.id) === String(id))?.title || "a column"}]`;
+    await logCardHistory({ cardId, userId, action: "moved", cardTitle: before.title, detail: `to ${nameOf(columnId)} from ${nameOf(before.column_id)}` });
+  }
+  return r.rows[0];
+}
+
+// Snapshot of the whole board, given to Claude as context so it plans against
+// reality. Columns + their cards (id/title/description), nothing private.
+async function aiBoardState(boardId) {
+  const cols = (await pool.query("SELECT id, title, position FROM columns WHERE board_id = $1 ORDER BY position", [boardId])).rows;
+  const out = [];
+  for (const col of cols) {
+    const cards = (await pool.query(
+      "SELECT id, title, description FROM cards WHERE column_id = $1 ORDER BY position",
+      [col.id]
+    )).rows;
+    out.push({ column_id: col.id, title: col.title, cards });
+  }
+  return out;
+}
+
+// Tool schemas exposed to Claude. Each maps to one aiX helper above.
+const AI_TOOLS = [
+  {
+    name: "get_board_state",
+    description: "Get the current columns and cards on the board. Call this first to understand the board before suggesting or making changes.",
+    input_schema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "create_column",
+    description: "Create a new column (list) on the board. Max 10 columns.",
+    input_schema: {
+      type: "object",
+      properties: { title: { type: "string", description: "Column title" } },
+      required: ["title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "create_card",
+    description: "Create a new card in a column. Use get_board_state first to find the column_id.",
+    input_schema: {
+      type: "object",
+      properties: {
+        column_id: { type: "integer", description: "ID of the column to add the card to" },
+        title: { type: "string", description: "Card title" },
+        description: { type: "string", description: "Optional card description" },
+      },
+      required: ["column_id", "title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "update_card",
+    description: "Edit a card's title and/or description.",
+    input_schema: {
+      type: "object",
+      properties: {
+        card_id: { type: "integer", description: "ID of the card to edit" },
+        title: { type: "string", description: "New title (optional)" },
+        description: { type: "string", description: "New description (optional)" },
+      },
+      required: ["card_id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "move_card",
+    description: "Move a card to a different column.",
+    input_schema: {
+      type: "object",
+      properties: {
+        card_id: { type: "integer", description: "ID of the card to move" },
+        column_id: { type: "integer", description: "ID of the destination column" },
+      },
+      required: ["card_id", "column_id"],
+      additionalProperties: false,
+    },
+  },
+];
+
+// Run one tool call and return its result text. `applied` accumulates a
+// human-readable list of write actions for the UI summary.
+async function runAiTool(name, input, { boardId, userId, applied }) {
+  switch (name) {
+    case "get_board_state":
+      return JSON.stringify(await aiBoardState(boardId));
+    case "create_column": {
+      const col = await aiCreateColumn({ boardId, title: input.title });
+      applied.push(`Created column “${col.title}”`);
+      return `Created column id ${col.id} titled "${col.title}".`;
+    }
+    case "create_card": {
+      const card = await aiCreateCard({ boardId, userId, columnId: input.column_id, title: input.title, description: input.description });
+      applied.push(`Created card “${card.title}”`);
+      return `Created card id ${card.id} titled "${card.title}".`;
+    }
+    case "update_card": {
+      const card = await aiUpdateCard({ boardId, userId, cardId: input.card_id, title: input.title, description: input.description });
+      applied.push(`Updated card “${card.title}”`);
+      return `Updated card id ${card.id}.`;
+    }
+    case "move_card": {
+      const card = await aiMoveCard({ boardId, userId, cardId: input.card_id, columnId: input.column_id });
+      applied.push(`Moved card “${card.title}”`);
+      return `Moved card id ${card.id} to column ${input.column_id}.`;
+    }
+    default:
+      throw new Error(`Unknown tool: ${name}`);
+  }
+}
+
+// GET /api/ai/key — does the user have a key configured, and which model?
+// Never returns the key itself.
+app.get("/api/ai/key", requireAuth, async (req, res) => {
+  const r = await pool.query("SELECT ai_api_key, ai_model FROM users WHERE id = $1", [req.session.userId]);
+  res.json({ configured: !!r.rows[0]?.ai_api_key, model: r.rows[0]?.ai_model || AI_DEFAULT_MODEL });
+});
+
+// PUT /api/ai/key — store/replace the user's Anthropic key (validated against the
+// Models API before saving) and/or update the chosen model. Send key:"" to clear.
+app.put("/api/ai/key", requireAuth, async (req, res) => {
+  const { key, model } = req.body || {};
+
+  if (key === "") {
+    await pool.query("UPDATE users SET ai_api_key = NULL WHERE id = $1", [req.session.userId]);
+    return res.json({ configured: false, model: model || AI_DEFAULT_MODEL });
+  }
+
+  if (key !== undefined) {
+    if (typeof key !== "string" || !key.trim()) return res.status(400).json({ error: "Key is required" });
+    // Validate by listing models with it; a bad key throws 401 here.
+    try {
+      const client = new Anthropic({ apiKey: key.trim() });
+      await client.models.list();
+    } catch (e) {
+      const status = e?.status === 401 ? 401 : 400;
+      return res.status(status).json({ error: status === 401 ? "That API key was rejected by Anthropic." : "Could not validate the key. Check it and try again." });
+    }
+    await pool.query("UPDATE users SET ai_api_key = $1 WHERE id = $2", [encryptKey(key.trim()), req.session.userId]);
+  }
+
+  if (model !== undefined) {
+    if (model && !isAllowedModel(model)) return res.status(400).json({ error: "Unsupported model" });
+    await pool.query("UPDATE users SET ai_model = $1 WHERE id = $2", [model || null, req.session.userId]);
+  }
+
+  const r = await pool.query("SELECT ai_api_key, ai_model FROM users WHERE id = $1", [req.session.userId]);
+  res.json({ configured: !!r.rows[0]?.ai_api_key, model: r.rows[0]?.ai_model || AI_DEFAULT_MODEL });
+});
+
+// GET /api/ai/models — the two models the assistant supports (Haiku / Sonnet).
+app.get("/api/ai/models", requireAuth, (_req, res) => {
+  res.json(AI_MODELS);
+});
+
+// POST /api/ai/chat — one assistant turn. Body: { boardId?, message, history? }.
+// Runs a manual tool-calling loop under the user's own key. Returns the assistant
+// reply, the list of applied actions, and whether the board changed (so the UI
+// can reload it).
+app.post("/api/ai/chat", requireAuth, async (req, res) => {
+  const { boardId, message, history } = req.body || {};
+  if (!message || typeof message !== "string" || !message.trim()) {
+    return res.status(400).json({ error: "Message is required" });
+  }
+  if (tooLong(message, 4000)) return res.status(400).json({ error: "Message is too long" });
+
+  const r = await pool.query("SELECT ai_api_key, ai_model FROM users WHERE id = $1", [req.session.userId]);
+  const key = r.rows[0]?.ai_api_key && decryptKey(r.rows[0].ai_api_key);
+  if (!key) return res.status(400).json({ error: "Add your Anthropic API key in Settings → AI Assistant to use the assistant." });
+  const model = isAllowedModel(r.rows[0]?.ai_model) ? r.rows[0].ai_model : AI_DEFAULT_MODEL;
+
+  // A board context means full tool access; without one (dashboard), it's a
+  // read-only planning chat with no tools.
+  const hasBoard = boardId != null;
+  if (hasBoard && !await canAccessBoard(req.session.userId, boardId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const system = hasBoard
+    ? `You are a helpful kanban assistant embedded in a Trello-style board called "Scuffed Trello". ` +
+      `You help the user plan work and manage their board by creating columns, creating cards, editing cards, and moving cards between columns. ` +
+      `Always call get_board_state before creating or moving things so you use correct column and card IDs. ` +
+      `Be concise. After making changes, briefly summarise what you did.`
+    : `You are a helpful planning assistant in a Trello-style app called "Scuffed Trello". ` +
+      `The user is on their board-selection screen, so you cannot modify a board right now — help them plan, brainstrew, and break work down. ` +
+      `If they want you to create or move cards, tell them to open a board first. Be concise.`;
+
+  // Rebuild prior turns (text only) plus this message.
+  const messages = [];
+  if (Array.isArray(history)) {
+    for (const h of history.slice(-10)) {
+      if (h && (h.role === "user" || h.role === "assistant") && typeof h.content === "string") {
+        messages.push({ role: h.role, content: h.content });
+      }
+    }
+  }
+  messages.push({ role: "user", content: message.trim() });
+
+  const client = new Anthropic({ apiKey: key });
+  const applied = [];
+
+  try {
+    let reply = "";
+    // Bounded agentic loop: keep going while Claude asks for tools.
+    for (let step = 0; step < 8; step++) {
+      const resp = await client.messages.create({
+        model,
+        max_tokens: 2048,
+        system,
+        tools: hasBoard ? AI_TOOLS : [],
+        messages,
+      });
+
+      // Collect any text the model emitted this turn.
+      for (const block of resp.content) {
+        if (block.type === "text") reply += (reply ? "\n" : "") + block.text;
+      }
+
+      if (resp.stop_reason !== "tool_use") break;
+
+      // Echo the assistant turn, then run each tool and return all results in ONE
+      // user message (required for parallel tool calls).
+      messages.push({ role: "assistant", content: resp.content });
+      const toolResults = [];
+      for (const block of resp.content) {
+        if (block.type !== "tool_use") continue;
+        try {
+          const out = await runAiTool(block.name, block.input || {}, { boardId, userId: req.session.userId, applied });
+          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: out });
+        } catch (err) {
+          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: `Error: ${err.message}`, is_error: true });
+        }
+      }
+      messages.push({ role: "user", content: toolResults });
+    }
+
+    res.json({ reply: reply.trim() || "(no response)", applied, boardChanged: applied.length > 0 });
+  } catch (e) {
+    if (e?.status === 401) return res.status(401).json({ error: "Your API key was rejected. Re-enter it in Settings." });
+    if (e?.status === 429) return res.status(429).json({ error: "Your Anthropic key is rate limited. Try again shortly." });
+    console.error("AI chat failed:", e?.message || e);
+    res.status(502).json({ error: "The assistant could not complete that request." });
+  }
+});
+
 // ── Migrations ────────────────────────────────────────────────────────────────
 
 async function migrate() {
@@ -1913,6 +2302,15 @@ async function migrate() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_count INTEGER NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak INTEGER NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS streak_last_date DATE`);
+
+  // BYOK AI assistant: the user's own Anthropic API key (AES-256-GCM encrypted,
+  // never returned in plaintext) and the model they chose to run it under.
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_api_key TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_model VARCHAR(64)`);
+
+  // Presence: last_seen is bumped by the client heartbeat (~30s) while the app
+  // is open, so board member lists can flag who is currently active.
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ`);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_oauth_idx ON users (oauth_provider, oauth_id)
     WHERE oauth_provider IS NOT NULL
@@ -2075,7 +2473,7 @@ async function migrate() {
   await pool.query(`CREATE INDEX IF NOT EXISTS uploads_user_idx ON uploads(user_id)`);
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS guilds (
+    CREATE TABLE IF NOT EXISTS teams (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -2085,30 +2483,30 @@ async function migrate() {
   `);
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS guild_members (
-      guild_id INTEGER NOT NULL REFERENCES guilds(id) ON DELETE CASCADE,
+    CREATE TABLE IF NOT EXISTS team_members (
+      team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      PRIMARY KEY (guild_id, user_id)
+      PRIMARY KEY (team_id, user_id)
     )
   `);
-  // when a member joined — powers the "joined a guild" entry in Cosmic Activity
+  // when a member joined — powers the "joined a team" entry in Cosmic Activity
   await pool.query(`
-    ALTER TABLE guild_members ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT NOW()
+    ALTER TABLE team_members ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT NOW()
   `);
 
   await pool.query(`
-    ALTER TABLE boards ADD COLUMN IF NOT EXISTS guild_id INTEGER REFERENCES guilds(id) ON DELETE SET NULL
+    ALTER TABLE boards ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL
   `);
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS guild_invites (
+    CREATE TABLE IF NOT EXISTS team_invites (
       id SERIAL PRIMARY KEY,
-      guild_id INTEGER NOT NULL REFERENCES guilds(id) ON DELETE CASCADE,
+      team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
       inviter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       invitee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       status TEXT NOT NULL DEFAULT 'pending',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (guild_id, invitee_id)
+      UNIQUE (team_id, invitee_id)
     )
   `);
 
