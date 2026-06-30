@@ -24,11 +24,23 @@ export function assetUrl(path) {
   return path.startsWith('http') ? path : `${API}${path}`
 }
 
+// The live socket's id, kept here so apiFetch can stamp every request with the
+// originating socket. The backend echoes board changes to all OTHER sockets in
+// the room (it excludes this id), so the acting client never receives a redundant
+// event for a change it already applied from the REST response. socket.js sets
+// this on connect/disconnect; importing it here would cycle, so it pushes in.
+let currentSocketId = null
+export function setSocketId(id) { currentSocketId = id }
+
 export async function apiFetch(path, options = {}) {
   const res = await fetch(`${API}${path}`, {
     ...options,
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(currentSocketId ? { 'X-Socket-Id': currentSocketId } : {}),
+      ...options.headers,
+    },
   })
   return res
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { apiFetch, uploadImage, assetUrl } from '../api.js'
+import { socket } from '../socket.js'
 import UserAvatar from './UserAvatar.jsx'
 
 function formatDate(iso) {
@@ -106,6 +107,51 @@ export default function CardDetailModal({ card, boardId, currentUserId, onClose,
   }
 
   useEffect(() => { loadHistory() }, [card.id])
+
+  // Real-time: keep this card's comments, reactions, assignees and history in
+  // sync with edits other members make while the modal is open. Only events for
+  // THIS card are applied; the acting client is excluded server-side, so these
+  // never double up with the local optimistic updates above.
+  useEffect(() => {
+    const onCommentCreated = ({ cardId, comment }) => {
+      if (cardId !== card.id) return
+      setComments(c => c.some(cm => cm.id === comment.id) ? c : [...c, comment])
+    }
+    const onCommentUpdated = ({ cardId, comment }) => {
+      if (cardId !== card.id) return
+      setComments(c => c.map(cm => cm.id === comment.id ? comment : cm))
+    }
+    const onCommentDeleted = ({ cardId, commentId }) => {
+      if (cardId !== card.id) return
+      setComments(c => c.filter(cm => cm.id !== commentId))
+    }
+    const onReactions = ({ cardId, commentId, reactions }) => {
+      if (cardId !== card.id) return
+      setComments(c => c.map(cm => cm.id === commentId ? { ...cm, reactions } : cm))
+    }
+    const onAssignees = ({ cardId, assignees: next }) => {
+      if (cardId !== card.id) return
+      setAssignees(next)
+      loadHistory()
+    }
+    // Title/description/move edits write a history row — refresh the trail.
+    const onCardUpdated = ({ card: c }) => { if (c.id === card.id) loadHistory() }
+
+    socket.on('comment:created', onCommentCreated)
+    socket.on('comment:updated', onCommentUpdated)
+    socket.on('comment:deleted', onCommentDeleted)
+    socket.on('comment:reactions', onReactions)
+    socket.on('card:assignees', onAssignees)
+    socket.on('card:updated', onCardUpdated)
+    return () => {
+      socket.off('comment:created', onCommentCreated)
+      socket.off('comment:updated', onCommentUpdated)
+      socket.off('comment:deleted', onCommentDeleted)
+      socket.off('comment:reactions', onReactions)
+      socket.off('card:assignees', onAssignees)
+      socket.off('card:updated', onCardUpdated)
+    }
+  }, [card.id])
 
   useEffect(() => {
     if (!boardId) return

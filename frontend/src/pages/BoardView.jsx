@@ -6,8 +6,23 @@ import ImageUploadField from '../components/ImageUploadField.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
 import AiAssistant from '../components/AiAssistant.jsx'
 import { apiFetch, assetUrl, exportBoard, importBoard } from '../api.js'
+import { socket, joinBoard, leaveBoard } from '../socket.js'
 import { buildSearchRegex } from '../utils.js'
 import { ZODIAC_CONSTELLATIONS } from '../constants.js'
+
+// Canonical orderings mirroring the server: cards are starred-first then by
+// position; columns by position. Applied when reconciling remote real-time
+// events so every client converges on the same layout the REST load produces.
+function sortCards(cards) {
+  return [...cards].sort((a, b) => {
+    const sa = a.starred ? 1 : 0, sb = b.starred ? 1 : 0
+    if (sa !== sb) return sb - sa
+    return (a.position ?? 0) - (b.position ?? 0)
+  })
+}
+function sortColumns(cols) {
+  return [...cols].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+}
 
 // Stylised stroke glyphs for the topbar toggles, matching the app's celestial
 // line-icon language (currentColor stroke, rounded joins). Members = three
@@ -259,6 +274,85 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
     loadBoard()
   }, [boardId])
 
+  // ── Real-time collaboration ───────────────────────────────────────────────
+  // Join this board's room and apply changes other members make. Every handler
+  // is server-authoritative: payloads carry the resulting DB row(s), which we
+  // reconcile by id and re-sort, so concurrent edits converge. The acting client
+  // is excluded server-side (via the X-Socket-Id header) and never sees an echo.
+  useEffect(() => {
+    if (boardId == null) return
+
+    const stopJoin = joinBoard(boardId)
+
+    // Remove a card from whichever column holds it, returning the columns with
+    // it stripped plus the card object we found (to merge enriched fields).
+    function stripCard(cols, cardId) {
+      let found = null
+      const next = cols.map(col => {
+        const hit = col.cards.find(c => c.id === cardId)
+        if (hit) found = hit
+        return hit ? { ...col, cards: col.cards.filter(c => c.id !== cardId) } : col
+      })
+      return [next, found]
+    }
+
+    const handlers = {
+      'column:created': ({ column }) => setColumns(cols =>
+        cols.some(c => c.id === column.id) ? cols : sortColumns([...cols, { ...column, cards: [] }])
+      ),
+      'column:updated': ({ column }) => setColumns(cols => sortColumns(
+        cols.map(c => c.id === column.id ? { ...c, title: column.title, position: column.position } : c)
+      )),
+      'column:deleted': ({ columnId }) => setColumns(cols => cols.filter(c => c.id !== columnId)),
+
+      'card:created': ({ columnId, card }) => setColumns(cols => cols.map(col =>
+        col.id === columnId && !col.cards.some(c => c.id === card.id)
+          ? { ...col, cards: sortCards([...col.cards, card]) }
+          : col
+      )),
+      'card:updated': ({ card }) => {
+        setColumns(cols => {
+          const [stripped, existing] = stripCard(cols, card.id)
+          const merged = { ...(existing || {}), ...card }
+          return stripped.map(col =>
+            col.id === card.column_id ? { ...col, cards: sortCards([...col.cards, merged]) } : col
+          )
+        })
+        setDetailCard(d => d && d.id === card.id ? { ...d, ...card } : d)
+      },
+      'card:deleted': ({ cardId }) => setColumns(cols => stripCard(cols, cardId)[0]),
+
+      'card:assignees': ({ cardId, assignees }) => {
+        setColumns(cols => cols.map(col => ({
+          ...col,
+          cards: col.cards.map(c => c.id === cardId ? { ...c, assignees } : c),
+        })))
+        setDetailCard(d => d && d.id === cardId ? { ...d, assignees } : d)
+      },
+
+      // Comment add/remove only shifts the board-face count badge; the open
+      // detail modal maintains the comment list itself via its own subscription.
+      'comment:created': ({ cardId }) => setColumns(cols => cols.map(col => ({
+        ...col,
+        cards: col.cards.map(c => c.id === cardId ? { ...c, comment_count: (c.comment_count ?? 0) + 1 } : c),
+      }))),
+      'comment:deleted': ({ cardId }) => setColumns(cols => cols.map(col => ({
+        ...col,
+        cards: col.cards.map(c => c.id === cardId ? { ...c, comment_count: Math.max(0, (c.comment_count ?? 0) - 1) } : c),
+      }))),
+
+      'board:updated': ({ board: b }) => setBoard(prev => prev ? { ...prev, ...b } : b),
+      'board:reload': () => loadBoard(),
+    }
+
+    for (const [event, fn] of Object.entries(handlers)) socket.on(event, fn)
+    return () => {
+      for (const [event, fn] of Object.entries(handlers)) socket.off(event, fn)
+      stopJoin?.()
+      leaveBoard(boardId)
+    }
+  }, [boardId])
+
   async function handleExport() {
     setIoMessage('')
     setIoBusy(true)
@@ -417,17 +511,19 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
     ))
   }
 
+  // Dragging one column onto another just swaps the two — they trade places and
+  // every other column stays put. Only the two swapped columns change position
+  // (position tracks the array index), so only those two need persisting.
   async function moveColumn(draggedColId, targetColId) {
     if (draggedColId === targetColId) return
     const from = columns.findIndex(c => c.id === draggedColId)
     const to = columns.findIndex(c => c.id === targetColId)
     if (from === -1 || to === -1) return
     const reordered = [...columns]
-    const [moved] = reordered.splice(from, 1)
-    reordered.splice(from < to ? to - 1 : to, 0, moved)
+    ;[reordered[from], reordered[to]] = [reordered[to], reordered[from]]
     setColumns(reordered)
-    await Promise.all(reordered.map((col, i) =>
-      apiFetch(`/api/columns/${col.id}`, {
+    await Promise.all([from, to].map(i =>
+      apiFetch(`/api/columns/${reordered[i].id}`, {
         method: 'PATCH',
         body: JSON.stringify({ position: i }),
       })
