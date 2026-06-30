@@ -1,6 +1,8 @@
 import "dotenv/config";
+import http from "http";
 import express from "express";
 import cors from "cors";
+import { Server as SocketServer } from "socket.io";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import cookieParser from "cookie-parser";
@@ -162,13 +164,56 @@ app.use(cors({ origin: CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use("/uploads", express.static(UPLOAD_DIR));
-app.use(session({
+const sessionMiddleware = session({
   store: new PgSession({ pool }),
   secret: process.env.SESSION_SECRET || "dev-secret-change-in-prod",
   resave: false,
   saveUninitialized: false,
   cookie: { httpOnly: true, secure: isProd, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 },
-}));
+});
+app.use(sessionMiddleware);
+
+// ── Real-time (Socket.IO) ──────────────────────────────────────────────────────
+// Collaborative board updates ride a Socket.IO layer attached to the same HTTP
+// server. Auth is the SAME session cookie the REST API uses: io.engine.use runs
+// the express-session middleware on the WebSocket handshake, so socket.request.
+// session.userId identifies the connected user exactly as req.session does.
+// Each board is a room ("board:<id>"); a socket only joins after canAccessBoard
+// passes, so events never reach a user who couldn't load the board over REST.
+const server = http.createServer(app);
+const io = new SocketServer(server, {
+  cors: { origin: CLIENT_URL, credentials: true },
+});
+io.engine.use(sessionMiddleware);
+
+io.on("connection", (socket) => {
+  const userId = socket.request.session?.userId;
+  // Reject sockets with no logged-in session — they can't access any board.
+  if (!userId) { socket.disconnect(true); return; }
+
+  socket.on("board:join", async (boardId) => {
+    if (boardId == null) return;
+    if (!await canAccessBoard(userId, boardId)) return;
+    socket.join(`board:${boardId}`);
+  });
+
+  socket.on("board:leave", (boardId) => {
+    if (boardId != null) socket.leave(`board:${boardId}`);
+  });
+});
+
+// Emit an event to everyone watching a board, optionally excluding the socket
+// that triggered the change. The acting client passes its socket id in the
+// "x-socket-id" request header so it doesn't receive an echo of its own action
+// (it already applied the change optimistically against the authoritative REST
+// response). Best-effort: a missing boardId is a no-op.
+function broadcast(req, boardId, event, payload) {
+  if (boardId == null) return;
+  const room = `board:${boardId}`;
+  const exceptId = req?.headers?.["x-socket-id"];
+  const target = exceptId ? io.to(room).except(exceptId) : io.to(room);
+  target.emit(event, payload);
+}
 
 function requireAuth(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
@@ -994,6 +1039,7 @@ app.patch("/api/boards/:id", requireAuth, async (req, res) => {
       detail: prevTitle,
     });
   }
+  broadcast(req, Number(req.params.id), "board:updated", { board: result.rows[0] });
   res.json(result.rows[0]);
 });
 
@@ -1156,6 +1202,9 @@ app.post("/api/boards/:id/import", requireAuth, async (req, res) => {
     action: "imported",
     title: boardTitle,
   });
+  // Import rewrites the whole structure; peers can't reconcile granularly, so
+  // tell them to re-fetch the board.
+  broadcast(req, Number(req.params.id), "board:reload", {});
   res.json({ success: true });
 });
 
@@ -1492,6 +1541,7 @@ app.post("/api/columns", requireAuth, async (req, res) => {
     "INSERT INTO columns (board_id, title, position) VALUES ($1, $2, $3) RETURNING *",
     [board_id, title, position]
   );
+  broadcast(req, board_id, "column:created", { column: result.rows[0] });
   res.json(result.rows[0]);
 });
 
@@ -1501,6 +1551,7 @@ app.delete("/api/columns/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   await pool.query("DELETE FROM columns WHERE id = $1", [req.params.id]);
+  broadcast(req, col.rows[0].board_id, "column:deleted", { columnId: Number(req.params.id) });
   res.json({ success: true });
 });
 
@@ -1520,6 +1571,7 @@ app.patch("/api/columns/:id", requireAuth, async (req, res) => {
     `UPDATE columns SET ${fields.join(', ')} WHERE id = $${values.length} RETURNING *`,
     values
   );
+  broadcast(req, col.rows[0].board_id, "column:updated", { column: result.rows[0] });
   res.json(result.rows[0]);
 });
 
@@ -1568,7 +1620,14 @@ app.post("/api/cards", requireAuth, async (req, res) => {
   const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
   await logActivity({ boardId: col.rows[0].board_id, cardId: card.id, userId: req.session.userId, action: "created", cardTitle: card.title });
   await logCardHistory({ cardId: card.id, userId: req.session.userId, action: "created", cardTitle: card.title });
-  res.json({ ...card, created_by_username: user.rows[0]?.username || null });
+  const created = { ...card, created_by_username: user.rows[0]?.username || null };
+  // Peers haven't loaded this card, so send the enriched shape the board face
+  // expects (empty comment_count/assignees a fresh card always has).
+  broadcast(req, col.rows[0].board_id, "card:created", {
+    columnId: column_id,
+    card: { comment_count: 0, assignees: [], ...created },
+  });
+  res.json(created);
 });
 
 app.delete("/api/cards/:id", requireAuth, async (req, res) => {
@@ -1588,6 +1647,7 @@ app.delete("/api/cards/:id", requireAuth, async (req, res) => {
   await logActivity({ boardId: card.rows[0].board_id, cardId: req.params.id, userId: req.session.userId, action: "deleted", cardTitle: card.rows[0].title });
   await pool.query("DELETE FROM cards WHERE id = $1", [req.params.id]);
   deleteSpacesImages(images.rows.map(r => r.url));
+  broadcast(req, card.rows[0].board_id, "card:deleted", { cardId: Number(req.params.id) });
   res.json({ success: true });
 });
 
@@ -1608,6 +1668,7 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
       "UPDATE cards SET starred = $1 WHERE id = $2 RETURNING *",
       [starred, req.params.id]
     );
+    broadcast(req, card.rows[0].board_id, "card:updated", { card: result.rows[0] });
     return res.json(result.rows[0]);
   }
 
@@ -1631,7 +1692,9 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
     if (changed.length) {
       await logCardHistory({ cardId: req.params.id, userId: req.session.userId, action: "edited", cardTitle: result.rows[0].title, detail: changed.join(", ") });
     }
-    return res.json({ ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null });
+    const edited = { ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null };
+    broadcast(req, card.rows[0].board_id, "card:updated", { card: edited });
+    return res.json(edited);
   }
 
   if (track_edit) {
@@ -1654,13 +1717,16 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
         detail: `to ${nameOf(column_id)} from ${nameOf(before.rows[0].column_id)}`,
       });
     }
-    return res.json({ ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null });
+    const moved = { ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null };
+    broadcast(req, card.rows[0].board_id, "card:updated", { card: moved });
+    return res.json(moved);
   }
 
   const result = await pool.query(
     "UPDATE cards SET column_id = $1, position = $2 WHERE id = $3 RETURNING *",
     [column_id, position, req.params.id]
   );
+  broadcast(req, card.rows[0].board_id, "card:updated", { card: result.rows[0] });
   res.json(result.rows[0]);
 });
 
@@ -1673,6 +1739,19 @@ async function cardBoardId(cardId) {
     [cardId]
   );
   return r.rows[0]?.board_id ?? null;
+}
+
+// Re-read a card's full assignee list and push it to the board room. Both the
+// board face (assignee chips) and an open card-detail modal apply it by card id.
+async function broadcastAssignees(req, boardId, cardId) {
+  const assignees = await pool.query(
+    `SELECT u.id, u.username, u.avatar_url FROM users u
+     JOIN card_assignees ca ON ca.user_id = u.id
+     WHERE ca.card_id = $1
+     ORDER BY u.username`,
+    [cardId]
+  );
+  broadcast(req, boardId, "card:assignees", { cardId: Number(cardId), assignees: assignees.rows });
 }
 
 app.get("/api/cards/:id/assignees", requireAuth, async (req, res) => {
@@ -1714,6 +1793,7 @@ app.post("/api/cards/:id/assignees", requireAuth, async (req, res) => {
   if (inserted.rows[0]) {
     const cardTitle = (await pool.query("SELECT title FROM cards WHERE id = $1", [req.params.id])).rows[0]?.title;
     await logCardHistory({ cardId: req.params.id, userId: req.session.userId, action: "assigned", cardTitle, detail: user.rows[0]?.username || "a member" });
+    await broadcastAssignees(req, boardId, req.params.id);
   }
   res.json(user.rows[0]);
 });
@@ -1731,6 +1811,7 @@ app.delete("/api/cards/:id/assignees/:userId", requireAuth, async (req, res) => 
     const cardTitle = (await pool.query("SELECT title FROM cards WHERE id = $1", [req.params.id])).rows[0]?.title;
     const removedUser = (await pool.query("SELECT username FROM users WHERE id = $1", [req.params.userId])).rows[0];
     await logCardHistory({ cardId: req.params.id, userId: req.session.userId, action: "unassigned", cardTitle, detail: removedUser?.username || "a member" });
+    await broadcastAssignees(req, boardId, req.params.id);
   }
   res.json({ success: true });
 });
@@ -1800,7 +1881,9 @@ app.post("/api/cards/:id/comments", requireAuth, async (req, res) => {
     [req.params.id, req.session.userId, body?.trim() || "", image_url || null]
   );
   const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
-  res.json({ ...result.rows[0], username: user.rows[0].username, reactions: [] });
+  const comment = { ...result.rows[0], username: user.rows[0].username, reactions: [] };
+  broadcast(req, card.rows[0].board_id, "comment:created", { cardId: Number(req.params.id), comment });
+  res.json(comment);
 });
 
 // Reject the upload before we stream a file to Spaces if the user is already
@@ -1895,13 +1978,15 @@ app.patch("/api/comments/:id", requireAuth, async (req, res) => {
     `SELECT emoji, user_id AS "userId" FROM comment_reactions WHERE comment_id = $1`,
     [req.params.id]
   );
-  res.json({ ...result.rows[0], username: user.rows[0].username, reactions: reactions.rows });
+  const updated = { ...result.rows[0], username: user.rows[0].username, reactions: reactions.rows };
+  broadcast(req, comment.rows[0].board_id, "comment:updated", { cardId: comment.rows[0].card_id, comment: updated });
+  res.json(updated);
 });
 
 // POST /api/comments/:id/reactions — toggle an emoji reaction on a comment
 app.post("/api/comments/:id/reactions", requireAuth, async (req, res) => {
   const comment = await pool.query(
-    `SELECT columns.board_id FROM card_comments cc
+    `SELECT columns.board_id, cc.card_id FROM card_comments cc
      JOIN cards ON cards.id = cc.card_id
      JOIN columns ON columns.id = cards.column_id
      WHERE cc.id = $1`,
@@ -1934,17 +2019,33 @@ app.post("/api/comments/:id/reactions", requireAuth, async (req, res) => {
     `SELECT emoji, user_id AS "userId" FROM comment_reactions WHERE comment_id = $1`,
     [req.params.id]
   );
+  broadcast(req, comment.rows[0].board_id, "comment:reactions", {
+    cardId: comment.rows[0].card_id,
+    commentId: Number(req.params.id),
+    reactions: reactions.rows,
+  });
   res.json({ reactions: reactions.rows });
 });
 
 app.delete("/api/comments/:id", requireAuth, async (req, res) => {
-  const comment = await pool.query("SELECT user_id, image_url FROM card_comments WHERE id = $1", [req.params.id]);
+  const comment = await pool.query(
+    `SELECT cc.user_id, cc.image_url, cc.card_id, columns.board_id
+     FROM card_comments cc
+     JOIN cards ON cards.id = cc.card_id
+     JOIN columns ON columns.id = cards.column_id
+     WHERE cc.id = $1`,
+    [req.params.id]
+  );
   if (!comment.rows[0]) return res.status(404).json({ error: "Not found" });
   if (comment.rows[0].user_id !== req.session.userId) {
     return res.status(403).json({ error: "You can only delete your own comments" });
   }
   await pool.query("DELETE FROM card_comments WHERE id = $1", [req.params.id]);
   deleteSpacesImages(comment.rows[0].image_url);
+  broadcast(req, comment.rows[0].board_id, "comment:deleted", {
+    cardId: comment.rows[0].card_id,
+    commentId: Number(req.params.id),
+  });
   res.json({ success: true });
 });
 
@@ -2597,4 +2698,4 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-migrate().then(() => app.listen(PORT, () => console.log(`Server running on port ${PORT}`)));
+migrate().then(() => server.listen(PORT, () => console.log(`Server running on port ${PORT}`)));
