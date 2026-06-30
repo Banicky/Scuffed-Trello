@@ -511,17 +511,19 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
     ))
   }
 
+  // Dragging one column onto another just swaps the two — they trade places and
+  // every other column stays put. Only the two swapped columns change position
+  // (position tracks the array index), so only those two need persisting.
   async function moveColumn(draggedColId, targetColId) {
     if (draggedColId === targetColId) return
     const from = columns.findIndex(c => c.id === draggedColId)
     const to = columns.findIndex(c => c.id === targetColId)
     if (from === -1 || to === -1) return
     const reordered = [...columns]
-    const [moved] = reordered.splice(from, 1)
-    reordered.splice(from < to ? to - 1 : to, 0, moved)
+    ;[reordered[from], reordered[to]] = [reordered[to], reordered[from]]
     setColumns(reordered)
-    await Promise.all(reordered.map((col, i) =>
-      apiFetch(`/api/columns/${col.id}`, {
+    await Promise.all([from, to].map(i =>
+      apiFetch(`/api/columns/${reordered[i].id}`, {
         method: 'PATCH',
         body: JSON.stringify({ position: i }),
       })
