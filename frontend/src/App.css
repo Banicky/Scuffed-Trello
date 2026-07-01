@@ -2813,6 +2813,80 @@ select.card-input {
   min-width: 0;
 }
 
+/* ── Mobile: settings sidebar collapses to a top strip, mirroring .dash-layout's
+   mobile treatment. Below 640px the fixed 216px nav (flex-shrink: 0) plus the
+   6-column, fixed-48px preset grid no longer fit side-by-side, which is what
+   forced the whole page into horizontal scroll with content clipped off the
+   right edge. ── */
+@media (max-width: 640px) {
+  .settings-layout {
+    flex-direction: column;
+  }
+
+  .settings-nav {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    margin: 12px 12px 6px;
+    padding: 6px;
+    border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--bg) 62%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+    gap: 4px;
+  }
+
+  /* three equal-width tabs sized to fit without a scrollbar; text truncates
+     with an ellipsis on the very narrowest phones rather than overflowing */
+  .settings-nav-item {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 8px 4px;
+    border-radius: 10px;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .settings-nav-glyph {
+    width: auto;
+    font-size: 14px;
+  }
+  /* the active marker is a left rail in the vertical desktop list; inside a
+     rounded pill-strip the existing accent background/text is enough on its
+     own, so drop the rail rather than have it float mid-tab */
+  .settings-nav-item.active::before {
+    content: none;
+  }
+
+  .settings-pane {
+    padding: 20px 16px 40px;
+  }
+
+  .settings-section {
+    max-width: 100%;
+    padding: 20px 18px;
+  }
+
+  /* fixed 48px columns × 6 forced a ~330px-wide grid regardless of viewport;
+     auto-fill lets it wrap to however many columns actually fit */
+  .settings-avatar-presets {
+    grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+  }
+  .settings-avatar-preset {
+    width: auto;
+    height: auto;
+    aspect-ratio: 1;
+  }
+}
+
 .settings-section {
   max-width: 560px;
   padding: 28px 32px;
