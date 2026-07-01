@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { gsap } from 'gsap'
 import Column from '../components/Column.jsx'
-import CardDetailModal from '../components/CardDetailModal.jsx'
+import CardDetailModal, { formatDate, describeHistory } from '../components/CardDetailModal.jsx'
 import ImageUploadField from '../components/ImageUploadField.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
 import AiAssistant from '../components/AiAssistant.jsx'
@@ -45,6 +45,73 @@ function DesignGlyph() {
       <path d="M12 2.5l8.23 4.75v9.5L12 21.5l-8.23-4.75v-9.5z" />
       <path d="M12 8l1.15 2.85L16 12l-2.85 1.15L12 16l-1.15-2.85L8 12l2.85-1.15z" />
     </svg>
+  )
+}
+
+function HistoryGlyph() {
+  return (
+    <svg className="btn-glyph" width="15" height="15" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v4h4" />
+      <path d="M12 8v4l3 2" />
+    </svg>
+  )
+}
+
+// Anchors a toggle panel (Design/Members/History) directly under whichever
+// button opened it, instead of a fixed top-right screen position — which
+// otherwise leaves panels like Design (not the rightmost button) looking
+// stranded far from the button that triggered them. Falls back to the old
+// fixed spot for the one frame before layout has measured the button.
+function useAnchorPos(btnRef, isOpen) {
+  const [pos, setPos] = useState(null)
+  useLayoutEffect(() => {
+    if (!isOpen || !btnRef.current) { setPos(null); return }
+    const r = btnRef.current.getBoundingClientRect()
+    setPos({ top: r.bottom + 8, right: window.innerWidth - r.right })
+  }, [isOpen, btnRef])
+  return pos || { top: 56, right: 16 }
+}
+
+// Board-wide equivalent of the per-card history rail: same query shape
+// (/api/boards/:id/history mirrors /api/cards/:id/history), and reuses its
+// describeHistory/formatDate + .card-history-* rendering so entries read
+// identically whether you're looking at one card or the whole board.
+function BoardHistoryPanel({ boardId, onClose }) {
+  const [history, setHistory] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    apiFetch(`/api/boards/${boardId}/history`)
+      .then(r => r.json())
+      .then(data => { if (active) setHistory(Array.isArray(data) ? data : []) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [boardId])
+
+  return (
+    <div className="members-panel board-members-panel board-history-panel">
+      <div className="members-panel-header">
+        <span className="members-panel-title">Board history</span>
+        <button className="members-panel-close" onClick={onClose}>✕</button>
+      </div>
+      <ul className="card-history-list">
+        {!loading && history.length === 0 && (
+          <li className="card-history-empty">No history yet.</li>
+        )}
+        {history.map(h => (
+          <li key={h.id} className={`card-history-item card-history-item--${h.action}`}>
+            <span className="card-history-dot" aria-hidden="true" />
+            <div className="card-history-content">
+              <p className="card-history-text">{describeHistory(h)}</p>
+              <span className="card-history-date">{formatDate(h.created_at)}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -138,6 +205,13 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   const [dragOverCardId, setDragOverCardId] = useState(null)
   const [showMembers, setShowMembers] = useState(false)
   const [showDesign, setShowDesign] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const designBtnRef = useRef(null)
+  const membersBtnRef = useRef(null)
+  const historyBtnRef = useRef(null)
+  const designPos = useAnchorPos(designBtnRef, showDesign)
+  const membersPos = useAnchorPos(membersBtnRef, showMembers)
+  const historyPos = useAnchorPos(historyBtnRef, showHistory)
   const [columnLimitError, setColumnLimitError] = useState(false)
   const [draggingColId, setDraggingColId] = useState(null)
   const [colDragOverId, setColDragOverId] = useState(null)
@@ -625,7 +699,19 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
           }}
         />
       )}
-      <header className="topbar">
+      <header
+        className="topbar"
+        onClickCapture={e => {
+          // Delegated so every header button gets the click "flair" for free —
+          // no need to touch each button's own onClick. Remove-then-reflow-then-
+          // add restarts the CSS animation even on rapid repeat clicks.
+          const btn = e.target.closest('button')
+          if (!btn || btn.disabled) return
+          btn.classList.remove('btn-pop')
+          void btn.offsetWidth
+          btn.classList.add('btn-pop')
+        }}
+      >
         <div className="topbar-left">
           <button className="back-btn" onClick={onBack} title="Back to dashboard">←</button>
           <div className="board-icon board-icon--constellation" title={zodiac?.name} aria-label={zodiac ? `${zodiac.name} constellation` : undefined}>
@@ -748,6 +834,7 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
           </button>
           {isOwner && (
             <button
+              ref={designBtnRef}
               className={`btn-ghost members-toggle${showDesign ? ' active' : ''}`}
               onClick={() => setShowDesign(v => !v)}
             >
@@ -756,11 +843,20 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
             </button>
           )}
           <button
+            ref={membersBtnRef}
             className={`btn-ghost members-toggle${showMembers ? ' active' : ''}`}
             onClick={() => setShowMembers(v => !v)}
           >
             <MembersGlyph />
             Members
+          </button>
+          <button
+            ref={historyBtnRef}
+            className={`btn-ghost members-toggle${showHistory ? ' active' : ''}`}
+            onClick={() => setShowHistory(v => !v)}
+          >
+            <HistoryGlyph />
+            History
           </button>
           <button
             className={`btn-ghost members-toggle ai-toggle${aiOpen ? ' active' : ''}`}
@@ -782,7 +878,7 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
 
       {showDesign && (
         <div className="board-members-overlay" onClick={() => setShowDesign(false)}>
-          <div onClick={e => e.stopPropagation()}>
+          <div className="board-panel-anchor" style={designPos} onClick={e => e.stopPropagation()}>
             <div className="members-panel board-members-panel board-design-panel">
               <div className="members-panel-header">
                 <span className="members-panel-title">Board design</span>
@@ -817,8 +913,16 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
 
       {showMembers && (
         <div className="board-members-overlay" onClick={() => setShowMembers(false)}>
-          <div onClick={e => e.stopPropagation()}>
+          <div className="board-panel-anchor" style={membersPos} onClick={e => e.stopPropagation()}>
             <MembersPanel boardId={boardId} isOwner={isOwner} onClose={() => setShowMembers(false)} />
+          </div>
+        </div>
+      )}
+
+      {showHistory && (
+        <div className="board-members-overlay" onClick={() => setShowHistory(false)}>
+          <div className="board-panel-anchor" style={historyPos} onClick={e => e.stopPropagation()}>
+            <BoardHistoryPanel boardId={boardId} onClose={() => setShowHistory(false)} />
           </div>
         </div>
       )}
