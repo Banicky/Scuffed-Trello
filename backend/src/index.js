@@ -993,6 +993,28 @@ app.get("/api/boards/:id/activity", requireAuth, async (req, res) => {
   res.json(result.rows);
 });
 
+// GET /api/boards/:id/history — full board-wide change trail (newest first),
+// mirroring /api/cards/:id/history's query but joined across every card on
+// the board instead of a single card_id.
+app.get("/api/boards/:id/history", requireAuth, async (req, res) => {
+  if (!await canAccessBoard(req.session.userId, req.params.id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const result = await pool.query(
+    `SELECT h.id, h.action, h.card_title, h.detail, h.created_at,
+            COALESCE(u.username, h.username) AS username
+     FROM card_history h
+     JOIN cards c ON c.id = h.card_id
+     JOIN columns col ON col.id = c.column_id
+     LEFT JOIN users u ON u.id = h.user_id
+     WHERE col.board_id = $1
+     ORDER BY h.created_at DESC, h.id DESC
+     LIMIT 100`,
+    [req.params.id]
+  );
+  res.json(result.rows);
+});
+
 app.patch("/api/boards/:id", requireAuth, async (req, res) => {
   if (!await canAccessBoard(req.session.userId, req.params.id)) {
     return res.status(403).json({ error: "Forbidden" });

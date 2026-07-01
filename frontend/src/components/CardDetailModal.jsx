@@ -3,7 +3,7 @@ import { apiFetch, uploadImage, assetUrl } from '../api.js'
 import { socket } from '../socket.js'
 import UserAvatar from './UserAvatar.jsx'
 
-function formatDate(iso) {
+export function formatDate(iso) {
   if (!iso) return ''
   const d = new Date(iso)
   return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) +
@@ -49,7 +49,7 @@ function AssignIcon() {
 
 // Build the human-readable sentence for one history row, e.g.
 // "ming moved Theme to Review from In Progress".
-function describeHistory(h) {
+export function describeHistory(h) {
   const who = h.username || 'Someone'
   const title = h.card_title || 'this card'
   switch (h.action) {
