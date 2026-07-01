@@ -5385,7 +5385,10 @@ select.card-input {
   left: auto;
   right: 0;
   width: min(320px, calc(100vw - 32px));
-  background: var(--column-bg);
+  /* --column-bg doesn't exist anywhere in the stylesheet, so this was
+     silently resolving to fully transparent — the hero card's orrery art
+     behind it was showing straight through instead of a solid panel */
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 8px 32px -4px rgba(0,0,0,0.5);
@@ -6696,9 +6699,15 @@ select.card-input {
   will-change: opacity;
 }
 
-/* lift the actual UI above the canvas */
-.dashboard-shell > .topbar,
+/* lift the actual UI above the canvas. The topbar sits one layer above
+   dash-layout (rather than tying at the same z-index) so its popovers — the
+   notif dropdown, search suggestions, user menu — always render in front of
+   the hero card below them. At equal z-index the tie breaks on DOM order,
+   which favours dash-layout (it comes later) and let a tall notif dropdown
+   (e.g. with an unread invite) get rendered underneath the hero card's
+   frosted glass instead of over it. */
 .dashboard-shell > .dash-layout { position: relative; z-index: 1; }
+.dashboard-shell > .topbar { position: relative; z-index: 2; }
 
 /* ── Hero card: a pane of black glass under the stars ── */
 .dashboard-shell .dash-hero-card {

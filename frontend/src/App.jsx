@@ -81,6 +81,10 @@ export default function App() {
     applyAccentTheme('arcane')
     document.documentElement.classList.remove('force-reduced-motion')
     setStatus('auth')
+    // otherwise `if (settingsSection)` still wins the next render and mounts
+    // SettingsPage with a null user, which crashes to a blank screen instead
+    // of falling through to AuthPage
+    setSettingsSection(null)
   }
 
   function openBoard(boardId, color) {
