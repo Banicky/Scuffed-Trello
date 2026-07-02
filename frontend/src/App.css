@@ -2113,6 +2113,18 @@ select.card-input {
   .board-tile-zodiac-halo { animation: none; opacity: 0.5; }
 }
 
+/* While the board grid is actively scrolling (the same .is-scrolling window
+   that reveals the scrollbar), hold every tile's twinkle/sparkle/breathe
+   loop. With 20+ boards ~150 animated nodes carrying blur/drop-shadow
+   filters sit in the viewport, and their per-frame updates compete with the
+   scroll itself. A paused animation keeps its current frame, so the hold is
+   invisible and each loop resumes exactly where it left off. */
+.dashboard-main.is-scrolling .board-tile-zodiac-line,
+.dashboard-main.is-scrolling .board-tile-zodiac-star,
+.dashboard-main.is-scrolling .board-tile-zodiac-halo {
+  animation-play-state: paused;
+}
+
 /* heraldic rule: a thin inset platinum frame, like the chased border of a
    knight's shield */
 .board-tile-face::before {

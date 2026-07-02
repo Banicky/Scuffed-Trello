@@ -90,6 +90,54 @@ export default function Starfield({ mode = 'night', randomConstellations = false
     let raf = 0
     let t = 0
     let nextShoot = 1.5
+    // While the user is actively scrolling any pane above the canvas, we skip
+    // drawing and let the canvas hold its last frame. A repainting canvas
+    // forces every backdrop-filter glass surface over it (sidebar, hero card,
+    // topbar pills) to re-blur each frame — pausing during scroll hands that
+    // whole budget back to the scroll. Holds ~160ms past the last scroll event.
+    let scrollHoldUntil = 0
+
+    // Pre-rendered sprites: the nebula blobs and mote glow are radial
+    // gradients that never change shape or tint — only position and alpha.
+    // Rendering them once and drawImage-ing per frame replaces the 21
+    // createRadialGradient allocations + large gradient fills every frame.
+    let nebulaSprites = []
+    let particleSprite = null
+
+    function makeNebulaSprites() {
+      const md = Math.max(w, h)
+      nebulaSprites = NEBULAE.map(n => {
+        const rr = n.r * md
+        // low-res sprite upscaled at draw time — a smooth radial gradient at
+        // alpha ≤0.07 shows no visible banding, and this keeps memory tiny
+        const size = 256
+        const c = document.createElement('canvas')
+        c.width = c.height = size
+        const g2 = c.getContext('2d')
+        const grad = g2.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+        const [r, gr, b] = n.color
+        grad.addColorStop(0, `rgba(${r},${gr},${b},${n.a})`)
+        grad.addColorStop(1, `rgba(${r},${gr},${b},0)`)
+        g2.fillStyle = grad
+        g2.fillRect(0, 0, size, size)
+        return { canvas: c, rr }
+      })
+    }
+
+    function makeParticleSprite() {
+      const size = 64
+      const c = document.createElement('canvas')
+      c.width = c.height = size
+      const g2 = c.getContext('2d')
+      const [pr, pg, pb] = particleTint
+      const grad = g2.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+      grad.addColorStop(0, `rgba(${pr},${pg},${pb},1)`)
+      grad.addColorStop(1, `rgba(${pr},${pg},${pb},0)`)
+      g2.fillStyle = grad
+      g2.fillRect(0, 0, size, size)
+      return c
+    }
+    particleSprite = makeParticleSprite()
 
     function build() {
       stars = []
@@ -182,6 +230,7 @@ export default function Starfield({ mode = 'night', randomConstellations = false
       canvas.width = Math.round(w * dpr)
       canvas.height = Math.round(h * dpr)
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      makeNebulaSprites() // blob radius tracks the viewport size
     }
 
     function spawnShoot() {
@@ -202,20 +251,13 @@ export default function Starfield({ mode = 'night', randomConstellations = false
     }
 
     function drawNebulae(time) {
-      const md = Math.max(w, h)
-      for (let i = 0; i < NEBULAE.length; i++) {
+      for (let i = 0; i < nebulaSprites.length; i++) {
         const n = NEBULAE[i]
+        const { canvas: img, rr } = nebulaSprites[i]
         // slow organic drift so the cloud breathes instead of sitting static
         const cx = n.x * w + Math.sin(time * 0.035 + i * 1.3) * 9
         const cy = n.y * h + Math.cos(time * 0.027 + i * 0.7) * 7
-        const rr = n.r * md
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rr)
-        const [r, gr, b] = n.color
-        g.addColorStop(0, `rgba(${r},${gr},${b},${n.a})`)
-        g.addColorStop(1, `rgba(${r},${gr},${b},0)`)
-        ctx.fillStyle = g
-        // only the blob's bounding box needs painting — the rest is transparent
-        ctx.fillRect(cx - rr, cy - rr, rr * 2, rr * 2)
+        ctx.drawImage(img, cx - rr, cy - rr, rr * 2, rr * 2)
       }
     }
 
@@ -247,7 +289,6 @@ export default function Starfield({ mode = 'night', randomConstellations = false
     }
 
     function drawParticles(dt, time, p) {
-      const [pr, pg, pb] = particleTint
       for (const q of particles) {
         q.x += q.vx * dt
         q.y += q.vy * dt
@@ -256,19 +297,24 @@ export default function Starfield({ mode = 'night', randomConstellations = false
         else if (q.x > 1.05) q.x = -0.05
         const px = q.x * w + p.x * q.depth * 30
         const py = q.y * h + p.y * q.depth * 30
-        const a = q.baseA * (0.7 + 0.3 * Math.sin(time * 0.5 + q.phase))
-        const g = ctx.createRadialGradient(px, py, 0, px, py, q.r)
-        g.addColorStop(0, `rgba(${pr},${pg},${pb},${a})`)
-        g.addColorStop(1, `rgba(${pr},${pg},${pb},0)`)
-        ctx.fillStyle = g
-        ctx.beginPath()
-        ctx.arc(px, py, q.r, 0, Math.PI * 2)
-        ctx.fill()
+        // globalAlpha scales the sprite's full-alpha gradient down to `a` —
+        // the same falloff the old per-frame createRadialGradient produced
+        ctx.globalAlpha = q.baseA * (0.7 + 0.3 * Math.sin(time * 0.5 + q.phase))
+        ctx.drawImage(particleSprite, px - q.r, py - q.r, q.r * 2, q.r * 2)
       }
+      ctx.globalAlpha = 1
     }
 
     function frame(now) {
       const time = now / 1000
+      // scroll in progress: hold the last frame (no canvas invalidation, so
+      // the glass panes above don't re-blur) and check again next frame. The
+      // dt clamp below keeps motion continuous on resume — no catch-up jump.
+      if (now < scrollHoldUntil) {
+        t = time
+        raf = requestAnimationFrame(frame)
+        return
+      }
       const dt = Math.min(time - t || 0.016, 0.05)
       t = time
 
@@ -364,12 +410,17 @@ export default function Starfield({ mode = 'night', randomConstellations = false
 
     function onResize() { resize(); build(); if (reduced) staticFrame() }
 
+    // scroll events don't bubble, but capture on window catches the inner
+    // scrollers (board grid, sidebar, popovers) that slide over the canvas
+    function onScrollHold() { scrollHoldUntil = performance.now() + 160 }
+
     resize()
     build()
     if (reduced) {
       staticFrame()
     } else {
       window.addEventListener('pointermove', onPointer, { passive: true })
+      window.addEventListener('scroll', onScrollHold, { capture: true, passive: true })
       raf = requestAnimationFrame(frame)
     }
     window.addEventListener('resize', onResize)
@@ -378,6 +429,7 @@ export default function Starfield({ mode = 'night', randomConstellations = false
       cancelAnimationFrame(raf)
       window.removeEventListener('resize', onResize)
       window.removeEventListener('pointermove', onPointer)
+      window.removeEventListener('scroll', onScrollHold, { capture: true })
     }
   }, [mode, randomConstellations])
 
