@@ -119,6 +119,7 @@ function MembersPanel({ boardId, isOwner, onClose }) {
   const [members, setMembers] = useState([])
   const [invite, setInvite] = useState('')
   const [error, setError] = useState('')
+  const [sent, setSent] = useState('')
 
   useEffect(() => {
     let active = true
@@ -136,13 +137,16 @@ function MembersPanel({ boardId, isOwner, onClose }) {
   async function handleInvite(e) {
     e.preventDefault()
     setError('')
+    setSent('')
+    // sends an invitation missive — they only join once they accept it,
+    // so nothing is added to the member list here
     const res = await apiFetch(`/api/boards/${boardId}/members`, {
       method: 'POST',
       body: JSON.stringify({ username: invite.trim() }),
     })
     const data = await res.json()
     if (!res.ok) return setError(data.error)
-    setMembers(m => [...m, data])
+    setSent(`Missive dispatched to ${data.invitee?.username || invite.trim()} — awaiting their answer.`)
     setInvite('')
   }
 
@@ -185,12 +189,13 @@ function MembersPanel({ boardId, isOwner, onClose }) {
             className="card-input"
             placeholder="Username or email"
             value={invite}
-            onChange={e => setInvite(e.target.value)}
+            onChange={e => { setInvite(e.target.value); setSent('') }}
             maxLength={255}
           />
           <button className="btn-primary" type="submit">Invite</button>
         </form>
       )}
+      {sent && <p className="invite-sent-note">✦ {sent}</p>}
       {error && <p className="auth-error" style={{ marginTop: 6 }}>{error}</p>}
     </div>
   )

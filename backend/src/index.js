@@ -1263,6 +1263,9 @@ app.get("/api/boards/:boardId/members", requireAuth, async (req, res) => {
   res.json(result.rows);
 });
 
+// Inviting someone to a board is consensual: this records a pending invite and
+// drops a missive in their notifications instead of adding them outright.
+// Membership is only granted when they accept (POST /api/board-invites/:id/accept).
 app.post("/api/boards/:boardId/members", requireAuth, async (req, res) => {
   if (!await isOwner(req.session.userId, req.params.boardId)) {
     return res.status(403).json({ error: "Only the board owner can invite members" });
@@ -1279,11 +1282,40 @@ app.post("/api/boards/:boardId/members", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "You already own this board" });
   }
 
-  await pool.query(
-    "INSERT INTO board_members (board_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+  const already = await pool.query(
+    `SELECT 1 FROM boards WHERE id = $1 AND owner_id = $2
+     UNION SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2
+     UNION SELECT 1 FROM team_members tm
+       JOIN boards b ON b.team_id = tm.team_id
+       WHERE b.id = $1 AND tm.user_id = $2`,
     [req.params.boardId, invitee.id]
   );
-  res.json(invitee);
+  if (already.rowCount > 0) return res.status(400).json({ error: "That voyager already has access to this galaxy" });
+
+  // re-inviting after a decline revives the same row as a fresh pending invite
+  const invite = await pool.query(
+    `INSERT INTO board_invites (board_id, inviter_id, invitee_id, status)
+     VALUES ($1, $2, $3, 'pending')
+     ON CONFLICT (board_id, invitee_id) DO UPDATE SET status = 'pending', inviter_id = $2, created_at = NOW()
+     RETURNING *`,
+    [req.params.boardId, req.session.userId, invitee.id]
+  );
+
+  const [board, inviter] = await Promise.all([
+    pool.query("SELECT title FROM boards WHERE id = $1", [req.params.boardId]),
+    pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]),
+  ]);
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, data) VALUES ($1, 'board_invite', $2)`,
+    [invitee.id, JSON.stringify({
+      invite_id: invite.rows[0].id,
+      board_id: parseInt(req.params.boardId),
+      board_title: board.rows[0].title,
+      inviter_username: inviter.rows[0].username,
+    })]
+  );
+
+  res.json({ success: true, pending: true, invitee: { id: invitee.id, username: invitee.username } });
 });
 
 app.delete("/api/boards/:boardId/members/:userId", requireAuth, async (req, res) => {
@@ -1513,6 +1545,54 @@ app.post("/api/team-invites/:id/decline", requireAuth, async (req, res) => {
   await pool.query(
     `UPDATE notifications SET read = true
      WHERE user_id = $1 AND type = 'team_invite' AND (data->>'invite_id')::int = $2`,
+    [req.session.userId, parseInt(req.params.id)]
+  );
+  res.json({ success: true });
+});
+
+// POST /api/board-invites/:id/accept — the consent gate for board membership;
+// only here does the invitee actually land in board_members
+app.post("/api/board-invites/:id/accept", requireAuth, async (req, res) => {
+  const invite = await pool.query("SELECT * FROM board_invites WHERE id = $1", [req.params.id]);
+  if (!invite.rows[0]) return res.status(404).json({ error: "Invite not found" });
+  if (invite.rows[0].invitee_id !== req.session.userId) return res.status(403).json({ error: "This invitation is not for you" });
+  if (invite.rows[0].status !== "pending") return res.status(400).json({ error: "Invitation is no longer pending" });
+
+  await pool.query(
+    "INSERT INTO board_members (board_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [invite.rows[0].board_id, req.session.userId]
+  );
+  await pool.query("UPDATE board_invites SET status = 'accepted' WHERE id = $1", [req.params.id]);
+  await pool.query(
+    `UPDATE notifications SET read = true
+     WHERE user_id = $1 AND type = 'board_invite' AND (data->>'invite_id')::int = $2`,
+    [req.session.userId, parseInt(req.params.id)]
+  );
+
+  // hand the board back in the same shape GET /api/boards returns for members,
+  // so the dashboard can slot it straight into the Shared Galaxies list
+  const board = await pool.query(
+    `SELECT b.*, 'member' AS role, NULL AS last_accessed_at,
+            g.name AS team_name, g.icon_color AS team_icon_color,
+            ${COLUMN_COUNTS_SQL} AS column_counts, ${BOARD_MEMBERS_SQL} AS members
+       FROM boards b
+       LEFT JOIN teams g ON g.id = b.team_id
+      WHERE b.id = $1`,
+    [invite.rows[0].board_id]
+  );
+  res.json({ success: true, board: board.rows[0] });
+});
+
+// POST /api/board-invites/:id/decline
+app.post("/api/board-invites/:id/decline", requireAuth, async (req, res) => {
+  const invite = await pool.query("SELECT * FROM board_invites WHERE id = $1", [req.params.id]);
+  if (!invite.rows[0]) return res.status(404).json({ error: "Invite not found" });
+  if (invite.rows[0].invitee_id !== req.session.userId) return res.status(403).json({ error: "This invitation is not for you" });
+
+  await pool.query("UPDATE board_invites SET status = 'declined' WHERE id = $1", [req.params.id]);
+  await pool.query(
+    `UPDATE notifications SET read = true
+     WHERE user_id = $1 AND type = 'board_invite' AND (data->>'invite_id')::int = $2`,
     [req.session.userId, parseInt(req.params.id)]
   );
   res.json({ success: true });
@@ -2630,6 +2710,20 @@ async function migrate() {
       status TEXT NOT NULL DEFAULT 'pending',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (team_id, invitee_id)
+    )
+  `);
+
+  // Board invitations — joining a board requires the invitee's consent
+  // (mirrors team_invites); accepting is what inserts into board_members
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS board_invites (
+      id SERIAL PRIMARY KEY,
+      board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      inviter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      invitee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (board_id, invitee_id)
     )
   `);
 

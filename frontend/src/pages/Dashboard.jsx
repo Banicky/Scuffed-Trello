@@ -20,6 +20,30 @@ function teamHex(iconColor) {
   return TEAM_COLORS.find(c => c.key === iconColor)?.hex || '#aa3bff'
 }
 
+// Single-color rocket glyph shared by the hero streak chip and the Cosmic
+// Activity streak badge. The .rocket-flame exhaust group exists so GSAP can
+// flicker it — the tween targets '.cosmic-page .rocket-flame', so only the
+// badge instance animates; everywhere else the flame just renders static.
+function RocketIcon({ className = '' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      {/* hull */}
+      <path d="M12 1.8c2.8 2.1 4.2 5 4.2 8.4 0 2-.5 3.9-1.4 5.6H9.2A12.3 12.3 0 0 1 7.8 10.2c0-3.4 1.4-6.3 4.2-8.4z" />
+      {/* porthole */}
+      <circle cx="12" cy="9" r="1.7" fill="rgba(6, 7, 11, 0.55)" />
+      {/* fins */}
+      <path d="M8.2 11.6 5.6 15.8c1 .5 2.1.8 3.2.9z" />
+      <path d="M15.8 11.6l2.6 4.2c-1 .5-2.1.8-3.2.9z" />
+      {/* exhaust */}
+      <g className="rocket-flame">
+        <path d="M12 16.6c1.2 1.5 1.2 3.2 0 5.2-1.2-2-1.2-3.7 0-5.2z" />
+        <path d="M10.1 16.6c.5.9.5 1.9 0 3-.5-1.1-.5-2.1 0-3z" opacity="0.6" />
+        <path d="M13.9 16.6c.5.9.5 1.9 0 3-.5-1.1-.5-2.1 0-3z" opacity="0.6" />
+      </g>
+    </svg>
+  )
+}
+
 function TeamIcon({ team, className = '' }) {
   const initial = (team.name?.trim()[0] || '?').toUpperCase()
   return (
@@ -665,13 +689,16 @@ function TeamInviteModal({ team, onClose }) {
 
 function NotificationItem({ notif, onAccept, onDecline }) {
   const d = notif.data || {}
-  if (notif.type !== 'team_invite') return null
+  if (notif.type !== 'team_invite' && notif.type !== 'board_invite') return null
+  const isBoard = notif.type === 'board_invite'
   return (
     <div className={`notif-item${notif.read ? ' notif-item--read' : ''}`}>
-      <div className="notif-item-sigil" aria-hidden="true">⚔</div>
+      <div className="notif-item-sigil" aria-hidden="true">{isBoard ? '✦' : '⚔'}</div>
       <div className="notif-item-body">
         <p className="notif-item-text">
-          <strong>{d.inviter_username}</strong> invites you to join the team <strong>{d.team_name}</strong>.
+          {isBoard
+            ? <><strong>{d.inviter_username}</strong> invites you to explore the galaxy <strong>{d.board_title}</strong>.</>
+            : <><strong>{d.inviter_username}</strong> invites you to join the team <strong>{d.team_name}</strong>.</>}
         </p>
         <p className="notif-item-time">{relativeTime(notif.created_at) || 'just now'}</p>
         {!notif.read && (
@@ -850,16 +877,34 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   }
 
   async function handleAcceptInvite(notif) {
-    const res = await apiFetch(`/api/team-invites/${notif.data.invite_id}/accept`, { method: 'POST' })
+    const isBoard = notif.type === 'board_invite'
+    const res = await apiFetch(
+      isBoard
+        ? `/api/board-invites/${notif.data.invite_id}/accept`
+        : `/api/team-invites/${notif.data.invite_id}/accept`,
+      { method: 'POST' }
+    )
     const data = await res.json()
     if (!res.ok) return
-    setTeams(gs => gs.find(g => g.id === data.team.id) ? gs : [...gs, data.team])
+    if (isBoard) {
+      // the accepted board arrives in the same shape as GET /api/boards rows,
+      // so it slots straight into the Shared Galaxies list
+      if (data.board) setBoards(bs => bs.find(b => b.id === data.board.id) ? bs : [...bs, data.board])
+    } else {
+      setTeams(gs => gs.find(g => g.id === data.team.id) ? gs : [...gs, data.team])
+    }
     setNotifications(ns => ns.map(n => n.id === notif.id ? { ...n, read: true } : n))
     setNotifOpen(false)
   }
 
   async function handleDeclineInvite(notif) {
-    await apiFetch(`/api/team-invites/${notif.data.invite_id}/decline`, { method: 'POST' })
+    const isBoard = notif.type === 'board_invite'
+    await apiFetch(
+      isBoard
+        ? `/api/board-invites/${notif.data.invite_id}/decline`
+        : `/api/team-invites/${notif.data.invite_id}/decline`,
+      { method: 'POST' }
+    )
     setNotifications(ns => ns.map(n => n.id === notif.id ? { ...n, read: true } : n))
   }
 
@@ -1048,7 +1093,15 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     const ctx = gsap.context(() => {
       if (activityPageRef.current) gsap.from(activityPageRef.current, { opacity: 0, duration: 0.25, ease: 'power1.out' })
       gsap.from('.cosmic-page', { y: 34, scale: 0.96, opacity: 0, duration: 0.5, ease: 'power3.out' })
-      gsap.from('.cosmic-page .streak-flame', { scale: 0.5, opacity: 0, duration: 0.6, ease: 'back.out(1.7)', delay: 0.18 })
+      // the streak rocket lifts off into place, then idles: a slow hover bob
+      // plus a fast exhaust flicker scaling from the nozzle (svgOrigin is the
+      // flame root in viewBox coords). All run inside this context, so they
+      // revert when the page closes.
+      gsap.from('.cosmic-page .streak-rocket', { y: 30, scale: 0.5, opacity: 0, duration: 0.65, ease: 'back.out(1.7)', delay: 0.18 })
+      gsap.to('.cosmic-page .streak-rocket-svg', { y: -2.5, duration: 1.9, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: 0.85 })
+      gsap.fromTo('.cosmic-page .rocket-flame',
+        { scaleY: 0.75, scaleX: 0.94, svgOrigin: '12 16.6' },
+        { scaleY: 1.15, scaleX: 1, duration: 0.22, repeat: -1, yoyo: true, ease: 'sine.inOut' })
       // pop the dots in with a fromTo so they always settle visible — a plain
       // from(scale:0) can leave them stuck invisible if the open tween is cut short
       gsap.fromTo('.cosmic-page .streak-dot',
@@ -1527,9 +1580,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                 aria-haspopup="dialog"
               >
                 <span className="hero-stat-streak">
-                  <svg className="hero-stat-flame" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M12 2c1 3-1 4-2 6-1.4 2.8.4 4.8 2 4.8 1.2 0 2.1-1 1.9-2.4 1.6 1 2.6 2.7 2.6 4.4A6.4 6.4 0 0 1 5.6 15c0-3 1.9-4.6 3-7 .8-1.9 2.4-3.9 3.4-6z" />
-                  </svg>
+                  <RocketIcon className="hero-stat-rocket" />
                   <strong>{user.streak_count ?? 0}</strong> day{(user.streak_count ?? 0) === 1 ? '' : 's'} active
                 </span>
                 <span className="hero-stat-sep" aria-hidden="true">·</span>
@@ -1864,10 +1915,11 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
               {/* Streak panel */}
               <aside className="cosmic-page-streak">
                 <p className="cosmic-page-eyebrow">Login Streak</p>
-                <div className="streak-flame" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2c1 3-1 4-2 6-1.4 2.8.4 4.8 2 4.8 1.2 0 2.1-1 1.9-2.4 1.6 1 2.6 2.7 2.6 4.4A6.4 6.4 0 0 1 5.6 15c0-3 1.9-4.6 3-7 .8-1.9 2.4-3.9 3.4-6z" />
-                  </svg>
+                <div className="streak-rocket" aria-hidden="true">
+                  {/* GSAP drives all motion (see the activityPageOpen effect):
+                      the badge launches in, the svg bobs on its hover, and the
+                      .rocket-flame exhaust group flickers from the nozzle */}
+                  <RocketIcon className="streak-rocket-svg" />
                 </div>
                 <div className="streak-count" ref={streakRef}>{user.streak_count ?? 0}</div>
                 <div className="streak-label">{(user.streak_count ?? 0) === 1 ? 'day active' : 'days active'}</div>
