@@ -2113,6 +2113,18 @@ select.card-input {
   .board-tile-zodiac-halo { animation: none; opacity: 0.5; }
 }
 
+/* While the board grid is actively scrolling (the same .is-scrolling window
+   that reveals the scrollbar), hold every tile's twinkle/sparkle/breathe
+   loop. With 20+ boards ~150 animated nodes carrying blur/drop-shadow
+   filters sit in the viewport, and their per-frame updates compete with the
+   scroll itself. A paused animation keeps its current frame, so the hold is
+   invisible and each loop resumes exactly where it left off. */
+.dashboard-main.is-scrolling .board-tile-zodiac-line,
+.dashboard-main.is-scrolling .board-tile-zodiac-star,
+.dashboard-main.is-scrolling .board-tile-zodiac-halo {
+  animation-play-state: paused;
+}
+
 /* heraldic rule: a thin inset platinum frame, like the chased border of a
    knight's shield */
 .board-tile-face::before {
@@ -3850,6 +3862,15 @@ select.card-input {
   flex: 1;
 }
 
+/* confirmation that an invitation missive went out — membership is pending
+   until the invitee accepts, so nothing appears in the list yet */
+.invite-sent-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--star, var(--accent));
+}
+
 /* ── Board design panel ── */
 .board-design-panel {
   width: 300px;
@@ -4739,14 +4760,37 @@ select.card-input {
   flex-shrink: 0;
 }
 
+/* Section headings read like engraved star-chart captions: the grimoire serif
+   with real weight behind it, wide tracking, a small compass star, and a
+   hairline rule that fades toward the sidebar edge. currentColor drives the
+   star + rule, so the night/day color overrides recolor the whole ornament. */
 .sidebar-section-label {
+  display: flex;
+  align-items: center;
+  gap: calc(7 * var(--u));
   font-family: var(--fantasy);
-  font-size: calc(10 * var(--u));
-  letter-spacing: 0.16em;
+  font-size: calc(11.5 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--text-muted, #888);
   padding: calc(22 * var(--u)) calc(12 * var(--u)) calc(8 * var(--u));
   margin: 0;
+  white-space: nowrap;
+}
+.sidebar-section-label::before {
+  content: '✦';
+  font-size: calc(9 * var(--u));
+  letter-spacing: 0;
+  opacity: 0.65;
+}
+.sidebar-section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  min-width: calc(12 * var(--u));
+  background: linear-gradient(90deg, currentColor, transparent);
+  opacity: 0.3;
 }
 
 .sidebar-item {
@@ -4843,6 +4887,11 @@ select.card-input {
 }
 
 /* ── Team Icon ── */
+/* Team emblems read as arcane sigils rather than app icons: by night a pane of
+   dark glass rimmed and lit by the team's hue, the serif initial glowing like
+   a rune; the day realm swaps in frosted pastel glass with an ink initial
+   (see the .dashboard-shell--day override). The user's chosen hue survives —
+   it's remixed through the sky tones instead of painted on at full saturation. */
 .team-icon {
   display: inline-flex;
   align-items: center;
@@ -4850,35 +4899,37 @@ select.card-input {
   width: 26px;
   height: 26px;
   border-radius: 7px;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--team-color, var(--accent)) 68%, #fff),
-    var(--team-color, var(--accent))
+  background: radial-gradient(
+    120% 120% at 30% 18%,
+    color-mix(in srgb, var(--team-color, var(--accent)) 36%, rgba(18, 21, 30, 0.92)) 0%,
+    color-mix(in srgb, var(--team-color, var(--accent)) 12%, rgba(8, 9, 14, 0.96)) 100%
   );
-  color: #fff;
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 32%, #e9edf7);
   font-family: var(--fantasy);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   letter-spacing: 0;
   flex-shrink: 0;
   line-height: 1;
   user-select: none;
   box-shadow:
-    0 2px 8px -2px color-mix(in srgb, var(--team-color, var(--accent)) 65%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    inset 0 0 0 1px color-mix(in srgb, var(--team-color, var(--accent)) 48%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 14px -6px color-mix(in srgb, var(--team-color, var(--accent)) 70%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--team-color, var(--accent)) 55%, transparent);
 }
 
 .team-icon--md {
   width: 36px;
   height: 36px;
-  font-size: 17px;
+  font-size: 19px;
   border-radius: 9px;
 }
 
 .team-icon--lg {
   width: 48px;
   height: 48px;
-  font-size: 22px;
+  font-size: 25px;
   border-radius: 12px;
 }
 
@@ -5940,7 +5991,7 @@ select.card-input {
 }
 .hero-stat-streak { display: inline-flex; align-items: center; gap: 6px; }
 .hero-stat-streak strong { color: var(--text-h); font-weight: 700; }
-.hero-stat-flame {
+.hero-stat-rocket {
   width: 15px;
   height: 15px;
   color: #ff8a3d;
@@ -6134,8 +6185,12 @@ select.card-input {
   will-change: transform, height;
 }
 
-/* — Streak (shown inside the Cosmic Activity page) — */
-.streak-flame {
+/* — Streak rocket (shown inside the Cosmic Activity page) — the ember badge
+   ring stays warm so the exhaust glow ties into the orange streak dots below.
+   Motion (launch-in, hover bob, flame flicker) is GSAP-driven from the
+   activityPageOpen effect; under reduced motion that effect never runs, so
+   the rocket simply sits static. */
+.streak-rocket {
   width: 64px;
   height: 64px;
   display: flex;
@@ -6147,15 +6202,10 @@ select.card-input {
   box-shadow: 0 0 26px rgba(255, 138, 61, 0.28), inset 0 0 0 1px rgba(255, 138, 61, 0.3);
   margin-bottom: 6px;
 }
-.streak-flame svg {
-  width: 32px;
-  height: 32px;
+.streak-rocket svg {
+  width: 36px;
+  height: 36px;
   filter: drop-shadow(0 0 6px rgba(255, 138, 61, 0.6));
-  animation: streak-flicker 2.4s ease-in-out infinite;
-}
-@keyframes streak-flicker {
-  0%, 100% { transform: scale(1); opacity: 0.92; }
-  50% { transform: scale(1.08); opacity: 1; }
 }
 
 .streak-count {
@@ -6298,9 +6348,6 @@ select.card-input {
 .dashboard-shell--day .voyager-stat {
   background: rgba(250, 253, 255, 0.62);
   border: 1px solid rgba(110, 145, 200, 0.28);
-}
-@media (prefers-reduced-motion: reduce) {
-  .streak-flame svg { animation: none; }
 }
 
 /* ── Sidebar user section at bottom ── */
@@ -6850,7 +6897,6 @@ select.card-input {
 }
 .dashboard-shell .sidebar-section-label {
   color: rgba(190, 200, 220, 0.78);
-  letter-spacing: 0.22em;
 }
 /* breadcrumb + page title read clearly against the void */
 .dashboard-shell .topbar-breadcrumb {
@@ -7180,6 +7226,23 @@ select.card-input {
 }
 .dashboard-shell--day .sidebar-section-label { color: rgba(58, 84, 130, 0.9); }
 .dashboard-shell--day .topbar-breadcrumb { color: rgba(62, 88, 134, 0.9); opacity: 1; }
+
+/* team sigils by day: frosted pastel glass — the team hue washed toward the
+   bright sky — with the initial in that hue deepened to ink so it stays legible
+   on the light pane (mirrors the night sigil in the base .team-icon rule) */
+.dashboard-shell--day .team-icon {
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--team-color, var(--accent)) 18%, #fbfdff) 0%,
+    color-mix(in srgb, var(--team-color, var(--accent)) 36%, #e0ebf8) 100%
+  );
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 52%, #1a2334);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--team-color, var(--accent)) 36%, rgba(255, 255, 255, 0.7)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 3px 10px -5px color-mix(in srgb, var(--team-color, var(--accent)) 55%, rgba(40, 70, 120, 0.4));
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
 
 /* count badges, the date eyebrow, and the hero corner filigree shed their blue
    for a neutral gray / grayish-black */
