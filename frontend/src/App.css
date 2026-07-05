@@ -1896,6 +1896,16 @@ select.card-input {
   .dashboard-main {
     padding: 28px 20px 40px;
   }
+
+  /* auto-fill's 1fr columns stretch a lone tile to the full row width on
+     narrow screens; cap each column's width so tiles stay card-sized and
+     center the leftover row space instead of blowing a tile up to fill it. */
+  .board-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 160px));
+    justify-content: center;
+    grid-auto-rows: 150px;
+    gap: 12px;
+  }
 }
 
 /* ── Hero ── */
@@ -5275,44 +5285,6 @@ select.card-input {
   margin: 0;
 }
 
-/* ── Mobile: sidebar collapses to a top strip ── */
-@media (max-width: 640px) {
-  .dash-layout {
-    flex-direction: column;
-  }
-
-  .dash-sidebar {
-    width: 100%;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    padding: 8px 12px;
-    border: none;
-    border-radius: 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 4px;
-    align-items: center;
-  }
-
-  .sidebar-section-label {
-    display: none;
-  }
-
-  .sidebar-item {
-    white-space: nowrap;
-    flex-shrink: 0;
-    padding: 6px 10px;
-    font-size: 12.5px;
-  }
-
-  .sidebar-create-btn {
-    flex-shrink: 0;
-    margin-top: 0;
-    white-space: nowrap;
-  }
-}
-
 /* ── Dashboard topbar: breadcrumb+title left, search+bell right ── */
 .dashboard-shell .topbar {
   display: flex;
@@ -5466,6 +5438,83 @@ select.card-input {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* ── Mobile hamburger (hidden on desktop; the sidebar docks there instead) ── */
+.dash-hamburger-btn {
+  display: none;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dash-hamburger-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.topbar-left-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* ── Mobile: sidebar becomes a hamburger-triggered off-canvas drawer ── */
+.mobile-nav-backdrop {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .dash-hamburger-btn {
+    display: flex;
+  }
+
+  .dashboard-shell .topbar-left {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .dash-layout {
+    position: relative;
+  }
+
+  .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 7, 11, 0.55);
+    z-index: 300;
+  }
+
+  .dash-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(78vw, 280px);
+    flex-direction: column;
+    border-radius: 0;
+    border: none;
+    border-right: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+    padding-top: 84px;
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    z-index: 301;
+  }
+
+  .dash-sidebar--open {
+    transform: translateX(0);
+  }
 }
 
 /* ── Notification bell + dropdown ── */

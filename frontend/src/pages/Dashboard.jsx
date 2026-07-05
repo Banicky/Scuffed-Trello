@@ -836,6 +836,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const [notifOpen, setNotifOpen] = useState(false)
   const [showTeamInvite, setShowTeamInvite] = useState(false)
   const [inviteTargetTeam, setInviteTargetTeam] = useState(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   // Day/Night dashboard mode — defaults to night (the original design).
   const [colorMode, setColorMode] = useState(() => localStorage.getItem('dash-color-mode') || 'night')
@@ -963,6 +964,20 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
     document.addEventListener('mousedown', handle)
     return () => document.removeEventListener('mousedown', handle)
   }, [notifOpen])
+
+  // Mobile hamburger drawer: close on Escape, or if the viewport widens past
+  // the breakpoint where the sidebar is docked again.
+  useEffect(() => {
+    if (!mobileNavOpen) return
+    function onKey(e) { if (e.key === 'Escape') setMobileNavOpen(false) }
+    function onResize() { if (window.innerWidth > 640) setMobileNavOpen(false) }
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onResize)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onResize)
+    }
+  }, [mobileNavOpen])
 
   useEffect(() => {
     apiFetch('/api/boards')
@@ -1312,8 +1327,21 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
       <header className="topbar">
         <div className="topbar-left">
-          <p className="topbar-breadcrumb">DASHBOARD › {isPersonal ? 'MY BOARDS' : (teamDetails?.name?.toUpperCase() || 'TEAM')}</p>
-          <h1 className="topbar-page-title">{isPersonal ? 'My Universe' : (teamDetails?.name || 'Team')}</h1>
+          <button
+            className="dash-hamburger-btn"
+            onClick={() => setMobileNavOpen(v => !v)}
+            aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileNavOpen}
+            aria-controls="dash-sidebar-nav"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <div className="topbar-left-text">
+            <p className="topbar-breadcrumb">DASHBOARD › {isPersonal ? 'MY BOARDS' : (teamDetails?.name?.toUpperCase() || 'TEAM')}</p>
+            <h1 className="topbar-page-title">{isPersonal ? 'My Universe' : (teamDetails?.name || 'Team')}</h1>
+          </div>
         </div>
         <div className="topbar-right">
           <button
@@ -1416,7 +1444,16 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
 
       <div className="dash-layout">
         {/* ── Sidebar ── */}
-        <nav className="dash-sidebar" ref={sidebarRef} aria-label="Navigation">
+        {mobileNavOpen && (
+          <div className="mobile-nav-backdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
+        )}
+        <nav
+          id="dash-sidebar-nav"
+          className={`dash-sidebar${mobileNavOpen ? ' dash-sidebar--open' : ''}`}
+          ref={sidebarRef}
+          aria-label="Navigation"
+          onClick={() => setMobileNavOpen(false)}
+        >
           <div className="sidebar-profile" onClick={() => onOpenSettings('avatar')} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') onOpenSettings('avatar') }}>
             <div className="sidebar-profile-top">
               <span className="sidebar-profile-av">
@@ -1486,7 +1523,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                   className="sidebar-team-invite-btn"
                   title="Invite Members"
                   aria-label={`Invite to ${g.name}`}
-                  onClick={e => { e.stopPropagation(); setInviteTargetTeam(g); setShowTeamInvite(true) }}
+                  onClick={e => { e.stopPropagation(); setInviteTargetTeam(g); setShowTeamInvite(true); setMobileNavOpen(false) }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -1501,7 +1538,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
                   className="sidebar-team-manage-btn"
                   title="Manage / Delete"
                   aria-label={`Manage ${g.name}`}
-                  onClick={e => { e.stopPropagation(); setActiveContext(g.id); setShowTeamSettings(true) }}
+                  onClick={e => { e.stopPropagation(); setActiveContext(g.id); setShowTeamSettings(true); setMobileNavOpen(false) }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="3"/>
