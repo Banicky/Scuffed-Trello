@@ -563,7 +563,6 @@ function BoardCard({ board, index, stagger, onOpen, onDelete, onRename, isOwner 
       </div>
 
       <div className="board-tile-info">
-        <span className="board-tile-arrow" aria-hidden="true">→</span>
         <div className="board-tile-info-text">
           {board.team_name && (
             <span

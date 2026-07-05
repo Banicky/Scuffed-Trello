@@ -342,7 +342,7 @@ export default function AuthPage({ onLogin }) {
 
         <p className="auth-eyebrow">Cosmic task management</p>
         <h1 className="auth-visual-heading">Organize anything into a <span className="auth-accent-word">universe</span> worth exploring.</h1>
-        <p className="auth-visual-sub">Boards become galaxies, your crew becomes a team, and tasks become quests — a project tracker that actually pulls you back in.</p>
+        <p className="auth-visual-sub">Every board is a galaxy — build your team, lean on your AI co-pilot, and climb the ranks with a daily streak.</p>
 
         <ul className="auth-features">
           {FEATURES.map(f => (
@@ -572,7 +572,7 @@ export default function AuthPage({ onLogin }) {
             <label className="auth-label">Username</label>
             <input
               className="card-input"
-              placeholder="username"
+              placeholder="Enter username"
               value={registerForm.username}
               onChange={e => setRegisterForm(f => ({ ...f, username: e.target.value }))}
               maxLength={50}
@@ -583,7 +583,7 @@ export default function AuthPage({ onLogin }) {
             <input
               className="card-input"
               type="email"
-              placeholder="you@example.com"
+              placeholder="Enter email"
               value={registerForm.email}
               onChange={e => setRegisterForm(f => ({ ...f, email: e.target.value }))}
               maxLength={255}
@@ -593,7 +593,7 @@ export default function AuthPage({ onLogin }) {
             <input
               className="card-input"
               type="password"
-              placeholder="password"
+              placeholder="Enter password"
               value={registerForm.password}
               onChange={e => setRegisterForm(f => ({ ...f, password: e.target.value }))}
               maxLength={255}

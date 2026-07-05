@@ -6743,24 +6743,6 @@ select.card-input {
   transform: translateX(-10px);
 }
 
-/* ── Board tile arrow ── */
-.board-tile-arrow {
-  position: absolute;
-  bottom: 14px;
-  right: 14px;
-  z-index: 3;
-  font-size: 17px;
-  color: rgba(255, 255, 255, 0.5);
-  pointer-events: none;
-  transition: color 0.15s, transform 0.15s;
-  line-height: 1;
-
-  .board-tile:hover & {
-    color: rgba(255, 255, 255, 0.9);
-    transform: translateX(3px);
-  }
-}
-
 /* ── Hero username italic highlight ── */
 .dash-hero-username {
   color: var(--accent);
