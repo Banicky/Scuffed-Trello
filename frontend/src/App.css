@@ -7202,6 +7202,21 @@ select.card-input {
 .dashboard-shell--day .dash-sidebar::after {
   display: none;
 }
+/* On phones the sidebar is an off-canvas drawer (≤640px block near .dash-layout).
+   That rule is single-class, so the two-class day glass rail above outranks it
+   and would yank the drawer back into flow — restore the drawer geometry here,
+   and swap the 10%-white glass for a near-opaque day fill so the page doesn't
+   bleed through the slide-in panel. */
+@media (max-width: 640px) {
+  .dashboard-shell--day .dash-sidebar {
+    position: fixed;
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    border-right: 1px solid rgba(140, 150, 165, 0.55);
+    background: rgba(238, 244, 251, 0.92);
+  }
+}
 
 /* ── Glassy reflection (day): a static highlight pass that makes the frosted
    panes — hero card, sidebar, board tiles — read as real glass. A bright sheen
