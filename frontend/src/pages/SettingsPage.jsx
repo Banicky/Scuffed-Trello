@@ -4,21 +4,6 @@ import TwoFactorSection from '../components/TwoFactorSection.jsx'
 import TwoFactorSetup from './TwoFactorSetup.jsx'
 import Starfield from '../components/Starfield.jsx'
 
-const AVATAR_PRESETS = [
-  { key: '♈', label: 'Aries' },
-  { key: '♉', label: 'Taurus' },
-  { key: '♊', label: 'Gemini' },
-  { key: '♋', label: 'Cancer' },
-  { key: '♌', label: 'Leo' },
-  { key: '♍', label: 'Virgo' },
-  { key: '♎', label: 'Libra' },
-  { key: '♏', label: 'Scorpio' },
-  { key: '♐', label: 'Sagittarius' },
-  { key: '♑', label: 'Capricorn' },
-  { key: '♒', label: 'Aquarius' },
-  { key: '♓', label: 'Pisces' },
-]
-
 // Three curated themes. Each renders the same GSAP cosmic-orrery format in the
 // picker; `variant` decides the central body (ringed planet vs. radiant sun).
 export const THEME_PRESETS = [
@@ -38,7 +23,7 @@ export function applyAccentTheme(value) {
 function AvatarSection({ user, onUpdate, guardRef }) {
   // Avatar edits are *staged* locally and only persisted when the user clicks
   // "Save Changes" — nothing hits the server on a mere preset click or file pick.
-  //  · draftUrl     — pending avatar_url to save ('preset:x', a server url, or null for initials)
+  //  · draftUrl     — pending avatar_url to save (a server url, or null for initials)
   //  · pendingFile  — a chosen custom image not yet uploaded
   //  · pendingPreview — object URL for previewing that pending file
   const [draftUrl, setDraftUrl] = useState(user.avatar_url ?? null)
@@ -59,20 +44,11 @@ function AvatarSection({ user, onUpdate, guardRef }) {
   // Release the preview object URL on unmount so we don't leak it.
   useEffect(() => () => { if (pendingPreview) URL.revokeObjectURL(pendingPreview) }, [pendingPreview])
 
-  const draftPresetKey = draftUrl?.startsWith('preset:') ? draftUrl.slice(7) : null
   const draftCustomUrl = pendingFile
     ? pendingPreview
-    : (draftUrl && !draftUrl.startsWith('preset:') ? assetUrl(draftUrl) : null)
+    : (draftUrl ? assetUrl(draftUrl) : null)
   const hasCustomDraft = draftCustomUrl != null
-  const hasAnyAvatar = hasCustomDraft || draftPresetKey != null
   const dirty = pendingFile != null || (draftUrl ?? null) !== (user.avatar_url ?? null)
-
-  function selectPreset(key) {
-    setError('')
-    setDraftUrl(`preset:${key}`)
-    setPendingFile(null)
-    setPendingPreview(prev => { if (prev) URL.revokeObjectURL(prev); return null })
-  }
 
   function chooseFile(e) {
     const file = e.target.files?.[0]
@@ -141,29 +117,9 @@ function AvatarSection({ user, onUpdate, guardRef }) {
       <div className="settings-avatar-hero">
         {hasCustomDraft ? (
           <img className="settings-avatar-hero-img" src={draftCustomUrl} alt={user.username} />
-        ) : draftPresetKey ? (
-          <span className="settings-avatar-hero-sigil">{draftPresetKey}</span>
         ) : (
           <span className="settings-avatar-hero-monogram">{(user.username[0] || '?').toUpperCase()}</span>
         )}
-      </div>
-
-      <div className="settings-avatar-block">
-        <h3 className="settings-block-label">Zodiac Signs</h3>
-        <div className="settings-avatar-presets">
-          {AVATAR_PRESETS.map(p => (
-            <button
-              key={p.key}
-              className={`settings-avatar-preset${draftPresetKey === p.key ? ' selected' : ''}`}
-              onClick={() => selectPreset(p.key)}
-              disabled={saving}
-              title={p.label}
-              aria-label={`${p.label} sign${draftPresetKey === p.key ? ' (selected)' : ''}`}
-            >
-              {p.key}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="settings-avatar-block">
@@ -177,7 +133,7 @@ function AvatarSection({ user, onUpdate, guardRef }) {
           >
             {hasCustomDraft ? 'Replace image' : 'Upload image'}
           </button>
-          {hasAnyAvatar && (
+          {hasCustomDraft && (
             <button
               className="btn-ghost settings-avatar-clear"
               onClick={useInitials}

@@ -170,6 +170,31 @@
   gap: 12px;
 }
 
+/* ── Header button click flair: a quick squash-and-pop with an expanding
+   accent-coloured ring, applied via a delegated click handler on .topbar (see
+   BoardView.jsx) so every header button gets it without individual wiring ── */
+@keyframes btn-pop-flair {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  35% { transform: scale(0.9); }
+  60% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+.topbar button.btn-pop {
+  animation: btn-pop-flair 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar button.btn-pop { animation: none; }
+}
+
 .board-icon {
   width: 36px;
   height: 36px;
@@ -1871,6 +1896,16 @@ select.card-input {
   .dashboard-main {
     padding: 28px 20px 40px;
   }
+
+  /* auto-fill's 1fr columns stretch a lone tile to the full row width on
+     narrow screens; cap each column's width so tiles stay card-sized and
+     center the leftover row space instead of blowing a tile up to fill it. */
+  .board-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 160px));
+    justify-content: center;
+    grid-auto-rows: 150px;
+    gap: 12px;
+  }
 }
 
 /* ── Hero ── */
@@ -2026,6 +2061,7 @@ select.card-input {
   fill: none;
   stroke: rgba(255, 255, 255, 0.42);
   stroke-width: 0.7;
+  /* opacity-only shimmer (see zodiac-line-shimmer below) so this never repaints */
   animation: zodiac-line-shimmer 6s ease-in-out infinite;
 }
 .board-tile-zodiac-star {
@@ -2033,8 +2069,13 @@ select.card-input {
   /* scale the circle around its own centre (cx/cy) rather than the SVG origin */
   transform-box: fill-box;
   transform-origin: center;
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tile) 80%, #fff)) drop-shadow(0 0 2px #fff);
-  /* gentle constant twinkle (opacity) + an occasional bright flare (scale) */
+  /* a single drop-shadow — the halo circle behind each star already supplies
+     the outer bloom, so a second chained drop-shadow only doubled the filter
+     rasterisation cost per star for a barely-visible difference */
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tile) 70%, #fff));
+  /* gentle constant twinkle (opacity) + an occasional bright flare (scale) —
+     both compositor-only properties, so the static filter above is rasterised
+     once and just re-blended/re-scaled per frame instead of repainted */
   animation:
     zodiac-twinkle 3.2s ease-in-out infinite,
     zodiac-sparkle 8s ease-in-out infinite;
@@ -2069,14 +2110,29 @@ select.card-input {
   84% { transform: scale(1.45); }
   100% { transform: scale(1); }
 }
+/* opacity-only (not stroke colour) so the line never needs a main-thread
+   repaint — animating `stroke` can't run on the compositor and, multiplied
+   across every visible tile, was a steady drag on scroll performance */
 @keyframes zodiac-line-shimmer {
-  0%, 100% { stroke: rgba(255, 255, 255, 0.3); }
-  50% { stroke: rgba(255, 255, 255, 0.5); }
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .board-tile-zodiac-star { animation: none; opacity: 0.8; }
   .board-tile-zodiac-line { animation: none; }
   .board-tile-zodiac-halo { animation: none; opacity: 0.5; }
+}
+
+/* While the board grid is actively scrolling (the same .is-scrolling window
+   that reveals the scrollbar), hold every tile's twinkle/sparkle/breathe
+   loop. With 20+ boards ~150 animated nodes carrying blur/drop-shadow
+   filters sit in the viewport, and their per-frame updates compete with the
+   scroll itself. A paused animation keeps its current frame, so the hold is
+   invisible and each loop resumes exactly where it left off. */
+.dashboard-main.is-scrolling .board-tile-zodiac-line,
+.dashboard-main.is-scrolling .board-tile-zodiac-star,
+.dashboard-main.is-scrolling .board-tile-zodiac-halo {
+  animation-play-state: paused;
 }
 
 /* heraldic rule: a thin inset platinum frame, like the chased border of a
@@ -2802,6 +2858,80 @@ select.card-input {
   overflow-y: auto;
   padding: 32px 40px 48px;
   min-width: 0;
+}
+
+/* ── Mobile: settings sidebar collapses to a top strip, mirroring .dash-layout's
+   mobile treatment. Below 640px the fixed 216px nav (flex-shrink: 0) plus the
+   6-column, fixed-48px preset grid no longer fit side-by-side, which is what
+   forced the whole page into horizontal scroll with content clipped off the
+   right edge. ── */
+@media (max-width: 640px) {
+  .settings-layout {
+    flex-direction: column;
+  }
+
+  .settings-nav {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    margin: 12px 12px 6px;
+    padding: 6px;
+    border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--bg) 62%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+    gap: 4px;
+  }
+
+  /* three equal-width tabs sized to fit without a scrollbar; text truncates
+     with an ellipsis on the very narrowest phones rather than overflowing */
+  .settings-nav-item {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 8px 4px;
+    border-radius: 10px;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .settings-nav-glyph {
+    width: auto;
+    font-size: 14px;
+  }
+  /* the active marker is a left rail in the vertical desktop list; inside a
+     rounded pill-strip the existing accent background/text is enough on its
+     own, so drop the rail rather than have it float mid-tab */
+  .settings-nav-item.active::before {
+    content: none;
+  }
+
+  .settings-pane {
+    padding: 20px 16px 40px;
+  }
+
+  .settings-section {
+    max-width: 100%;
+    padding: 20px 18px;
+  }
+
+  /* fixed 48px columns × 6 forced a ~330px-wide grid regardless of viewport;
+     auto-fill lets it wrap to however many columns actually fit */
+  .settings-avatar-presets {
+    grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+  }
+  .settings-avatar-preset {
+    width: auto;
+    height: auto;
+    aspect-ratio: 1;
+  }
 }
 
 .settings-section {
@@ -3563,11 +3693,31 @@ select.card-input {
 }
 
 .board-members-panel {
-  position: absolute;
-  top: 56px;
-  right: 16px;
-  z-index: 100;
   min-width: 280px;
+  /* pop-in on open instead of appearing instantly — top/right come from the
+     inline style below (measured from whichever button opened it) */
+  animation: panel-pop-in 0.16s cubic-bezier(0.3, 1.4, 0.6, 1) both;
+}
+
+@keyframes panel-pop-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-members-panel { animation: none; }
+}
+
+/* Positioned wrapper for Design/Members/History panels — top/right are set
+   inline per-panel (see useAnchorPos in BoardView.jsx), anchoring each panel
+   directly under the button that opened it instead of a single fixed spot
+   that left buttons like Design (not the rightmost one) far from their panel.
+   `fixed` (not `absolute`) so top/right stay viewport-relative, matching how
+   they were measured — the overlay's own `right: var(--ai-panel-w)` override
+   (below) would otherwise shift an absolutely-positioned child's containing
+   block and double-offset the panel when the AI assistant is docked open. */
+.board-panel-anchor {
+  position: fixed;
+  z-index: 100;
 }
 
 .board-members-overlay {
@@ -3722,9 +3872,59 @@ select.card-input {
   flex: 1;
 }
 
+/* confirmation that an invitation missive went out — membership is pending
+   until the invitee accepts, so nothing appears in the list yet */
+.invite-sent-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--star, var(--accent));
+}
+
 /* ── Board design panel ── */
 .board-design-panel {
   width: 300px;
+}
+
+.board-history-panel {
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  max-height: min(520px, calc(100vh - 96px));
+  display: flex;
+  flex-direction: column;
+}
+/* .card-history-list (App.css, "Card history" section) is already flex:1 +
+   min-height:0 + overflow-y:auto — it just needs a bounded flex-column
+   ancestor to actually scroll within, which .board-history-panel provides */
+.board-history-panel .card-history-list {
+  padding-right: 4px;
+  /* thin custom scrollbar matching the board's own scroll areas (.board,
+     .column-cards, .ai-panel-body) instead of the default chunky OS bar —
+     --sb-thumb/--sb-thumb-hover are defined on the ancestor .board-shell */
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-thumb) transparent;
+}
+.board-history-panel .card-history-list::-webkit-scrollbar {
+  width: 8px;
+}
+.board-history-panel .card-history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.board-history-panel .card-history-list::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+.board-history-panel .card-history-list::-webkit-scrollbar-thumb:hover {
+  background: var(--sb-thumb-hover);
+}
+.board-history-panel .card-history-list::-webkit-scrollbar-button {
+  display: none;
+}
+.board-history-panel .card-history-list::-webkit-scrollbar-corner {
+  background: transparent;
 }
 .board-design-hint {
   font-size: 12.5px;
@@ -4570,14 +4770,37 @@ select.card-input {
   flex-shrink: 0;
 }
 
+/* Section headings read like engraved star-chart captions: the grimoire serif
+   with real weight behind it, wide tracking, a small compass star, and a
+   hairline rule that fades toward the sidebar edge. currentColor drives the
+   star + rule, so the night/day color overrides recolor the whole ornament. */
 .sidebar-section-label {
+  display: flex;
+  align-items: center;
+  gap: calc(7 * var(--u));
   font-family: var(--fantasy);
-  font-size: calc(10 * var(--u));
-  letter-spacing: 0.16em;
+  font-size: calc(11.5 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--text-muted, #888);
   padding: calc(22 * var(--u)) calc(12 * var(--u)) calc(8 * var(--u));
   margin: 0;
+  white-space: nowrap;
+}
+.sidebar-section-label::before {
+  content: '✦';
+  font-size: calc(9 * var(--u));
+  letter-spacing: 0;
+  opacity: 0.65;
+}
+.sidebar-section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  min-width: calc(12 * var(--u));
+  background: linear-gradient(90deg, currentColor, transparent);
+  opacity: 0.3;
 }
 
 .sidebar-item {
@@ -4674,6 +4897,11 @@ select.card-input {
 }
 
 /* ── Team Icon ── */
+/* Team emblems read as arcane sigils rather than app icons: by night a pane of
+   dark glass rimmed and lit by the team's hue, the serif initial glowing like
+   a rune; the day realm swaps in frosted pastel glass with an ink initial
+   (see the .dashboard-shell--day override). The user's chosen hue survives —
+   it's remixed through the sky tones instead of painted on at full saturation. */
 .team-icon {
   display: inline-flex;
   align-items: center;
@@ -4681,35 +4909,37 @@ select.card-input {
   width: 26px;
   height: 26px;
   border-radius: 7px;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--team-color, var(--accent)) 68%, #fff),
-    var(--team-color, var(--accent))
+  background: radial-gradient(
+    120% 120% at 30% 18%,
+    color-mix(in srgb, var(--team-color, var(--accent)) 36%, rgba(18, 21, 30, 0.92)) 0%,
+    color-mix(in srgb, var(--team-color, var(--accent)) 12%, rgba(8, 9, 14, 0.96)) 100%
   );
-  color: #fff;
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 32%, #e9edf7);
   font-family: var(--fantasy);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   letter-spacing: 0;
   flex-shrink: 0;
   line-height: 1;
   user-select: none;
   box-shadow:
-    0 2px 8px -2px color-mix(in srgb, var(--team-color, var(--accent)) 65%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    inset 0 0 0 1px color-mix(in srgb, var(--team-color, var(--accent)) 48%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 14px -6px color-mix(in srgb, var(--team-color, var(--accent)) 70%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--team-color, var(--accent)) 55%, transparent);
 }
 
 .team-icon--md {
   width: 36px;
   height: 36px;
-  font-size: 17px;
+  font-size: 19px;
   border-radius: 9px;
 }
 
 .team-icon--lg {
   width: 48px;
   height: 48px;
-  font-size: 22px;
+  font-size: 25px;
   border-radius: 12px;
 }
 
@@ -5055,44 +5285,6 @@ select.card-input {
   margin: 0;
 }
 
-/* ── Mobile: sidebar collapses to a top strip ── */
-@media (max-width: 640px) {
-  .dash-layout {
-    flex-direction: column;
-  }
-
-  .dash-sidebar {
-    width: 100%;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    padding: 8px 12px;
-    border: none;
-    border-radius: 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 4px;
-    align-items: center;
-  }
-
-  .sidebar-section-label {
-    display: none;
-  }
-
-  .sidebar-item {
-    white-space: nowrap;
-    flex-shrink: 0;
-    padding: 6px 10px;
-    font-size: 12.5px;
-  }
-
-  .sidebar-create-btn {
-    flex-shrink: 0;
-    margin-top: 0;
-    white-space: nowrap;
-  }
-}
-
 /* ── Dashboard topbar: breadcrumb+title left, search+bell right ── */
 .dashboard-shell .topbar {
   display: flex;
@@ -5248,6 +5440,83 @@ select.card-input {
   justify-content: center;
 }
 
+/* ── Mobile hamburger (hidden on desktop; the sidebar docks there instead) ── */
+.dash-hamburger-btn {
+  display: none;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dash-hamburger-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.topbar-left-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* ── Mobile: sidebar becomes a hamburger-triggered off-canvas drawer ── */
+.mobile-nav-backdrop {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .dash-hamburger-btn {
+    display: flex;
+  }
+
+  .dashboard-shell .topbar-left {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .dash-layout {
+    position: relative;
+  }
+
+  .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 7, 11, 0.55);
+    z-index: 300;
+  }
+
+  .dash-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(78vw, 280px);
+    flex-direction: column;
+    border-radius: 0;
+    border: none;
+    border-right: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+    padding-top: 84px;
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    z-index: 301;
+  }
+
+  .dash-sidebar--open {
+    transform: translateX(0);
+  }
+}
+
 /* ── Notification bell + dropdown ── */
 .topbar-notif-wrap {
   position: relative;
@@ -5302,7 +5571,10 @@ select.card-input {
   left: auto;
   right: 0;
   width: min(320px, calc(100vw - 32px));
-  background: var(--column-bg);
+  /* --column-bg doesn't exist anywhere in the stylesheet, so this was
+     silently resolving to fully transparent — the hero card's orrery art
+     behind it was showing straight through instead of a solid panel */
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 8px 32px -4px rgba(0,0,0,0.5);
@@ -5768,7 +6040,7 @@ select.card-input {
 }
 .hero-stat-streak { display: inline-flex; align-items: center; gap: 6px; }
 .hero-stat-streak strong { color: var(--text-h); font-weight: 700; }
-.hero-stat-flame {
+.hero-stat-rocket {
   width: 15px;
   height: 15px;
   color: #ff8a3d;
@@ -5962,8 +6234,12 @@ select.card-input {
   will-change: transform, height;
 }
 
-/* — Streak (shown inside the Cosmic Activity page) — */
-.streak-flame {
+/* — Streak rocket (shown inside the Cosmic Activity page) — the ember badge
+   ring stays warm so the exhaust glow ties into the orange streak dots below.
+   Motion (launch-in, hover bob, flame flicker) is GSAP-driven from the
+   activityPageOpen effect; under reduced motion that effect never runs, so
+   the rocket simply sits static. */
+.streak-rocket {
   width: 64px;
   height: 64px;
   display: flex;
@@ -5975,15 +6251,10 @@ select.card-input {
   box-shadow: 0 0 26px rgba(255, 138, 61, 0.28), inset 0 0 0 1px rgba(255, 138, 61, 0.3);
   margin-bottom: 6px;
 }
-.streak-flame svg {
-  width: 32px;
-  height: 32px;
+.streak-rocket svg {
+  width: 36px;
+  height: 36px;
   filter: drop-shadow(0 0 6px rgba(255, 138, 61, 0.6));
-  animation: streak-flicker 2.4s ease-in-out infinite;
-}
-@keyframes streak-flicker {
-  0%, 100% { transform: scale(1); opacity: 0.92; }
-  50% { transform: scale(1.08); opacity: 1; }
 }
 
 .streak-count {
@@ -6126,9 +6397,6 @@ select.card-input {
 .dashboard-shell--day .voyager-stat {
   background: rgba(250, 253, 255, 0.62);
   border: 1px solid rgba(110, 145, 200, 0.28);
-}
-@media (prefers-reduced-motion: reduce) {
-  .streak-flame svg { animation: none; }
 }
 
 /* ── Sidebar user section at bottom ── */
@@ -6524,24 +6792,6 @@ select.card-input {
   transform: translateX(-10px);
 }
 
-/* ── Board tile arrow ── */
-.board-tile-arrow {
-  position: absolute;
-  bottom: 14px;
-  right: 14px;
-  z-index: 3;
-  font-size: 17px;
-  color: rgba(255, 255, 255, 0.5);
-  pointer-events: none;
-  transition: color 0.15s, transform 0.15s;
-  line-height: 1;
-
-  .board-tile:hover & {
-    color: rgba(255, 255, 255, 0.9);
-    transform: translateX(3px);
-  }
-}
-
 /* ── Hero username italic highlight ── */
 .dash-hero-username {
   color: var(--accent);
@@ -6613,9 +6863,15 @@ select.card-input {
   will-change: opacity;
 }
 
-/* lift the actual UI above the canvas */
-.dashboard-shell > .topbar,
+/* lift the actual UI above the canvas. The topbar sits one layer above
+   dash-layout (rather than tying at the same z-index) so its popovers — the
+   notif dropdown, search suggestions, user menu — always render in front of
+   the hero card below them. At equal z-index the tie breaks on DOM order,
+   which favours dash-layout (it comes later) and let a tall notif dropdown
+   (e.g. with an unread invite) get rendered underneath the hero card's
+   frosted glass instead of over it. */
 .dashboard-shell > .dash-layout { position: relative; z-index: 1; }
+.dashboard-shell > .topbar { position: relative; z-index: 2; }
 
 /* ── Hero card: a pane of black glass under the stars ── */
 .dashboard-shell .dash-hero-card {
@@ -6672,7 +6928,6 @@ select.card-input {
 }
 .dashboard-shell .sidebar-section-label {
   color: rgba(190, 200, 220, 0.78);
-  letter-spacing: 0.22em;
 }
 /* breadcrumb + page title read clearly against the void */
 .dashboard-shell .topbar-breadcrumb {
@@ -6947,6 +7202,21 @@ select.card-input {
 .dashboard-shell--day .dash-sidebar::after {
   display: none;
 }
+/* On phones the sidebar is an off-canvas drawer (≤640px block near .dash-layout).
+   That rule is single-class, so the two-class day glass rail above outranks it
+   and would yank the drawer back into flow — restore the drawer geometry here,
+   and swap the 10%-white glass for a near-opaque day fill so the page doesn't
+   bleed through the slide-in panel. */
+@media (max-width: 640px) {
+  .dashboard-shell--day .dash-sidebar {
+    position: fixed;
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    border-right: 1px solid rgba(140, 150, 165, 0.55);
+    background: rgba(238, 244, 251, 0.92);
+  }
+}
 
 /* ── Glassy reflection (day): a static highlight pass that makes the frosted
    panes — hero card, sidebar, board tiles — read as real glass. A bright sheen
@@ -7002,6 +7272,23 @@ select.card-input {
 }
 .dashboard-shell--day .sidebar-section-label { color: rgba(58, 84, 130, 0.9); }
 .dashboard-shell--day .topbar-breadcrumb { color: rgba(62, 88, 134, 0.9); opacity: 1; }
+
+/* team sigils by day: frosted pastel glass — the team hue washed toward the
+   bright sky — with the initial in that hue deepened to ink so it stays legible
+   on the light pane (mirrors the night sigil in the base .team-icon rule) */
+.dashboard-shell--day .team-icon {
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--team-color, var(--accent)) 18%, #fbfdff) 0%,
+    color-mix(in srgb, var(--team-color, var(--accent)) 36%, #e0ebf8) 100%
+  );
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 52%, #1a2334);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--team-color, var(--accent)) 36%, rgba(255, 255, 255, 0.7)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 3px 10px -5px color-mix(in srgb, var(--team-color, var(--accent)) 55%, rgba(40, 70, 120, 0.4));
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
 
 /* count badges, the date eyebrow, and the hero corner filigree shed their blue
    for a neutral gray / grayish-black */
@@ -7090,11 +7377,13 @@ select.card-input {
 .dashboard-shell--day .board-tile-zodiac-star {
   fill: #0e1626;
   /* a tight white core + a soft dark-gray bloom so each node reads as a deep,
-     glowing star against the bright card */
+     glowing star against the bright card. Two drop-shadows, not three — each
+     chained drop-shadow is a separate expensive rasterisation pass, repeated
+     per star per tile, and the halo circle behind each star already supplies
+     most of the outer bloom (see .board-tile-zodiac-halo below). */
   filter:
-    drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.85))
-    drop-shadow(0 0 6px rgba(54, 58, 68, 0.95))
-    drop-shadow(0 0 13px rgba(58, 62, 72, 0.55));
+    drop-shadow(0 0 2px rgba(255, 255, 255, 0.85))
+    drop-shadow(0 0 7px rgba(54, 58, 68, 0.85));
 }
 /* the breathing dark-gray glow behind each node — a slow pulse of opacity and
    blur. The per-node animation-delay (set inline, seeded by board id) keeps the
@@ -7114,6 +7403,33 @@ select.card-input {
 }
 @media (prefers-reduced-motion: reduce) {
   .dashboard-shell--day .board-tile-zodiac-halo { animation: none; opacity: 0.5; }
+}
+
+/* ── Board hover preview (day): flips the mini board surface from the dark
+   night panel to a light one, with ink-dark text/columns, so the hover
+   preview matches the bright glass card it's sitting on instead of always
+   showing a night-mode surface ── */
+.dashboard-shell--day .board-preview {
+  background: color-mix(in srgb, var(--tile) 14%, #f5f9fd);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+.dashboard-shell--day .board-preview-state {
+  color: rgba(24, 32, 46, 0.65);
+}
+.dashboard-shell--day .mini-col {
+  background: rgba(24, 32, 46, 0.06);
+}
+.dashboard-shell--day .mini-col-title {
+  color: rgba(24, 32, 46, 0.85);
+}
+.dashboard-shell--day .mini-col-count {
+  color: rgba(24, 32, 46, 0.5);
+}
+.dashboard-shell--day .mini-card {
+  background: rgba(24, 32, 46, 0.08);
+}
+.dashboard-shell--day .mini-card-title {
+  color: rgba(24, 32, 46, 0.82);
 }
 
 /* ── Hero orrery re-tinted for daylight — kept deep enough to read clearly

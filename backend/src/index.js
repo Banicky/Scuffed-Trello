@@ -1,6 +1,8 @@
 import "dotenv/config";
+import http from "http";
 import express from "express";
 import cors from "cors";
+import { Server as SocketServer } from "socket.io";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import cookieParser from "cookie-parser";
@@ -162,13 +164,56 @@ app.use(cors({ origin: CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use("/uploads", express.static(UPLOAD_DIR));
-app.use(session({
+const sessionMiddleware = session({
   store: new PgSession({ pool }),
   secret: process.env.SESSION_SECRET || "dev-secret-change-in-prod",
   resave: false,
   saveUninitialized: false,
   cookie: { httpOnly: true, secure: isProd, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 },
-}));
+});
+app.use(sessionMiddleware);
+
+// ── Real-time (Socket.IO) ──────────────────────────────────────────────────────
+// Collaborative board updates ride a Socket.IO layer attached to the same HTTP
+// server. Auth is the SAME session cookie the REST API uses: io.engine.use runs
+// the express-session middleware on the WebSocket handshake, so socket.request.
+// session.userId identifies the connected user exactly as req.session does.
+// Each board is a room ("board:<id>"); a socket only joins after canAccessBoard
+// passes, so events never reach a user who couldn't load the board over REST.
+const server = http.createServer(app);
+const io = new SocketServer(server, {
+  cors: { origin: CLIENT_URL, credentials: true },
+});
+io.engine.use(sessionMiddleware);
+
+io.on("connection", (socket) => {
+  const userId = socket.request.session?.userId;
+  // Reject sockets with no logged-in session — they can't access any board.
+  if (!userId) { socket.disconnect(true); return; }
+
+  socket.on("board:join", async (boardId) => {
+    if (boardId == null) return;
+    if (!await canAccessBoard(userId, boardId)) return;
+    socket.join(`board:${boardId}`);
+  });
+
+  socket.on("board:leave", (boardId) => {
+    if (boardId != null) socket.leave(`board:${boardId}`);
+  });
+});
+
+// Emit an event to everyone watching a board, optionally excluding the socket
+// that triggered the change. The acting client passes its socket id in the
+// "x-socket-id" request header so it doesn't receive an echo of its own action
+// (it already applied the change optimistically against the authoritative REST
+// response). Best-effort: a missing boardId is a no-op.
+function broadcast(req, boardId, event, payload) {
+  if (boardId == null) return;
+  const room = `board:${boardId}`;
+  const exceptId = req?.headers?.["x-socket-id"];
+  const target = exceptId ? io.to(room).except(exceptId) : io.to(room);
+  target.emit(event, payload);
+}
 
 function requireAuth(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
@@ -948,6 +993,28 @@ app.get("/api/boards/:id/activity", requireAuth, async (req, res) => {
   res.json(result.rows);
 });
 
+// GET /api/boards/:id/history — full board-wide change trail (newest first),
+// mirroring /api/cards/:id/history's query but joined across every card on
+// the board instead of a single card_id.
+app.get("/api/boards/:id/history", requireAuth, async (req, res) => {
+  if (!await canAccessBoard(req.session.userId, req.params.id)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const result = await pool.query(
+    `SELECT h.id, h.action, h.card_title, h.detail, h.created_at,
+            COALESCE(u.username, h.username) AS username
+     FROM card_history h
+     JOIN cards c ON c.id = h.card_id
+     JOIN columns col ON col.id = c.column_id
+     LEFT JOIN users u ON u.id = h.user_id
+     WHERE col.board_id = $1
+     ORDER BY h.created_at DESC, h.id DESC
+     LIMIT 100`,
+    [req.params.id]
+  );
+  res.json(result.rows);
+});
+
 app.patch("/api/boards/:id", requireAuth, async (req, res) => {
   if (!await canAccessBoard(req.session.userId, req.params.id)) {
     return res.status(403).json({ error: "Forbidden" });
@@ -994,6 +1061,7 @@ app.patch("/api/boards/:id", requireAuth, async (req, res) => {
       detail: prevTitle,
     });
   }
+  broadcast(req, Number(req.params.id), "board:updated", { board: result.rows[0] });
   res.json(result.rows[0]);
 });
 
@@ -1156,6 +1224,9 @@ app.post("/api/boards/:id/import", requireAuth, async (req, res) => {
     action: "imported",
     title: boardTitle,
   });
+  // Import rewrites the whole structure; peers can't reconcile granularly, so
+  // tell them to re-fetch the board.
+  broadcast(req, Number(req.params.id), "board:reload", {});
   res.json({ success: true });
 });
 
@@ -1192,6 +1263,9 @@ app.get("/api/boards/:boardId/members", requireAuth, async (req, res) => {
   res.json(result.rows);
 });
 
+// Inviting someone to a board is consensual: this records a pending invite and
+// drops a missive in their notifications instead of adding them outright.
+// Membership is only granted when they accept (POST /api/board-invites/:id/accept).
 app.post("/api/boards/:boardId/members", requireAuth, async (req, res) => {
   if (!await isOwner(req.session.userId, req.params.boardId)) {
     return res.status(403).json({ error: "Only the board owner can invite members" });
@@ -1208,11 +1282,40 @@ app.post("/api/boards/:boardId/members", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "You already own this board" });
   }
 
-  await pool.query(
-    "INSERT INTO board_members (board_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+  const already = await pool.query(
+    `SELECT 1 FROM boards WHERE id = $1 AND owner_id = $2
+     UNION SELECT 1 FROM board_members WHERE board_id = $1 AND user_id = $2
+     UNION SELECT 1 FROM team_members tm
+       JOIN boards b ON b.team_id = tm.team_id
+       WHERE b.id = $1 AND tm.user_id = $2`,
     [req.params.boardId, invitee.id]
   );
-  res.json(invitee);
+  if (already.rowCount > 0) return res.status(400).json({ error: "That voyager already has access to this galaxy" });
+
+  // re-inviting after a decline revives the same row as a fresh pending invite
+  const invite = await pool.query(
+    `INSERT INTO board_invites (board_id, inviter_id, invitee_id, status)
+     VALUES ($1, $2, $3, 'pending')
+     ON CONFLICT (board_id, invitee_id) DO UPDATE SET status = 'pending', inviter_id = $2, created_at = NOW()
+     RETURNING *`,
+    [req.params.boardId, req.session.userId, invitee.id]
+  );
+
+  const [board, inviter] = await Promise.all([
+    pool.query("SELECT title FROM boards WHERE id = $1", [req.params.boardId]),
+    pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]),
+  ]);
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, data) VALUES ($1, 'board_invite', $2)`,
+    [invitee.id, JSON.stringify({
+      invite_id: invite.rows[0].id,
+      board_id: parseInt(req.params.boardId),
+      board_title: board.rows[0].title,
+      inviter_username: inviter.rows[0].username,
+    })]
+  );
+
+  res.json({ success: true, pending: true, invitee: { id: invitee.id, username: invitee.username } });
 });
 
 app.delete("/api/boards/:boardId/members/:userId", requireAuth, async (req, res) => {
@@ -1447,6 +1550,54 @@ app.post("/api/team-invites/:id/decline", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// POST /api/board-invites/:id/accept — the consent gate for board membership;
+// only here does the invitee actually land in board_members
+app.post("/api/board-invites/:id/accept", requireAuth, async (req, res) => {
+  const invite = await pool.query("SELECT * FROM board_invites WHERE id = $1", [req.params.id]);
+  if (!invite.rows[0]) return res.status(404).json({ error: "Invite not found" });
+  if (invite.rows[0].invitee_id !== req.session.userId) return res.status(403).json({ error: "This invitation is not for you" });
+  if (invite.rows[0].status !== "pending") return res.status(400).json({ error: "Invitation is no longer pending" });
+
+  await pool.query(
+    "INSERT INTO board_members (board_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [invite.rows[0].board_id, req.session.userId]
+  );
+  await pool.query("UPDATE board_invites SET status = 'accepted' WHERE id = $1", [req.params.id]);
+  await pool.query(
+    `UPDATE notifications SET read = true
+     WHERE user_id = $1 AND type = 'board_invite' AND (data->>'invite_id')::int = $2`,
+    [req.session.userId, parseInt(req.params.id)]
+  );
+
+  // hand the board back in the same shape GET /api/boards returns for members,
+  // so the dashboard can slot it straight into the Shared Galaxies list
+  const board = await pool.query(
+    `SELECT b.*, 'member' AS role, NULL AS last_accessed_at,
+            g.name AS team_name, g.icon_color AS team_icon_color,
+            ${COLUMN_COUNTS_SQL} AS column_counts, ${BOARD_MEMBERS_SQL} AS members
+       FROM boards b
+       LEFT JOIN teams g ON g.id = b.team_id
+      WHERE b.id = $1`,
+    [invite.rows[0].board_id]
+  );
+  res.json({ success: true, board: board.rows[0] });
+});
+
+// POST /api/board-invites/:id/decline
+app.post("/api/board-invites/:id/decline", requireAuth, async (req, res) => {
+  const invite = await pool.query("SELECT * FROM board_invites WHERE id = $1", [req.params.id]);
+  if (!invite.rows[0]) return res.status(404).json({ error: "Invite not found" });
+  if (invite.rows[0].invitee_id !== req.session.userId) return res.status(403).json({ error: "This invitation is not for you" });
+
+  await pool.query("UPDATE board_invites SET status = 'declined' WHERE id = $1", [req.params.id]);
+  await pool.query(
+    `UPDATE notifications SET read = true
+     WHERE user_id = $1 AND type = 'board_invite' AND (data->>'invite_id')::int = $2`,
+    [req.session.userId, parseInt(req.params.id)]
+  );
+  res.json({ success: true });
+});
+
 app.get("/api/teams/:id/boards", requireAuth, async (req, res) => {
   if (!await canAccessTeam(req.session.userId, req.params.id)) {
     return res.status(403).json({ error: "Forbidden" });
@@ -1492,6 +1643,7 @@ app.post("/api/columns", requireAuth, async (req, res) => {
     "INSERT INTO columns (board_id, title, position) VALUES ($1, $2, $3) RETURNING *",
     [board_id, title, position]
   );
+  broadcast(req, board_id, "column:created", { column: result.rows[0] });
   res.json(result.rows[0]);
 });
 
@@ -1501,6 +1653,7 @@ app.delete("/api/columns/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   await pool.query("DELETE FROM columns WHERE id = $1", [req.params.id]);
+  broadcast(req, col.rows[0].board_id, "column:deleted", { columnId: Number(req.params.id) });
   res.json({ success: true });
 });
 
@@ -1520,6 +1673,7 @@ app.patch("/api/columns/:id", requireAuth, async (req, res) => {
     `UPDATE columns SET ${fields.join(', ')} WHERE id = $${values.length} RETURNING *`,
     values
   );
+  broadcast(req, col.rows[0].board_id, "column:updated", { column: result.rows[0] });
   res.json(result.rows[0]);
 });
 
@@ -1568,7 +1722,14 @@ app.post("/api/cards", requireAuth, async (req, res) => {
   const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
   await logActivity({ boardId: col.rows[0].board_id, cardId: card.id, userId: req.session.userId, action: "created", cardTitle: card.title });
   await logCardHistory({ cardId: card.id, userId: req.session.userId, action: "created", cardTitle: card.title });
-  res.json({ ...card, created_by_username: user.rows[0]?.username || null });
+  const created = { ...card, created_by_username: user.rows[0]?.username || null };
+  // Peers haven't loaded this card, so send the enriched shape the board face
+  // expects (empty comment_count/assignees a fresh card always has).
+  broadcast(req, col.rows[0].board_id, "card:created", {
+    columnId: column_id,
+    card: { comment_count: 0, assignees: [], ...created },
+  });
+  res.json(created);
 });
 
 app.delete("/api/cards/:id", requireAuth, async (req, res) => {
@@ -1588,6 +1749,7 @@ app.delete("/api/cards/:id", requireAuth, async (req, res) => {
   await logActivity({ boardId: card.rows[0].board_id, cardId: req.params.id, userId: req.session.userId, action: "deleted", cardTitle: card.rows[0].title });
   await pool.query("DELETE FROM cards WHERE id = $1", [req.params.id]);
   deleteSpacesImages(images.rows.map(r => r.url));
+  broadcast(req, card.rows[0].board_id, "card:deleted", { cardId: Number(req.params.id) });
   res.json({ success: true });
 });
 
@@ -1608,6 +1770,7 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
       "UPDATE cards SET starred = $1 WHERE id = $2 RETURNING *",
       [starred, req.params.id]
     );
+    broadcast(req, card.rows[0].board_id, "card:updated", { card: result.rows[0] });
     return res.json(result.rows[0]);
   }
 
@@ -1631,7 +1794,9 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
     if (changed.length) {
       await logCardHistory({ cardId: req.params.id, userId: req.session.userId, action: "edited", cardTitle: result.rows[0].title, detail: changed.join(", ") });
     }
-    return res.json({ ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null });
+    const edited = { ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null };
+    broadcast(req, card.rows[0].board_id, "card:updated", { card: edited });
+    return res.json(edited);
   }
 
   if (track_edit) {
@@ -1654,13 +1819,16 @@ app.patch("/api/cards/:id", requireAuth, async (req, res) => {
         detail: `to ${nameOf(column_id)} from ${nameOf(before.rows[0].column_id)}`,
       });
     }
-    return res.json({ ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null });
+    const moved = { ...result.rows[0], last_edited_by_username: editor.rows[0]?.username || null };
+    broadcast(req, card.rows[0].board_id, "card:updated", { card: moved });
+    return res.json(moved);
   }
 
   const result = await pool.query(
     "UPDATE cards SET column_id = $1, position = $2 WHERE id = $3 RETURNING *",
     [column_id, position, req.params.id]
   );
+  broadcast(req, card.rows[0].board_id, "card:updated", { card: result.rows[0] });
   res.json(result.rows[0]);
 });
 
@@ -1673,6 +1841,19 @@ async function cardBoardId(cardId) {
     [cardId]
   );
   return r.rows[0]?.board_id ?? null;
+}
+
+// Re-read a card's full assignee list and push it to the board room. Both the
+// board face (assignee chips) and an open card-detail modal apply it by card id.
+async function broadcastAssignees(req, boardId, cardId) {
+  const assignees = await pool.query(
+    `SELECT u.id, u.username, u.avatar_url FROM users u
+     JOIN card_assignees ca ON ca.user_id = u.id
+     WHERE ca.card_id = $1
+     ORDER BY u.username`,
+    [cardId]
+  );
+  broadcast(req, boardId, "card:assignees", { cardId: Number(cardId), assignees: assignees.rows });
 }
 
 app.get("/api/cards/:id/assignees", requireAuth, async (req, res) => {
@@ -1714,6 +1895,7 @@ app.post("/api/cards/:id/assignees", requireAuth, async (req, res) => {
   if (inserted.rows[0]) {
     const cardTitle = (await pool.query("SELECT title FROM cards WHERE id = $1", [req.params.id])).rows[0]?.title;
     await logCardHistory({ cardId: req.params.id, userId: req.session.userId, action: "assigned", cardTitle, detail: user.rows[0]?.username || "a member" });
+    await broadcastAssignees(req, boardId, req.params.id);
   }
   res.json(user.rows[0]);
 });
@@ -1731,6 +1913,7 @@ app.delete("/api/cards/:id/assignees/:userId", requireAuth, async (req, res) => 
     const cardTitle = (await pool.query("SELECT title FROM cards WHERE id = $1", [req.params.id])).rows[0]?.title;
     const removedUser = (await pool.query("SELECT username FROM users WHERE id = $1", [req.params.userId])).rows[0];
     await logCardHistory({ cardId: req.params.id, userId: req.session.userId, action: "unassigned", cardTitle, detail: removedUser?.username || "a member" });
+    await broadcastAssignees(req, boardId, req.params.id);
   }
   res.json({ success: true });
 });
@@ -1800,7 +1983,9 @@ app.post("/api/cards/:id/comments", requireAuth, async (req, res) => {
     [req.params.id, req.session.userId, body?.trim() || "", image_url || null]
   );
   const user = await pool.query("SELECT username FROM users WHERE id = $1", [req.session.userId]);
-  res.json({ ...result.rows[0], username: user.rows[0].username, reactions: [] });
+  const comment = { ...result.rows[0], username: user.rows[0].username, reactions: [] };
+  broadcast(req, card.rows[0].board_id, "comment:created", { cardId: Number(req.params.id), comment });
+  res.json(comment);
 });
 
 // Reject the upload before we stream a file to Spaces if the user is already
@@ -1895,13 +2080,15 @@ app.patch("/api/comments/:id", requireAuth, async (req, res) => {
     `SELECT emoji, user_id AS "userId" FROM comment_reactions WHERE comment_id = $1`,
     [req.params.id]
   );
-  res.json({ ...result.rows[0], username: user.rows[0].username, reactions: reactions.rows });
+  const updated = { ...result.rows[0], username: user.rows[0].username, reactions: reactions.rows };
+  broadcast(req, comment.rows[0].board_id, "comment:updated", { cardId: comment.rows[0].card_id, comment: updated });
+  res.json(updated);
 });
 
 // POST /api/comments/:id/reactions — toggle an emoji reaction on a comment
 app.post("/api/comments/:id/reactions", requireAuth, async (req, res) => {
   const comment = await pool.query(
-    `SELECT columns.board_id FROM card_comments cc
+    `SELECT columns.board_id, cc.card_id FROM card_comments cc
      JOIN cards ON cards.id = cc.card_id
      JOIN columns ON columns.id = cards.column_id
      WHERE cc.id = $1`,
@@ -1934,17 +2121,33 @@ app.post("/api/comments/:id/reactions", requireAuth, async (req, res) => {
     `SELECT emoji, user_id AS "userId" FROM comment_reactions WHERE comment_id = $1`,
     [req.params.id]
   );
+  broadcast(req, comment.rows[0].board_id, "comment:reactions", {
+    cardId: comment.rows[0].card_id,
+    commentId: Number(req.params.id),
+    reactions: reactions.rows,
+  });
   res.json({ reactions: reactions.rows });
 });
 
 app.delete("/api/comments/:id", requireAuth, async (req, res) => {
-  const comment = await pool.query("SELECT user_id, image_url FROM card_comments WHERE id = $1", [req.params.id]);
+  const comment = await pool.query(
+    `SELECT cc.user_id, cc.image_url, cc.card_id, columns.board_id
+     FROM card_comments cc
+     JOIN cards ON cards.id = cc.card_id
+     JOIN columns ON columns.id = cards.column_id
+     WHERE cc.id = $1`,
+    [req.params.id]
+  );
   if (!comment.rows[0]) return res.status(404).json({ error: "Not found" });
   if (comment.rows[0].user_id !== req.session.userId) {
     return res.status(403).json({ error: "You can only delete your own comments" });
   }
   await pool.query("DELETE FROM card_comments WHERE id = $1", [req.params.id]);
   deleteSpacesImages(comment.rows[0].image_url);
+  broadcast(req, comment.rows[0].board_id, "comment:deleted", {
+    cardId: comment.rows[0].card_id,
+    commentId: Number(req.params.id),
+  });
   res.json({ success: true });
 });
 
@@ -2510,6 +2713,20 @@ async function migrate() {
     )
   `);
 
+  // Board invitations — joining a board requires the invitee's consent
+  // (mirrors team_invites); accepting is what inserts into board_members
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS board_invites (
+      id SERIAL PRIMARY KEY,
+      board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      inviter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      invitee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (board_id, invitee_id)
+    )
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS notifications (
       id SERIAL PRIMARY KEY,
@@ -2597,4 +2814,4 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-migrate().then(() => app.listen(PORT, () => console.log(`Server running on port ${PORT}`)));
+migrate().then(() => server.listen(PORT, () => console.log(`Server running on port ${PORT}`)));
