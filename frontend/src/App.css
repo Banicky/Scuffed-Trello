@@ -5473,6 +5473,11 @@ select.card-input {
   display: none;
 }
 
+/* Drawer heading: only exists in the phone drawer (see ≤640px block below) */
+.dash-drawer-title {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .dash-hamburger-btn {
     display: flex;
@@ -5506,7 +5511,8 @@ select.card-input {
     border-radius: 0;
     border: none;
     border-right: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-    padding-top: 84px;
+    /* the drawer heading fills the strip the pinned topbar used to occupy */
+    padding-top: 18px;
     transform: translateX(-100%);
     transition: transform 0.28s ease;
     z-index: 301;
@@ -5514,6 +5520,80 @@ select.card-input {
 
   .dash-sidebar--open {
     transform: translateX(0);
+  }
+
+  /* One-line "Dashboard › My Universe" at the top of the drawer, echoing the
+     topbar's two voices: fantasy small-caps crumb, display-font page name. */
+  .dash-drawer-title {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    min-width: 0;
+    margin: 0 0 14px;
+    padding: 4px 12px 0;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .dash-drawer-title-crumb {
+    flex-shrink: 0;
+    font-family: var(--fantasy);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text);
+    opacity: 0.55;
+  }
+  .dash-drawer-title-name {
+    font-family: var(--display);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-h);
+    letter-spacing: -0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Drawer open: fade out the topbar action icons so they don't float over it */
+  .dashboard-shell .topbar-right {
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+  .dashboard-shell.mobile-nav-open .topbar-right {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* Drawer open: the backdrop + drawer (z300/301) are trapped inside
+     dash-layout's stacking context (z1), which sits BELOW the topbar (z2) —
+     so the header text painted over the drawer and slid across it when the
+     page scrolled. Lift the layout above the topbar while the drawer is out,
+     and freeze the page scroll behind it. */
+  .dashboard-shell.mobile-nav-open {
+    overflow-y: hidden;
+  }
+  .dashboard-shell.mobile-nav-open > .dash-layout {
+    z-index: 3;
+  }
+
+  /* On phones the header scrolls away with the page instead of staying pinned
+     (pinned + transparent, it collided with the content sliding beneath it).
+     Desktop keeps the app-shell layout: header fixed, .dashboard-main scrolls.
+     Here the shell itself becomes the one scroller — topbar and main flow
+     inside it — and the star canvas pins to the viewport so the sky still
+     covers the whole scroll, not just the first screenful. */
+  .dashboard-shell {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .dashboard-shell .starfield-canvas {
+    position: fixed;
+  }
+  .dash-layout {
+    overflow: visible;
+  }
+  .dash-layout .dashboard-main {
+    overflow-y: visible;
   }
 }
 

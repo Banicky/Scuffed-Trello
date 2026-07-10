@@ -1321,7 +1321,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const isPersonal = activeContext === 'personal'
 
   return (
-    <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}${aiOpen ? ' ai-open' : ''}`} ref={rootRef}>
+    <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}${aiOpen ? ' ai-open' : ''}${mobileNavOpen ? ' mobile-nav-open' : ''}`} ref={rootRef}>
       <Starfield mode={colorMode} randomConstellations />
       <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
 
@@ -1454,6 +1454,11 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
           aria-label="Navigation"
           onClick={() => setMobileNavOpen(false)}
         >
+          {/* Drawer-only heading (phones): fills the strip where the topbar sat before the drawer covered it */}
+          <p className="dash-drawer-title">
+            <span className="dash-drawer-title-crumb">Dashboard ›</span>
+            <span className="dash-drawer-title-name">{isPersonal ? 'My Universe' : (teamDetails?.name || 'Team')}</span>
+          </p>
           <div className="sidebar-profile" onClick={() => onOpenSettings('avatar')} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter') onOpenSettings('avatar') }}>
             <div className="sidebar-profile-top">
               <span className="sidebar-profile-av">
