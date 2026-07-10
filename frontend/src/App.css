@@ -8376,41 +8376,89 @@ select.card-input {
    (≤640), auth split (≤900) and card modal (≤720) already reflow elsewhere.
    ════════════════════════════════════════════════════════════════════ */
 
-/* Tablet: let the board topbar wrap and drop search to its own full row. */
+/* Narrow screens: recompose the topbar into three deliberate rows —
+     1 · identity   back · zodiac sigil · board name + meta · night/day · avatar
+     2 · actions    Design / Members / History / Assistant / Export / Import chips
+     3 · search     full-width input with its Aa · "ab" · nav toggles
+   The desktop group boxes are dissolved with display:contents so every control
+   becomes a direct flex item of the wrapping topbar, and `order` builds the rows. */
 @media (max-width: 768px) {
   .board-shell .topbar {
     height: auto;
-    min-height: 56px;
     flex-wrap: wrap;
-    padding: 8px 12px;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 10px 12px;
     gap: 8px;
+    row-gap: 10px;
   }
-  .board-shell .topbar-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
-  .board-shell .topbar-right { gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-  /* search becomes its own full-width row beneath the control groups */
-  .board-shell .topbar-search { order: 3; flex-basis: 100%; min-width: 0; }
-  .board-shell .search-input { flex: 1 1 auto; width: auto; }
-  /* keep a long board name from pushing the controls off-screen */
-  .board-shell .board-name {
-    max-width: 40vw;
+  .board-shell .topbar-left,
+  .board-shell .topbar-right,
+  .board-shell .board-io {
+    display: contents;
+  }
+
+  /* Row 1 — the classless div holding name+meta drinks the slack, pushing the
+     mode toggle and avatar to the right edge; long names ellipsize inside it. */
+  .board-shell .topbar-left > div:not([class]) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .board-shell .board-name,
+  .board-shell .board-meta {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .board-shell .board-name-input { width: 100%; }
+
+  /* Hard line break after the identity row: flex only wraps on overflow, so
+     without this the chips pile onto row 1 and crush the flexible title to
+     zero width. The negative margin folds the two row-gaps it creates back
+     into one. */
+  .board-shell .topbar::before {
+    content: '';
+    order: 1;
+    flex-basis: 100%;
+    height: 0;
+    margin: -5px 0;
+  }
+
+  /* Row 2 — six uniform chips; they wrap into balanced lines when cramped */
+  .board-shell .members-toggle { order: 2; }
+  .board-shell .board-io-btn { order: 3; }
+  .board-shell .members-toggle,
+  .board-shell .board-io-btn {
+    padding: 6px 11px;
+    font-size: 12.5px;
+  }
+  /* import/export status text takes its own quiet line, not a fake chip */
+  .board-shell .board-io-msg {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  /* Row 3 — search spans the bar; the input flexes, toggles keep their size */
+  .board-shell .topbar-search {
+    order: 4;
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .board-shell .search-input {
+    flex: 1 1 auto;
+    width: auto;
+  }
 }
 
-/* Phone: tighten everything so the wrapped rows fit a narrow screen. */
+/* Phone: tighten the rows for narrow screens. */
 @media (max-width: 480px) {
-  .board-shell .topbar { padding: 8px 10px; gap: 6px; }
-  .board-shell .topbar-left,
-  .board-shell .topbar-right { gap: 6px; }
+  .board-shell .topbar { padding: 8px 10px; gap: 6px; row-gap: 8px; }
   .board-shell .board-io-btn,
-  .board-shell .members-toggle,
-  .board-shell .btn-ghost {
-    padding: 5px 8px;
+  .board-shell .members-toggle {
+    padding: 5px 9px;
     font-size: 12px;
   }
-  .board-shell .board-name { max-width: 50vw; }
   .board-shell .board-meta { font-size: 11px; }
   /* a column nearly fills the phone; the next peeks to signal horizontal scroll */
   .board-shell .kanban-column { width: min(272px, 82vw); }
