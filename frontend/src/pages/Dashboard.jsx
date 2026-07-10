@@ -1321,7 +1321,7 @@ export default function Dashboard({ user, onOpenBoard, onLogout, onOpenSettings 
   const isPersonal = activeContext === 'personal'
 
   return (
-    <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}${aiOpen ? ' ai-open' : ''}${mobileNavOpen ? ' mobile-nav-open' : ''}`} ref={rootRef}>
+    <div className={`dashboard-shell${colorMode === 'day' ? ' dashboard-shell--day' : ''}${aiOpen ? ' ai-open' : ''}${mobileNavOpen ? ' mobile-nav-open' : ''}${searchOpen ? ' search-open' : ''}`} ref={rootRef}>
       <Starfield mode={colorMode} randomConstellations />
       <span className="mode-fx" ref={modeFxRef} aria-hidden="true" />
 

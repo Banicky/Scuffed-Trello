@@ -5576,6 +5576,44 @@ select.card-input {
     z-index: 3;
   }
 
+  /* Search open (phones): the bar leaves the flow and sweeps across the header
+     row as an overlay instead of shoving the title and bell aside. Anchored to
+     the right so the width transition grows it leftward from the icon; the
+     moon + bell fade out beneath it. Closing snaps (no width transition when
+     not .open) so the collapsing bar never re-enters the flow mid-animation. */
+  .dashboard-shell .dash-searchbar-wrap {
+    transition: box-shadow 0.2s ease, background 0.2s ease;
+  }
+  .dashboard-shell .dash-searchbar-wrap.open {
+    position: absolute;
+    top: 50%;
+    right: 28px;
+    transform: translateY(-50%);
+    width: calc(100% - 56px);
+    z-index: 3;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: width 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.2s ease,
+                background 0.2s ease;
+  }
+  .dashboard-shell .topbar-right .dash-mode-toggle {
+    transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.18s ease;
+  }
+  .dashboard-shell .topbar-right .topbar-notif-wrap,
+  .dashboard-shell .topbar-left {
+    transition: opacity 0.18s ease;
+  }
+  /* everything else in the header fades beneath the sweeping bar — including
+     the title block, which is taller than the pill and poked out below it */
+  .dashboard-shell.search-open .dash-mode-toggle,
+  .dashboard-shell.search-open .topbar-notif-wrap,
+  .dashboard-shell.search-open .topbar-left {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   /* On phones the header scrolls away with the page instead of staying pinned
      (pinned + transparent, it collided with the content sliding beneath it).
      Desktop keeps the app-shell layout: header fixed, .dashboard-main scrolls.
