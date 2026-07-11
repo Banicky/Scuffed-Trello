@@ -292,6 +292,81 @@
   text-overflow: ellipsis;
 }
 
+/* ── Undo toast: a deleted card waits out a grace window here before the
+   destructive server delete lands (see deleteCard in BoardView) ── */
+.undo-toast {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(480px, calc(100vw - 24px));
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: undo-toast-rise 0.22s ease;
+}
+
+@keyframes undo-toast-rise {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.undo-toast-text {
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo-toast-title {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.undo-toast-btn {
+  flex-shrink: 0;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  border-radius: 100px;
+  padding: 5px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.undo-toast-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* thin countdown along the bottom edge; duration matches UNDO_WINDOW_MS */
+.undo-toast-drain {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.65;
+  animation: undo-toast-drain 6s linear forwards;
+}
+
+@keyframes undo-toast-drain {
+  from { width: 100%; }
+  to   { width: 0; }
+}
+
 /* ── Notification bell ── */
 .notif {
   position: relative;
@@ -5473,6 +5548,11 @@ select.card-input {
   display: none;
 }
 
+/* Drawer heading: only exists in the phone drawer (see ≤640px block below) */
+.dash-drawer-title {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .dash-hamburger-btn {
     display: flex;
@@ -5506,7 +5586,8 @@ select.card-input {
     border-radius: 0;
     border: none;
     border-right: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-    padding-top: 84px;
+    /* the drawer heading fills the strip the pinned topbar used to occupy */
+    padding-top: 18px;
     transform: translateX(-100%);
     transition: transform 0.28s ease;
     z-index: 301;
@@ -5514,6 +5595,118 @@ select.card-input {
 
   .dash-sidebar--open {
     transform: translateX(0);
+  }
+
+  /* One-line "Dashboard › My Universe" at the top of the drawer, echoing the
+     topbar's two voices: fantasy small-caps crumb, display-font page name. */
+  .dash-drawer-title {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    min-width: 0;
+    margin: 0 0 14px;
+    padding: 4px 12px 0;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .dash-drawer-title-crumb {
+    flex-shrink: 0;
+    font-family: var(--fantasy);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text);
+    opacity: 0.55;
+  }
+  .dash-drawer-title-name {
+    font-family: var(--display);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-h);
+    letter-spacing: -0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Drawer open: fade out the topbar action icons so they don't float over it */
+  .dashboard-shell .topbar-right {
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+  .dashboard-shell.mobile-nav-open .topbar-right {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* Drawer open: the backdrop + drawer (z300/301) are trapped inside
+     dash-layout's stacking context (z1), which sits BELOW the topbar (z2) —
+     so the header text painted over the drawer and slid across it when the
+     page scrolled. Lift the layout above the topbar while the drawer is out,
+     and freeze the page scroll behind it. */
+  .dashboard-shell.mobile-nav-open {
+    overflow-y: hidden;
+  }
+  .dashboard-shell.mobile-nav-open > .dash-layout {
+    z-index: 3;
+  }
+
+  /* Search open (phones): the bar leaves the flow and sweeps across the header
+     row as an overlay instead of shoving the title and bell aside. Anchored to
+     the right so the width transition grows it leftward from the icon; the
+     moon + bell fade out beneath it. Closing snaps (no width transition when
+     not .open) so the collapsing bar never re-enters the flow mid-animation. */
+  .dashboard-shell .dash-searchbar-wrap {
+    transition: box-shadow 0.2s ease, background 0.2s ease;
+  }
+  .dashboard-shell .dash-searchbar-wrap.open {
+    position: absolute;
+    top: 50%;
+    right: 28px;
+    transform: translateY(-50%);
+    width: calc(100% - 56px);
+    z-index: 3;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: width 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.2s ease,
+                background 0.2s ease;
+  }
+  .dashboard-shell .topbar-right .dash-mode-toggle {
+    transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.18s ease;
+  }
+  .dashboard-shell .topbar-right .topbar-notif-wrap,
+  .dashboard-shell .topbar-left {
+    transition: opacity 0.18s ease;
+  }
+  /* everything else in the header fades beneath the sweeping bar — including
+     the title block, which is taller than the pill and poked out below it */
+  .dashboard-shell.search-open .dash-mode-toggle,
+  .dashboard-shell.search-open .topbar-notif-wrap,
+  .dashboard-shell.search-open .topbar-left {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* On phones the header scrolls away with the page instead of staying pinned
+     (pinned + transparent, it collided with the content sliding beneath it).
+     Desktop keeps the app-shell layout: header fixed, .dashboard-main scrolls.
+     Here the shell itself becomes the one scroller — topbar and main flow
+     inside it — and the star canvas pins to the viewport so the sky still
+     covers the whole scroll, not just the first screenful. */
+  .dashboard-shell {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .dashboard-shell .starfield-canvas {
+    position: fixed;
+  }
+  .dash-layout {
+    overflow: visible;
+  }
+  .dash-layout .dashboard-main {
+    overflow-y: visible;
   }
 }
 
@@ -8296,41 +8489,89 @@ select.card-input {
    (≤640), auth split (≤900) and card modal (≤720) already reflow elsewhere.
    ════════════════════════════════════════════════════════════════════ */
 
-/* Tablet: let the board topbar wrap and drop search to its own full row. */
+/* Narrow screens: recompose the topbar into three deliberate rows —
+     1 · identity   back · zodiac sigil · board name + meta · night/day · avatar
+     2 · actions    Design / Members / History / Assistant / Export / Import chips
+     3 · search     full-width input with its Aa · "ab" · nav toggles
+   The desktop group boxes are dissolved with display:contents so every control
+   becomes a direct flex item of the wrapping topbar, and `order` builds the rows. */
 @media (max-width: 768px) {
   .board-shell .topbar {
     height: auto;
-    min-height: 56px;
     flex-wrap: wrap;
-    padding: 8px 12px;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 10px 12px;
     gap: 8px;
+    row-gap: 10px;
   }
-  .board-shell .topbar-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
-  .board-shell .topbar-right { gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-  /* search becomes its own full-width row beneath the control groups */
-  .board-shell .topbar-search { order: 3; flex-basis: 100%; min-width: 0; }
-  .board-shell .search-input { flex: 1 1 auto; width: auto; }
-  /* keep a long board name from pushing the controls off-screen */
-  .board-shell .board-name {
-    max-width: 40vw;
+  .board-shell .topbar-left,
+  .board-shell .topbar-right,
+  .board-shell .board-io {
+    display: contents;
+  }
+
+  /* Row 1 — the classless div holding name+meta drinks the slack, pushing the
+     mode toggle and avatar to the right edge; long names ellipsize inside it. */
+  .board-shell .topbar-left > div:not([class]) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .board-shell .board-name,
+  .board-shell .board-meta {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .board-shell .board-name-input { width: 100%; }
+
+  /* Hard line break after the identity row: flex only wraps on overflow, so
+     without this the chips pile onto row 1 and crush the flexible title to
+     zero width. The negative margin folds the two row-gaps it creates back
+     into one. */
+  .board-shell .topbar::before {
+    content: '';
+    order: 1;
+    flex-basis: 100%;
+    height: 0;
+    margin: -5px 0;
+  }
+
+  /* Row 2 — six uniform chips; they wrap into balanced lines when cramped */
+  .board-shell .members-toggle { order: 2; }
+  .board-shell .board-io-btn { order: 3; }
+  .board-shell .members-toggle,
+  .board-shell .board-io-btn {
+    padding: 6px 11px;
+    font-size: 12.5px;
+  }
+  /* import/export status text takes its own quiet line, not a fake chip */
+  .board-shell .board-io-msg {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  /* Row 3 — search spans the bar; the input flexes, toggles keep their size */
+  .board-shell .topbar-search {
+    order: 4;
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .board-shell .search-input {
+    flex: 1 1 auto;
+    width: auto;
+  }
 }
 
-/* Phone: tighten everything so the wrapped rows fit a narrow screen. */
+/* Phone: tighten the rows for narrow screens. */
 @media (max-width: 480px) {
-  .board-shell .topbar { padding: 8px 10px; gap: 6px; }
-  .board-shell .topbar-left,
-  .board-shell .topbar-right { gap: 6px; }
+  .board-shell .topbar { padding: 8px 10px; gap: 6px; row-gap: 8px; }
   .board-shell .board-io-btn,
-  .board-shell .members-toggle,
-  .board-shell .btn-ghost {
-    padding: 5px 8px;
+  .board-shell .members-toggle {
+    padding: 5px 9px;
     font-size: 12px;
   }
-  .board-shell .board-name { max-width: 50vw; }
   .board-shell .board-meta { font-size: 11px; }
   /* a column nearly fills the phone; the next peeks to signal horizontal scroll */
   .board-shell .kanban-column { width: min(272px, 82vw); }

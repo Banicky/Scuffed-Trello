@@ -228,6 +228,11 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
   const [ioBusy, setIoBusy] = useState(false)
   const [ioMessage, setIoMessage] = useState('')
   const [aiOpen, setAiOpen] = useState(false)
+  // Deleted cards wait out an undo window before the server delete lands;
+  // each entry is { card, columnId, index, timer }. The ref mirrors the state
+  // so timers and the unmount flush see the live list, not a stale closure.
+  const [pendingDeletes, setPendingDeletes] = useState([])
+  const pendingDeletesRef = useRef([])
   const cardRefs = useRef(new Map())
   const importInputRef = useRef(null)
 
@@ -583,12 +588,59 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
     setColumns(cols => cols.filter(col => col.id !== columnId))
   }
 
-  async function deleteCard(columnId, cardId) {
-    await apiFetch(`/api/cards/${cardId}`, { method: 'DELETE' })
-    setColumns(cols => cols.map(col =>
-      col.id === columnId ? { ...col, cards: col.cards.filter(c => c.id !== cardId) } : col
+  // Deleting a card only removes it from the UI at first; the real DELETE is
+  // deferred for UNDO_WINDOW_MS so an accidental tap can be undone with the
+  // card's comments, assignees and images fully intact (the server delete is
+  // destructive and cascades all of those).
+  const UNDO_WINDOW_MS = 6000 // keep in sync with the .undo-toast-drain animation
+
+  function deleteCard(columnId, cardId) {
+    const col = columns.find(c => c.id === columnId)
+    const index = col ? col.cards.findIndex(c => c.id === cardId) : -1
+    if (index === -1) return
+    const entry = { card: col.cards[index], columnId, index }
+    setColumns(cols => cols.map(c =>
+      c.id === columnId ? { ...c, cards: c.cards.filter(x => x.id !== cardId) } : c
     ))
+    entry.timer = setTimeout(() => commitDelete(entry), UNDO_WINDOW_MS)
+    pendingDeletesRef.current = [...pendingDeletesRef.current, entry]
+    setPendingDeletes(pendingDeletesRef.current)
   }
+
+  async function commitDelete(entry) {
+    pendingDeletesRef.current = pendingDeletesRef.current.filter(e => e !== entry)
+    setPendingDeletes(pendingDeletesRef.current)
+    await apiFetch(`/api/cards/${entry.card.id}`, { method: 'DELETE' })
+  }
+
+  function undoDeletes() {
+    const entries = pendingDeletesRef.current
+    pendingDeletesRef.current = []
+    setPendingDeletes([])
+    entries.forEach(e => clearTimeout(e.timer))
+    // Restore newest-first so the indexes of earlier deletions stay accurate.
+    setColumns(cols => {
+      let next = cols
+      for (const { card, columnId, index } of [...entries].reverse()) {
+        next = next.map(col => {
+          if (col.id !== columnId || col.cards.some(c => c.id === card.id)) return col
+          const cards = [...col.cards]
+          cards.splice(Math.min(index, cards.length), 0, card)
+          return { ...col, cards }
+        })
+      }
+      return next
+    })
+  }
+
+  // Leaving the board inside the undo window still has to land the deletions.
+  useEffect(() => () => {
+    pendingDeletesRef.current.forEach(e => {
+      clearTimeout(e.timer)
+      apiFetch(`/api/cards/${e.card.id}`, { method: 'DELETE' })
+    })
+    pendingDeletesRef.current = []
+  }, [])
 
   // Dragging one column onto another just swaps the two — they trade places and
   // every other column stays put. Only the two swapped columns change position
@@ -1009,6 +1061,23 @@ export default function BoardView({ boardId, user, onBack, onReady, onOpenSettin
         )}
       </main>
       </div>
+
+      {pendingDeletes.length > 0 && (
+        <div className="undo-toast" role="status">
+          <span className="undo-toast-text">
+            {pendingDeletes.length === 1
+              ? <>Card <strong className="undo-toast-title">“{pendingDeletes[0].card.title}”</strong> deleted</>
+              : `${pendingDeletes.length} cards deleted`}
+          </span>
+          <button className="undo-toast-btn" onClick={undoDeletes}>Undo</button>
+          {/* keyed to the newest deletion so the drain bar restarts with each one */}
+          <span
+            key={pendingDeletes[pendingDeletes.length - 1].card.id}
+            className="undo-toast-drain"
+            aria-hidden="true"
+          />
+        </div>
+      )}
 
       <AiAssistant
         boardId={boardId}
