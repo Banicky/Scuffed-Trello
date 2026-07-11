@@ -292,6 +292,81 @@
   text-overflow: ellipsis;
 }
 
+/* ── Undo toast: a deleted card waits out a grace window here before the
+   destructive server delete lands (see deleteCard in BoardView) ── */
+.undo-toast {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(480px, calc(100vw - 24px));
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: undo-toast-rise 0.22s ease;
+}
+
+@keyframes undo-toast-rise {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.undo-toast-text {
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo-toast-title {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.undo-toast-btn {
+  flex-shrink: 0;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  border-radius: 100px;
+  padding: 5px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.undo-toast-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* thin countdown along the bottom edge; duration matches UNDO_WINDOW_MS */
+.undo-toast-drain {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.65;
+  animation: undo-toast-drain 6s linear forwards;
+}
+
+@keyframes undo-toast-drain {
+  from { width: 100%; }
+  to   { width: 0; }
+}
+
 /* ── Notification bell ── */
 .notif {
   position: relative;
